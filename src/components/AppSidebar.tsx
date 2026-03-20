@@ -40,6 +40,7 @@ export function AppSidebar() {
   if (role === "owner") {
     navItems.push(
       { title: "Agents", url: "/owner/agents", icon: UserCog },
+      { title: "Commissions", url: "/owner/commissions", icon: PoundSterling },
       { title: "Settings", url: "/owner/settings", icon: Settings }
     );
   }
