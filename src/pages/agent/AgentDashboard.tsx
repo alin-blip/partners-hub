@@ -43,6 +43,14 @@ export default function AgentDashboard() {
     enabled: !!user,
   });
 
+  const { data: tiers = [] } = useQuery({
+    queryKey: ["commission-tiers"],
+    queryFn: async () => {
+      const { data } = await supabase.from("commission_tiers").select("*").order("min_students");
+      return data || [];
+    },
+  });
+
   const activeEnrollments = enrollments.filter((e: any) => e.status === "active").length;
   const monthlyTarget = 10;
   const thisMonthStudents = students.filter((s: any) => {
