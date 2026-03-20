@@ -6,6 +6,7 @@ import {
   Settings,
   LogOut,
   GraduationCap,
+  PoundSterling,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -40,6 +41,7 @@ export function AppSidebar() {
   if (role === "owner") {
     navItems.push(
       { title: "Agents", url: "/owner/agents", icon: UserCog },
+      { title: "Commissions", url: "/owner/commissions", icon: PoundSterling },
       { title: "Settings", url: "/owner/settings", icon: Settings }
     );
   }

@@ -12,6 +12,7 @@ import EnrollStudent from "./pages/agent/EnrollStudent";
 import AdminAgentsPage from "./pages/admin/AdminAgentsPage";
 import AgentsPage from "./pages/owner/AgentsPage";
 import SettingsPage from "./pages/owner/SettingsPage";
+import CommissionsPage from "./pages/owner/CommissionsPage";
 import StudentsPage from "./pages/shared/StudentsPage";
 import EnrollmentsPage from "./pages/shared/EnrollmentsPage";
 import NotFound from "./pages/NotFound";
@@ -35,6 +36,7 @@ const App = () => (
             <Route path="/owner/enrollments" element={<EnrollmentsPage />} />
             <Route path="/owner/agents" element={<AgentsPage />} />
             <Route path="/owner/settings" element={<SettingsPage />} />
+            <Route path="/owner/commissions" element={<CommissionsPage />} />
             
             {/* Admin routes */}
             <Route path="/admin/dashboard" element={<AdminDashboard />} />

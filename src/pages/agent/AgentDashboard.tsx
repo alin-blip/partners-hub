@@ -4,7 +4,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Users, ClipboardList, Trophy } from "lucide-react";
+import { Users, ClipboardList, Trophy, PoundSterling } from "lucide-react";
+import { calcCommission } from "@/lib/commissions";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useNavigate } from "react-router-dom";
@@ -42,7 +43,16 @@ export default function AgentDashboard() {
     enabled: !!user,
   });
 
+  const { data: tiers = [] } = useQuery({
+    queryKey: ["commission-tiers"],
+    queryFn: async () => {
+      const { data } = await supabase.from("commission_tiers").select("*").order("min_students");
+      return data || [];
+    },
+  });
+
   const activeEnrollments = enrollments.filter((e: any) => e.status === "active").length;
+  const { tier: currentTier, amount: commissionAmount } = calcCommission(activeEnrollments, tiers);
   const monthlyTarget = 10;
   const thisMonthStudents = students.filter((s: any) => {
     const d = new Date(s.created_at);
@@ -66,7 +76,7 @@ export default function AgentDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <MetricCard title="My Students" value={students.length} icon={Users} />
           <MetricCard title="Active Enrollments" value={activeEnrollments} icon={ClipboardList} />
-          <MetricCard title="Commission Tier" value="—" icon={Trophy} description="Based on active students" />
+          <MetricCard title="Commission Tier" value={currentTier?.tier_name || "—"} icon={Trophy} description={`£${commissionAmount.toLocaleString()} earned`} />
         </div>
 
         <div className="rounded-lg border bg-card p-5">
