@@ -50,26 +50,18 @@ export default function AgentsPage() {
 
   const createUser = useMutation({
     mutationFn: async () => {
-      // Sign up user via auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: newEmail,
-        password: newPassword,
-        options: { data: { full_name: newName } },
+      const { data, error } = await supabase.functions.invoke("create-owner", {
+        body: {
+          email: newEmail,
+          password: newPassword,
+          full_name: newName,
+          role: newRole,
+          admin_id: newRole === "agent" && newAdminId ? newAdminId : undefined,
+        },
       });
-      if (authError) throw authError;
-      if (!authData.user) throw new Error("User creation failed");
-
-      // Assign role
-      const { error: roleError } = await supabase.from("user_roles").insert({
-        user_id: authData.user.id,
-        role: newRole as any,
-      });
-      if (roleError) throw roleError;
-
-      // Set admin_id if agent
-      if (newRole === "agent" && newAdminId) {
-        await supabase.from("profiles").update({ admin_id: newAdminId }).eq("id", authData.user.id);
-      }
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["all-profiles"] });

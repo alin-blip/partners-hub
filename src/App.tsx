@@ -9,6 +9,7 @@ import OwnerDashboard from "./pages/owner/OwnerDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AgentDashboard from "./pages/agent/AgentDashboard";
 import EnrollStudent from "./pages/agent/EnrollStudent";
+import AdminAgentsPage from "./pages/admin/AdminAgentsPage";
 import AgentsPage from "./pages/owner/AgentsPage";
 import SettingsPage from "./pages/owner/SettingsPage";
 import StudentsPage from "./pages/shared/StudentsPage";
@@ -39,6 +40,7 @@ const App = () => (
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/students" element={<StudentsPage />} />
             <Route path="/admin/enrollments" element={<EnrollmentsPage />} />
+            <Route path="/admin/agents" element={<AdminAgentsPage />} />
             
             {/* Agent routes */}
             <Route path="/agent/dashboard" element={<AgentDashboard />} />

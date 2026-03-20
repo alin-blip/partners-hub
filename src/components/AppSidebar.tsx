@@ -44,6 +44,12 @@ export function AppSidebar() {
     );
   }
 
+  if (role === "admin") {
+    navItems.push(
+      { title: "My Agents", url: "/admin/agents", icon: UserCog }
+    );
+  }
+
   return (
     <Sidebar collapsible="icon" className="border-r-0">
       <SidebarContent className="bg-sidebar text-sidebar-foreground">
