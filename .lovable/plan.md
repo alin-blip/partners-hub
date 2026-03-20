@@ -1,36 +1,39 @@
 
 
-# Admin Agent Management
+# Commission System Implementation
 
-Currently, only the Owner can create and manage users (admins + agents) via `/owner/agents`. Admins have no way to add or manage their own agents.
+## What exists now
+- `commission_tiers` table with `tier_name`, `min_students`, `max_students`, `commission_per_student`
+- Agent dashboard shows "Commission Tier: —" (hardcoded placeholder)
+- Owner dashboard shows "Est. Revenue" with hardcoded `agents * 500`
+- No commission tracking page exists
 
-## Changes
+## Plan
 
-### 1. New page: `src/pages/admin/AdminAgentsPage.tsx`
-- Similar to the Owner's AgentsPage but scoped to the admin's team
-- Shows only agents assigned to the current admin (`admin_id = auth.uid()`)
-- "Add Agent" dialog that creates an agent user via the `create-owner` edge function (repurposed to be a generic user creation function) or via `supabase.auth.signUp` + role insert
-- Automatically sets `admin_id` to the current admin's user ID
-- Can only create agents (not admins or owners)
-- Toggle active/inactive for their agents
+### 1. New page: `src/pages/owner/CommissionsPage.tsx`
+Owner-only page showing:
+- **Summary cards**: Total commission owed this month, total active students, average per agent
+- **Agent commission table**: Each agent with their student count (active enrollments), matched tier, commission amount, admin they belong to
+- **Monthly filter**: Select month/year to view historical data
+- Commission is calculated client-side by counting each agent's active enrollments and matching against `commission_tiers`
 
-### 2. Update Edge Function: `supabase/functions/create-owner/index.ts`
-- Rename/generalize to handle any role creation (agent, admin, owner)
-- Accept `role` and `admin_id` parameters
-- Validate that only authorized callers can create users (check caller's role)
+### 2. Add "Commission Tiers" tab to Settings
+- Add a new tab in `src/pages/owner/SettingsPage.tsx` for managing `commission_tiers` (CRUD)
+- Fields: tier name, min students, max students, commission per student (£)
 
-### 3. Update Sidebar: `src/components/AppSidebar.tsx`
-- Add "My Agents" nav item for admin role pointing to `/admin/agents`
+### 3. Update Agent Dashboard commission display
+- In `src/pages/agent/AgentDashboard.tsx`, fetch `commission_tiers` and calculate the agent's current tier based on their active enrollment count
+- Replace the "—" placeholder with actual tier name and earned commission amount
 
-### 4. Update Routes: `src/App.tsx`
-- Add route `/admin/agents` → `AdminAgentsPage`
+### 4. Update Owner Dashboard revenue metric
+- In `src/pages/owner/OwnerDashboard.tsx`, calculate real revenue by summing commission across all agents based on their student counts and tiers
 
-### 5. RLS consideration
-- Admins already have SELECT on profiles where `admin_id = auth.uid()`
-- The edge function uses the service role key, so it bypasses RLS for user creation
-- Profile update for `admin_id` will be done by the edge function with service role
+### 5. Add route and sidebar link
+- New route `/owner/commissions` → `CommissionsPage`
+- Add "Commissions" nav item with `PoundSterling` icon in `AppSidebar.tsx` for owner role
 
-### Technical details
-- The edge function approach is necessary because `supabase.auth.signUp` from the client would log out the current admin (it switches the session to the new user)
-- The edge function will accept `{ email, password, full_name, role, admin_id }` and use `auth.admin.createUser` to avoid session issues
+### Technical approach
+- No database changes needed — `commission_tiers` table already exists
+- Commission calculation: count agent's students with `status = 'active'` in enrollments, find matching tier where `count >= min_students AND (max_students IS NULL OR count <= max_students)`, multiply by `commission_per_student`
+- All calculations done client-side with existing RLS policies
 
