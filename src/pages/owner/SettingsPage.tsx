@@ -184,6 +184,7 @@ export default function SettingsPage() {
             <TabsTrigger value="campuses">Campuses</TabsTrigger>
             <TabsTrigger value="courses">Courses</TabsTrigger>
             <TabsTrigger value="intakes">Intakes</TabsTrigger>
+            <TabsTrigger value="commissions">Commission Tiers</TabsTrigger>
           </TabsList>
 
           <TabsContent value="universities" className="mt-4">
