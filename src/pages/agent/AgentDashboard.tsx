@@ -52,6 +52,7 @@ export default function AgentDashboard() {
   });
 
   const activeEnrollments = enrollments.filter((e: any) => e.status === "active").length;
+  const { tier: currentTier, amount: commissionAmount } = calcCommission(activeEnrollments, tiers);
   const monthlyTarget = 10;
   const thisMonthStudents = students.filter((s: any) => {
     const d = new Date(s.created_at);
