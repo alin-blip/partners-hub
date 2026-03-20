@@ -342,6 +342,10 @@ export default function SettingsPage() {
               }
             />
           </TabsContent>
+
+          <TabsContent value="commissions" className="mt-4">
+            <CommissionTiersSection deleteItem={deleteItem} />
+          </TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>
