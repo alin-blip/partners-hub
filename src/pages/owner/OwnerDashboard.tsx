@@ -56,9 +56,31 @@ export default function OwnerDashboard() {
     },
   });
 
+  const { data: tiers = [] } = useQuery({
+    queryKey: ["commission-tiers"],
+    queryFn: async () => {
+      const { data } = await supabase.from("commission_tiers").select("*").order("min_students");
+      return data || [];
+    },
+  });
+
   const roleMap = new Map(roles.map((r: any) => [r.user_id, r.role]));
   const activeAgents = agents.filter((a: any) => roleMap.get(a.id) === "agent" && a.is_active);
   const pipelineCount = enrollments.filter((e: any) => !["active", "rejected"].includes(e.status)).length;
+
+  // Calculate real revenue from commission tiers
+  const agentStudentCounts = new Map<string, number>();
+  for (const e of enrollments) {
+    const agentId = (e as any).students?.agent_id;
+    if (agentId && e.status === "active") {
+      agentStudentCounts.set(agentId, (agentStudentCounts.get(agentId) || 0) + 1);
+    }
+  }
+  const totalRevenue = activeAgents.reduce((sum: number, agent: any) => {
+    const count = agentStudentCounts.get(agent.id) || 0;
+    const { amount } = calcCommission(count, tiers);
+    return sum + amount;
+  }, 0);
 
   return (
     <DashboardLayout allowedRoles={["owner"]}>
