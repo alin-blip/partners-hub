@@ -76,7 +76,7 @@ export default function AgentDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <MetricCard title="My Students" value={students.length} icon={Users} />
           <MetricCard title="Active Enrollments" value={activeEnrollments} icon={ClipboardList} />
-          <MetricCard title="Commission Tier" value="—" icon={Trophy} description="Based on active students" />
+          <MetricCard title="Commission Tier" value={currentTier?.tier_name || "—"} icon={Trophy} description={`£${commissionAmount.toLocaleString()} earned`} />
         </div>
 
         <div className="rounded-lg border bg-card p-5">

@@ -93,9 +93,9 @@ export default function OwnerDashboard() {
           <MetricCard title="In Pipeline" value={pipelineCount} icon={ClipboardList} />
           <MetricCard
             title="Est. Revenue"
-            value={`£${(activeAgents.length * 500).toLocaleString()}`}
+            value={`£${totalRevenue.toLocaleString()}`}
             icon={PoundSterling}
-            description="Based on current tier"
+            description="Based on commission tiers"
           />
         </div>
 

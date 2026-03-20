@@ -94,6 +94,122 @@ function CrudSection({
   );
 }
 
+function CommissionTiersSection({ deleteItem }: { deleteItem: any }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+
+  const { data: tiers = [] } = useQuery({
+    queryKey: ["commission-tiers"],
+    queryFn: async () => {
+      const { data } = await supabase.from("commission_tiers").select("*").order("min_students");
+      return data || [];
+    },
+  });
+
+  const addTier = useMutation({
+    mutationFn: async (d: any) => {
+      const { error } = await supabase.from("commission_tiers").insert({
+        tier_name: d.tier_name,
+        min_students: Number(d.min_students),
+        max_students: d.max_students ? Number(d.max_students) : null,
+        commission_per_student: Number(d.commission_per_student),
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["commission-tiers"] });
+      toast({ title: "Tier added" });
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-3">
+        <CardTitle className="text-base">Commission Tiers</CardTitle>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90">
+              <Plus className="w-3 h-3 mr-1" /> Add
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Commission Tier</DialogTitle>
+            </DialogHeader>
+            <form
+              className="space-y-4 pt-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                addTier.mutate(Object.fromEntries(formData));
+                setOpen(false);
+              }}
+            >
+              <div className="space-y-2">
+                <Label>Tier Name</Label>
+                <Input name="tier_name" required placeholder="e.g. Bronze" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Min Students</Label>
+                  <Input name="min_students" type="number" required min={0} defaultValue={0} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Max Students</Label>
+                  <Input name="max_students" type="number" placeholder="∞" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Commission per Student (£)</Label>
+                <Input name="commission_per_student" type="number" required min={0} step="0.01" defaultValue={500} />
+              </div>
+              <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
+                Save
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </CardHeader>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Tier</TableHead>
+              <TableHead>Min Students</TableHead>
+              <TableHead>Max Students</TableHead>
+              <TableHead>£ per Student</TableHead>
+              <TableHead className="w-16" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {tiers.map((t: any) => (
+              <TableRow key={t.id}>
+                <TableCell className="font-medium">{t.tier_name}</TableCell>
+                <TableCell>{t.min_students}</TableCell>
+                <TableCell>{t.max_students ?? "∞"}</TableCell>
+                <TableCell>£{t.commission_per_student}</TableCell>
+                <TableCell>
+                  <Button variant="ghost" size="icon" onClick={() => deleteItem.mutate({ table: "commission_tiers", id: t.id })}>
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+            {tiers.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
+                  No tiers yet
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
