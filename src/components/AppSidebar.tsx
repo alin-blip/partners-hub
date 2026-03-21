@@ -7,9 +7,9 @@ import {
   LogOut,
   GraduationCap,
   PoundSterling,
+  UserCircle,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Sidebar,
@@ -29,7 +29,6 @@ export function AppSidebar() {
   const { role, profile, signOut } = useAuth();
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const location = useLocation();
   const prefix = role === "owner" ? "/owner" : role === "admin" ? "/admin" : "/agent";
 
   const navItems = [
@@ -51,6 +50,8 @@ export function AppSidebar() {
       { title: "My Agents", url: "/admin/agents", icon: UserCog }
     );
   }
+
+  navItems.push({ title: "Profile", url: `${prefix}/profile`, icon: UserCircle });
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">

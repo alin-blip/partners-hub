@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatusBadge } from "@/components/StatusBadge";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -11,32 +14,53 @@ import {
 } from "@/components/ui/select";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { Search, ChevronLeft, ChevronRight, Download } from "lucide-react";
 
 const STATUSES = [
   "applied", "documents_submitted", "processing", "accepted", "enrolled", "active", "rejected",
 ];
+const PAGE_SIZE = 20;
 
 export default function EnrollmentsPage() {
   const { role } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const canEdit = role === "owner" || role === "admin";
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [page, setPage] = useState(0);
 
-  const { data: enrollments = [] } = useQuery({
-    queryKey: ["enrollments-list"],
+  const { data, isLoading } = useQuery({
+    queryKey: ["enrollments-list", search, statusFilter, page],
     queryFn: async () => {
-      const { data } = await supabase
+      let query = supabase
         .from("enrollments")
         .select(`
           id, status, created_at, updated_at, notes,
           students!inner(first_name, last_name),
           universities!inner(name),
           courses!inner(name)
-        `)
-        .order("created_at", { ascending: false });
-      return data || [];
+        `, { count: "exact" });
+
+      if (search.trim()) {
+        query = query.or(`students.first_name.ilike.%${search}%,students.last_name.ilike.%${search}%`, { referencedTable: "students" });
+      }
+      if (statusFilter !== "All") {
+        query = query.eq("status", statusFilter);
+      }
+
+      const { data, count, error } = await query
+        .order("created_at", { ascending: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+      if (error) throw error;
+      return { enrollments: data || [], total: count || 0 };
     },
   });
+
+  const enrollments = data?.enrollments || [];
+  const total = data?.total || 0;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -52,10 +76,58 @@ export default function EnrollmentsPage() {
     },
   });
 
+  const handleExport = () => {
+    const headers = ["Student", "University", "Course", "Status", "Date"];
+    const rows = enrollments.map((e: any) => [
+      `${e.students?.first_name} ${e.students?.last_name}`,
+      e.universities?.name || "",
+      e.courses?.name || "",
+      e.status,
+      format(new Date(e.created_at), "yyyy-MM-dd"),
+    ]);
+    const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `enrollments_${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold tracking-tight">Enrollments</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold tracking-tight">Enrollments</h1>
+          {(role === "owner" || role === "admin") && (
+            <Button variant="outline" size="sm" onClick={handleExport}>
+              <Download className="w-4 h-4 mr-1" /> Export CSV
+            </Button>
+          )}
+        </div>
+
+        {/* Search & Filter */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by student name…"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+              className="pl-9"
+            />
+          </div>
+          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(0); }}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All">All Statuses</SelectItem>
+              {STATUSES.map((s) => <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
 
         <div className="rounded-lg border bg-card">
           <Table>
@@ -85,9 +157,7 @@ export default function EnrollmentsPage() {
                         </SelectTrigger>
                         <SelectContent>
                           {STATUSES.map((s) => (
-                            <SelectItem key={s} value={s}>
-                              <StatusBadge status={s} />
-                            </SelectItem>
+                            <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -100,16 +170,32 @@ export default function EnrollmentsPage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {enrollments.length === 0 && (
+              {enrollments.length === 0 && !isLoading && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                    No enrollments yet
+                    No enrollments found
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
+            </p>
+            <div className="flex gap-1">
+              <Button variant="outline" size="icon" disabled={page === 0} onClick={() => setPage(page - 1)}>
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Button variant="outline" size="icon" disabled={page >= totalPages - 1} onClick={() => setPage(page + 1)}>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

@@ -12,6 +12,9 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetSent, setResetSent] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -27,7 +30,6 @@ export default function Login() {
       return;
     }
 
-    // Role-based redirect happens in App.tsx via AuthProvider
     const { data } = await supabase.rpc("get_user_role", {
       _user_id: (await supabase.auth.getUser()).data.user?.id ?? "",
     });
@@ -40,6 +42,20 @@ export default function Login() {
 
     navigate(roleRoutes[data as string] || "/");
     setLoading(false);
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: `${window.location.origin}/login`,
+    });
+    setLoading(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      setResetSent(true);
+    }
   };
 
   return (
@@ -55,40 +71,89 @@ export default function Login() {
           </div>
         </CardHeader>
         <CardContent className="pt-4">
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <Button
-              type="submit"
-              className="w-full bg-accent text-accent-foreground hover:bg-accent/90 active:scale-[0.98] transition-all"
-              disabled={loading}
-            >
-              {loading ? "Signing in…" : "Sign In"}
-            </Button>
-          </form>
-          <p className="text-xs text-muted-foreground text-center mt-6">
-            Contact your administrator to get an account.
-          </p>
+          {forgotMode ? (
+            resetSent ? (
+              <div className="text-center space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  If an account exists for <strong>{resetEmail}</strong>, a password reset link has been sent.
+                </p>
+                <Button variant="outline" className="w-full" onClick={() => { setForgotMode(false); setResetSent(false); }}>
+                  Back to Login
+                </Button>
+              </div>
+            ) : (
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <p className="text-sm text-muted-foreground">Enter your email to receive a password reset link.</p>
+                <div className="space-y-2">
+                  <Label htmlFor="reset-email">Email</Label>
+                  <Input
+                    id="reset-email"
+                    type="email"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    required
+                    placeholder="you@example.com"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
+                  disabled={loading}
+                >
+                  {loading ? "Sending…" : "Send Reset Link"}
+                </Button>
+                <Button variant="ghost" className="w-full" onClick={() => setForgotMode(false)}>
+                  Back to Login
+                </Button>
+              </form>
+            )
+          ) : (
+            <>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Password</Label>
+                    <button
+                      type="button"
+                      onClick={() => setForgotMode(true)}
+                      className="text-xs text-accent hover:underline"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full bg-accent text-accent-foreground hover:bg-accent/90 active:scale-[0.98] transition-all"
+                  disabled={loading}
+                >
+                  {loading ? "Signing in…" : "Sign In"}
+                </Button>
+              </form>
+              <p className="text-xs text-muted-foreground text-center mt-6">
+                Contact your administrator to get an account.
+              </p>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
