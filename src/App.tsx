@@ -15,6 +15,8 @@ import SettingsPage from "./pages/owner/SettingsPage";
 import CommissionsPage from "./pages/owner/CommissionsPage";
 import StudentsPage from "./pages/shared/StudentsPage";
 import EnrollmentsPage from "./pages/shared/EnrollmentsPage";
+import StudentDetailPage from "./pages/shared/StudentDetailPage";
+import ProfilePage from "./pages/shared/ProfilePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,22 +35,28 @@ const App = () => (
             {/* Owner routes */}
             <Route path="/owner/dashboard" element={<OwnerDashboard />} />
             <Route path="/owner/students" element={<StudentsPage />} />
+            <Route path="/owner/students/:id" element={<StudentDetailPage />} />
             <Route path="/owner/enrollments" element={<EnrollmentsPage />} />
             <Route path="/owner/agents" element={<AgentsPage />} />
             <Route path="/owner/settings" element={<SettingsPage />} />
             <Route path="/owner/commissions" element={<CommissionsPage />} />
+            <Route path="/owner/profile" element={<ProfilePage />} />
             
             {/* Admin routes */}
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/students" element={<StudentsPage />} />
+            <Route path="/admin/students/:id" element={<StudentDetailPage />} />
             <Route path="/admin/enrollments" element={<EnrollmentsPage />} />
             <Route path="/admin/agents" element={<AdminAgentsPage />} />
+            <Route path="/admin/profile" element={<ProfilePage />} />
             
             {/* Agent routes */}
             <Route path="/agent/dashboard" element={<AgentDashboard />} />
             <Route path="/agent/students" element={<StudentsPage />} />
+            <Route path="/agent/students/:id" element={<StudentDetailPage />} />
             <Route path="/agent/enrollments" element={<EnrollmentsPage />} />
             <Route path="/agent/enroll" element={<EnrollStudent />} />
+            <Route path="/agent/profile" element={<ProfilePage />} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
