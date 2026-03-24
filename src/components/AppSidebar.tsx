@@ -44,6 +44,7 @@ export function AppSidebar() {
     navItems.push(
       { title: "Agents", url: "/owner/agents", icon: UserCog },
       { title: "Commissions", url: "/owner/commissions", icon: PoundSterling },
+      { title: "Knowledge Base", url: "/owner/knowledge-base", icon: Brain },
       { title: "Settings", url: "/owner/settings", icon: Settings }
     );
   }
