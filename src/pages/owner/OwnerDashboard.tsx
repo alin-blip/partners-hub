@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
+import { PromoBanner } from "@/components/PromoBanner";
 
 const chartConfig: ChartConfig = {
   students: { label: "Students", color: "hsl(var(--primary))" },
