@@ -18,7 +18,7 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const { messages } = await req.json();
+    const { messages, conversation_id } = await req.json();
     if (!messages || !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: "messages array is required" }), {
         status: 400,
@@ -37,7 +37,6 @@ serve(async (req) => {
     let userName = "User";
 
     if (token && token !== Deno.env.get("SUPABASE_ANON_KEY")) {
-      // Create a user-scoped client to verify the JWT
       const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
         global: { headers: { Authorization: `Bearer ${token}` } },
       });
@@ -45,7 +44,6 @@ serve(async (req) => {
       if (!userError && userData?.user) {
         userId = userData.user.id;
 
-        // Get role
         const { data: roleData } = await adminClient
           .from("user_roles")
           .select("role")
@@ -53,13 +51,44 @@ serve(async (req) => {
           .single();
         userRole = roleData?.role || null;
 
-        // Get name
         const { data: profileData } = await adminClient
           .from("profiles")
           .select("full_name")
           .eq("id", userId)
           .single();
         userName = profileData?.full_name || "User";
+      }
+    }
+
+    // --- Conversation persistence ---
+    let activeConversationId = conversation_id || null;
+    const lastUserMessage = messages[messages.length - 1];
+
+    if (userId) {
+      if (!activeConversationId) {
+        // Create new conversation
+        const title = (lastUserMessage?.content || "New conversation").slice(0, 50);
+        const { data: convData } = await adminClient
+          .from("ai_conversations")
+          .insert({ user_id: userId, title })
+          .select("id")
+          .single();
+        if (convData) activeConversationId = convData.id;
+      } else {
+        // Update conversation's updated_at
+        await adminClient
+          .from("ai_conversations")
+          .update({ updated_at: new Date().toISOString() })
+          .eq("id", activeConversationId);
+      }
+
+      // Save user message
+      if (activeConversationId && lastUserMessage) {
+        await adminClient.from("ai_messages").insert({
+          conversation_id: activeConversationId,
+          role: "user",
+          content: lastUserMessage.content,
+        });
       }
     }
 
@@ -87,7 +116,6 @@ serve(async (req) => {
     if (userId && userRole) {
       try {
         if (userRole === "agent") {
-          // Agent: only their students + enrollments
           const { data: students } = await adminClient
             .from("students")
             .select("id, first_name, last_name, email, phone, immigration_status")
@@ -122,7 +150,6 @@ serve(async (req) => {
           }
 
         } else if (userRole === "admin") {
-          // Admin: own students + team agents' students
           const { data: teamAgents } = await adminClient
             .from("profiles")
             .select("id, full_name")
@@ -151,7 +178,6 @@ serve(async (req) => {
           userDataSection = `\n\n[Your Context]\nRole: Admin | Name: ${userName}\nTeam Agents: ${(teamAgents || []).map((a: any) => a.full_name).join(", ") || "none"}\nTotal Students: ${(students || []).length}\nEnrollment Status: ${Object.entries(statusCounts).map(([k, v]) => `${k}: ${v}`).join(", ") || "none"}\n`;
 
         } else if (userRole === "owner") {
-          // Owner: summary stats only
           const { count: studentCount } = await adminClient
             .from("students")
             .select("*", { count: "exact", head: true });
@@ -240,9 +266,66 @@ ${knowledgeSection}${userDataSection}
       });
     }
 
-    return new Response(response.body, {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+    // Stream response and collect full assistant reply for persistence
+    const responseHeaders = {
+      ...corsHeaders,
+      "Content-Type": "text/event-stream",
+      ...(activeConversationId ? { "X-Conversation-Id": activeConversationId } : {}),
+    };
+
+    if (!userId || !activeConversationId) {
+      // No persistence needed, just proxy
+      return new Response(response.body, { headers: responseHeaders });
+    }
+
+    // Collect assistant content while streaming through
+    const reader = response.body!.getReader();
+    let fullAssistantContent = "";
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+        const decoder = new TextDecoder();
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            // Pass through to client
+            controller.enqueue(value);
+
+            // Parse SSE to collect content
+            const text = decoder.decode(value, { stream: true });
+            const lines = text.split("\n");
+            for (const line of lines) {
+              if (!line.startsWith("data: ")) continue;
+              const json = line.slice(6).trim();
+              if (json === "[DONE]") continue;
+              try {
+                const parsed = JSON.parse(json);
+                const content = parsed.choices?.[0]?.delta?.content;
+                if (content) fullAssistantContent += content;
+              } catch { /* skip parse errors */ }
+            }
+          }
+        } catch (err) {
+          console.error("Stream error:", err);
+        } finally {
+          // Save assistant message
+          if (fullAssistantContent) {
+            await adminClient.from("ai_messages").insert({
+              conversation_id: activeConversationId,
+              role: "assistant",
+              content: fullAssistantContent,
+            });
+          }
+          controller.close();
+        }
+      },
     });
+
+    return new Response(stream, { headers: responseHeaders });
   } catch (e) {
     console.error("ai-chat error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
