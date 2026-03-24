@@ -10,6 +10,7 @@ import {
   UserCircle,
   UserPlus,
   FolderOpen,
+  Brain,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
