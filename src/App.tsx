@@ -13,6 +13,7 @@ import AdminAgentsPage from "./pages/admin/AdminAgentsPage";
 import AgentsPage from "./pages/owner/AgentsPage";
 import SettingsPage from "./pages/owner/SettingsPage";
 import KnowledgeBasePage from "./pages/owner/KnowledgeBasePage";
+import AIMonitoringPage from "./pages/owner/AIMonitoringPage";
 import CommissionsPage from "./pages/owner/CommissionsPage";
 import StudentsPage from "./pages/shared/StudentsPage";
 import EnrollmentsPage from "./pages/shared/EnrollmentsPage";
