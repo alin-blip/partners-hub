@@ -16,15 +16,16 @@ EduForYou UK Agent Management Platform - design system and architecture decision
 
 ## Route Structure
 - /owner/dashboard, /admin/dashboard, /agent/dashboard
-- Shared: /[role]/students, /[role]/students/:id, /[role]/enrollments, /[role]/profile
+- Shared: /[role]/students, /[role]/students/:id, /[role]/enrollments, /[role]/profile, /[role]/enroll, /[role]/resources
 - Owner only: /owner/agents, /owner/settings, /owner/commissions
-- Agent only: /agent/enroll
+- Admin only: /admin/agents
 
 ## Key Tables
-profiles, user_roles, universities, campuses, courses, intakes, students, enrollments, commission_tiers
+profiles, user_roles, universities, campuses, courses, intakes, students, enrollments, commission_tiers, promotions, resources
 
 ## Storage
 - `student-documents` bucket (private) — files stored as `{student_id}/{DocType}_{timestamp}.ext`
+- `resource-files` bucket (public) — files stored as `{category}/{timestamp}_{filename}`
 - RLS: Agent=own students, Admin=team students, Owner=all
 
 ## Features Implemented
@@ -34,3 +35,5 @@ profiles, user_roles, universities, campuses, courses, intakes, students, enroll
 - Search, filter, server-side pagination on Students & Enrollments
 - Profile page with password change
 - Forgot password flow on Login page
+- Owner/Admin/Agent can all enroll students personally
+- Resource Hub: categories (Social Media Templates, Guides, FAQ, Training, Brand Assets), upload for Owner/Admin, view/download for all
