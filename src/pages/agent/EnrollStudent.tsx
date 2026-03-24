@@ -117,8 +117,11 @@ export default function EnrollStudent() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["agent-students"] });
       queryClient.invalidateQueries({ queryKey: ["agent-enrollments"] });
+      queryClient.invalidateQueries({ queryKey: ["students"] });
+      queryClient.invalidateQueries({ queryKey: ["enrollments"] });
       toast({ title: "Student enrolled!", description: "The application has been submitted." });
-      navigate("/agent/dashboard");
+      const navPrefix = role === "owner" ? "/owner" : role === "admin" ? "/admin" : "/agent";
+      navigate(`${navPrefix}/dashboard`);
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
