@@ -302,6 +302,7 @@ export default function SettingsPage() {
             <TabsTrigger value="courses">Courses</TabsTrigger>
             <TabsTrigger value="intakes">Intakes</TabsTrigger>
             <TabsTrigger value="commissions">Commission Tiers</TabsTrigger>
+            <TabsTrigger value="promotions">Promotions</TabsTrigger>
           </TabsList>
 
           <TabsContent value="universities" className="mt-4">

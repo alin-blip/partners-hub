@@ -51,6 +51,7 @@ export default function AdminDashboard() {
   return (
     <DashboardLayout allowedRoles={["admin"]}>
       <div className="space-y-6">
+        <PromoBanner />
         <h1 className="text-2xl font-bold tracking-tight">Team Dashboard</h1>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
