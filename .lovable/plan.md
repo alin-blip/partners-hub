@@ -1,104 +1,159 @@
 
 
-# Platform Gap Analysis & Enhancement Plan
+# Audit Complet EduForYou UK + Plan de Implementare
 
-## Current State Summary
-The platform has solid foundations: role-based auth (Owner/Admin/Agent), student enrollment workflow, commission tracking, hierarchical dashboards, and settings management. Here's what's missing to make it a competitive, production-ready agent management platform.
+## Reformulare Prompt (Expert Prompt Engineering)
 
----
+Iata ce ai cerut, restructurat ca prompt de executie:
 
-## Priority 1 — Critical Missing Features
+```text
+Esti expert in dezvoltare platforme SaaS de management agenti de recrutare
+studenti si expert in strategii Russell Brunson (affiliate armies).
 
-### 1. Student Detail Page with Document Upload
-**Problem**: No way to view/edit a student after creation. No document management (passports, transcripts, offer letters).
-- New page: `/[role]/students/:id` — full student profile with edit capability
-- File storage bucket for student documents (passport, qualifications, visa docs)
-- Document upload/download with status tracking per document type
-- Activity timeline showing enrollment status changes
+CONTEXT: Platforma EduForYou UK gestioneaza Owner → Admin → Agent cu
+enrollment workflow, comisioane pe tiers si dashboarduri ierarhice.
+Scale target: 10-20 admini, 100-300 agenti.
 
-### 2. Search, Filter & Pagination
-**Problem**: All list pages (Students, Enrollments, Users) show raw lists with no search or filtering. Breaks with scale.
-- Add search bar to Students, Enrollments, and Users pages
-- Filter by: status, university, agent, date range, immigration status
-- Server-side pagination (currently fetches all rows)
+CERINTE DE IMPLEMENTARE (in ordinea prioritatii):
 
-### 3. Notifications System
-**Problem**: No way for Admins/Owners to communicate status changes to agents. Agents don't know when enrollment status changes.
-- New `notifications` table (user_id, title, message, read, created_at)
-- Bell icon in header with unread count
-- Auto-notify agent when their enrollment status changes (database trigger)
-- Notifications dropdown/page
+1. AUDIT COMPLET al platformei existente:
+   - Ce functioneaza, ce lipseste, ce are bug-uri
+   - Scalabilitate pentru 300 agenti
+   - Gaps din perspectiva unui recruitment agency manager
 
-### 4. Password Reset / Profile Management
-**Problem**: No way to change password or update own profile. No "forgot password" flow.
-- Add profile edit page (name, phone, password change)
-- Add "Forgot password" link on login page using auth reset flow
+2. PROMOTIONAL BANNER SYSTEM:
+   - Banner persistent pe dashboard agenti: "Recruteaza si obtine
+     5 studenti admisi pana in 30 aprilie si obtine bonus £500 cash
+     + 25% din comisionul generat daca doresti"
+   - Configurabil de owner (text, deadline, sume)
+   - Countdown timer
 
----
+3. RESOURCE HUB (Materiale & Postari):
+   - Sectiune unde Owner/Admin posteaza materiale de marketing
+   - Agentii pot accesa: templates social media, ghiduri, FAQ-uri
+   - Organizat pe categorii
 
-## Priority 2 — Operational Improvements
+4. AI ASSISTANT - Company Knowledge Bot:
+   - Chatbot care stie totul despre EduForYou: cursuri, locatii,
+     preturi, cerinte, deadlines
+   - Alimentat din datele platformei (universities, courses, campuses,
+     intakes)
+   - Disponibil pentru agenti direct din sidebar
 
-### 5. Enrollment Notes & Timeline
-**Problem**: No audit trail of who changed what on an enrollment. Notes field exists but no UI to use it.
-- New `enrollment_timeline` table (enrollment_id, user_id, action, note, created_at)
-- Show timeline on enrollment detail view
-- Auto-log status changes with user and timestamp
+5. AI IMAGE GENERATOR:
+   - Generator de imagini branded EduForYou la cererea agentului
+   - Pentru social media posts, flyers, stories
+   - Folosind Lovable AI cu brand guidelines aplicate
 
-### 6. Dashboard Date Range Filters
-**Problem**: Owner/Admin dashboards show all-time data with no period filtering.
-- Add date range picker to dashboards
-- Filter metrics and charts by selected period
+6. PERSPECTIVA RUSSELL BRUNSON - Agent Success Toolkit:
+   - Leaderboard cu ranking agenti (gamification)
+   - Onboarding checklist pentru agenti noi
+   - Goal tracking & milestones vizuale
+   - Reward tiers vizibile (ce castig daca fac X)
 
-### 7. Admin Dashboard Enhancements
-**Problem**: Admin dashboard is sparse — no commission view, no agent performance comparison.
-- Add commission tracking for the admin's team
-- Add agent performance bar chart (same style as owner dashboard)
-
-### 8. Bulk Actions & CSV Import
-**Problem**: Each student must be enrolled individually. No bulk operations.
-- CSV import for students (template download + upload)
-- Bulk status update for enrollments (select multiple, change status)
+PRINCIPIU: Perfectiune in executie > viteza. Fiecare feature
+implementat complet, testat, fara bug-uri.
+```
 
 ---
 
-## Priority 3 — Polish & UX
+## AUDIT: Ce avem acum
 
-### 9. Responsive Mobile Experience
-**Problem**: Tables and charts don't work well on mobile.
-- Card-based list view for mobile (instead of tables)
-- Responsive chart sizing
+### Functional si bine implementat
+- **Auth system**: Login, forgot password, role-based routing, RLS corect pe user_roles
+- **Role hierarchy**: Owner → Admin → Agent cu security definer functions (`has_role`, `get_user_role`)
+- **User management**: Owner creaza admini/agenti, assign agent la admin, activate/deactivate
+- **Enrollment workflow**: Multi-step form (University → Campus → Course → Intake → Student), 7 statusuri
+- **Commission system**: Tiers dinamice, calcul automat, CommissionsPage cu filtrare lunara
+- **Owner dashboard**: Chart ierarhic Admin→Agent, metrici, recent enrollments
+- **Student detail**: Profil editabil, document upload/download, enrollment history
+- **Search & pagination**: Implementat pe Students si Enrollments (server-side)
+- **Profile management**: Edit profil, change password
+- **Settings**: CRUD universities, campuses, courses, intakes, commission tiers
+- **Storage**: Bucket `student-documents` cu RLS
 
-### 10. Dark Mode Support
-- Toggle in header or sidebar
-- Already using CSS variables so mostly theme layer changes
+### Probleme si gaps identificate
 
-### 11. Loading States & Error Boundaries
-**Problem**: Pages show blank or "Loading..." with no skeleton states.
-- Add skeleton loaders to all data tables and metric cards
-- Add error boundary components with retry
+| Zona | Problema | Severitate |
+|------|----------|------------|
+| **Scalabilitate** | Queries fara `.limit()` pe profiles/roles/students in Owner Dashboard — va incarca totul in memorie la 300 agenti | Critica |
+| **Admin Dashboard** | Lipseste complet: comisioane echipa, performance chart, nu poate vedea ce castiga agentii lui | Mare |
+| **Notificari** | Zero — agentii nu stiu cand li se schimba statusul enrollment-ului | Mare |
+| **Audit trail** | Nu exista timeline pe enrollments — cine a schimbat ce si cand | Mare |
+| **Agent onboarding** | Agentul nou vede dashboard gol, fara ghidare, fara next steps | Mare |
+| **Gamification** | Zero — niciun leaderboard, niciun ranking, niciun milestone | Mare |
+| **Materiale marketing** | Nu exista — agentii nu au acces la resurse branded | Mare |
+| **AI support** | Nu exista — agentii nu pot intreba rapid despre cursuri/locatii | Medie |
+| **Banner promotional** | Nu exista mecanism de campanii/promotii | Medie |
+| **Bulk operations** | Nu se pot importa studenti CSV sau schimba statusuri in bulk | Medie |
+| **Mobile** | Tabelele nu sunt responsive, charts se comprima | Medie |
+| **Loading states** | Doar text "Loading..." fara skeleton | Mica |
+| **Export** | CSV doar pe Students, lipseste pe Enrollments/Commissions | Mica |
 
-### 12. Data Export Enhancements
-**Problem**: Only Students page has CSV export. Owner needs enrollment and commission reports.
-- Add CSV/PDF export to Enrollments page
-- Add CSV/PDF export to Commissions page
+### Perspectiva Russell Brunson — Ce lipseste pentru "Agent Army"
+
+Russell Brunson ar spune ca un agent recrutor are nevoie de:
+1. **Clarity** — Sa stie exact ce trebuie sa faca (onboarding checklist) — LIPSESTE
+2. **Tools** — Materiale gata de postat, imagini branded — LIPSESTE
+3. **Motivation** — Leaderboard, ranking, rewards vizibile — LIPSESTE
+4. **Speed** — AI care raspunde instant la intrebari despre cursuri — LIPSESTE
+5. **Urgency** — Promotii cu deadline, bannere cu countdown — LIPSESTE
+6. **Community** — Resource hub, best practices — LIPSESTE
+7. **Tracking** — Sa vada clar: "mai am X studenti pana la bonus Y" — PARTIAL (progress bar exista dar e hardcodat)
 
 ---
 
-## Recommended Implementation Order
+## Plan de implementare — 6 faze
 
-| Phase | Features | Effort |
-|-------|----------|--------|
-| Phase 1 | Student Detail + Documents, Search/Filter, Password Reset | ~8 steps |
-| Phase 2 | Notifications, Enrollment Timeline, Admin Dashboard upgrade | ~6 steps |
-| Phase 3 | Bulk Import, Export enhancements, Date filters | ~4 steps |
-| Phase 4 | Mobile polish, Dark mode, Skeletons | ~4 steps |
+### Faza 1: Promotional Banner System
+- Tabel `promotions` (title, description, deadline, bonus_amount, is_active, created_by)
+- Owner: pagina/sectiune in Settings pentru CRUD promotii
+- Agent/Admin Dashboard: banner persistent cu countdown timer, dismiss-able
+- Banner design: gradient accent, icon trophy, text bold, countdown days:hours:mins
+- Migratia: creare tabel + RLS (owner manages, authenticated reads)
+
+### Faza 2: Resource Hub
+- Tabel `resources` (title, description, category, file_url, link_url, created_by, created_at)
+- Storage bucket `resources` pentru fisiere (PDF, imagini, templates)
+- Categorii: Social Media Templates, Guides, FAQ, Training, Brand Assets
+- Pagina `/[role]/resources` — grid de carduri cu download/preview
+- Owner/Admin pot adauga; Agentii pot vizualiza si descarca
+- Sidebar link cu icon BookOpen
+
+### Faza 3: AI Company Knowledge Bot
+- Edge function `ai-chat` care primeste conversatia + context din DB
+- System prompt alimentat automat cu: lista universities, courses (name + level + study_mode), campuses (name + city), intakes (label + date), commission tiers
+- UI: buton chat in sidebar/header, slide-over panel cu conversatie
+- Streaming response cu markdown rendering
+- Disponibil pentru toti userii autentificati
+
+### Faza 4: AI Image Generator
+- Edge function `generate-image` care foloseste Lovable AI image model
+- Prompt template cu brand guidelines EduForYou (culori, font, logo text)
+- UI: pagina `/[role]/create-image` cu input prompt + galerie rezultate
+- Optiuni preset: Social Media Post, Story, Flyer, Banner
+- Rezultatele salvate in storage bucket `generated-images`
+
+### Faza 5: Gamification & Agent Success (Russell Brunson)
+- **Leaderboard**: Pagina `/[role]/leaderboard` — ranking agenti dupa studenti activi luna curenta
+- **Milestones**: Vizualizare pe agent dashboard: "5/10 studenti → urmatorul tier Gold"
+- **Onboarding checklist**: Card pe dashboard agent nou: "1. Completeaza profilul 2. Citeste ghidul 3. Inscrie primul student 4. Upload documente"
+- **Reward tiers vizuale**: Card pe dashboard care arata toate tier-urile cu highlight pe cel curent si ce trebuie pentru urmatorul
+- Tabel `agent_milestones` (agent_id, milestone_key, completed_at)
+
+### Faza 6: Operational Polish
+- **Notifications system**: Tabel `notifications`, bell icon cu badge, trigger pe schimbare status enrollment
+- **Admin dashboard upgrade**: Comisioane echipa, chart performance, agent ranking
+- **Enrollment timeline**: Tabel `enrollment_timeline`, auto-log status changes
+- **CSV export** pe Enrollments si Commissions
+- **Skeleton loaders** pe toate paginile de date
 
 ---
 
-## Technical Notes
-- Document storage requires a new storage bucket with RLS policies per role
-- Notifications table needs RLS (users see only their own) + realtime subscription
-- Enrollment timeline requires a database trigger to auto-log status changes
-- Search/filter should use Supabase `.ilike()` and `.range()` for server-side pagination
-- Password reset uses `supabase.auth.resetPasswordForEmail()`
+## Nota tehnica
+- Faza 1-2: Database migrations + frontend, fara edge functions
+- Faza 3-4: Edge functions cu Lovable AI (LOVABLE_API_KEY deja configurat)
+- Faza 5: Calcule client-side pe datele existente + 1 tabel nou
+- Faza 6: Database triggers + realtime subscriptions
+- Toate fazele respecta RLS existent: Owner=all, Admin=team, Agent=own
 
