@@ -1,90 +1,67 @@
 
 
-# Plan: AI Knowledge Base + User-Scoped AI Context
+# Plan: AI Chat Persistence + Owner Chat Monitoring
 
 ## What We're Building
 
-1. **Knowledge Base management page** — Owner/Admin can upload documents (PDFs, text files about courses, brand guidelines, processes) that feed into the AI assistant's context
-2. **User-scoped AI context** — The AI edge function fetches the logged-in user's own data (their students, enrollments) so it answers in context of THAT user only, never leaking other agents' data
+1. **Chat conversation persistence** — Every message (user + assistant) saved to DB, conversations resumable across sessions
+2. **Conversation history sidebar** — Users can see past conversations, start new ones, resume old ones
+3. **Owner/Admin monitoring page** — Owner sees ALL conversations from all users; Admin sees their team's conversations. Full tracking of what agents/admins ask the AI.
 
 ---
 
-## Part A: Knowledge Base Table & Storage
+## Database
 
-### Database
-- Create `ai_knowledge_base` table: `id` (uuid), `title` (text), `content` (text — extracted/pasted text), `category` (text: "courses", "brand", "processes", "immigration", "general"), `file_path` (text, nullable — for uploaded files), `created_by` (uuid), `created_at`
-- RLS: Owner/Admin can CRUD; all authenticated can SELECT (the edge function reads it server-side anyway via service role)
-- No new storage bucket needed — we store the knowledge as text content directly (copy-paste or text extraction), which is more reliable for AI consumption than parsing PDFs at query time
+### Table: `ai_conversations`
+- `id` (uuid, PK), `user_id` (uuid, NOT NULL), `title` (text, default 'New conversation'), `created_at`, `updated_at`
+- RLS: Users CRUD own; Admin SELECT team's (via profiles.admin_id); Owner SELECT all
 
-### Admin UI: Knowledge Base Page
-- New page `src/pages/owner/KnowledgeBasePage.tsx`
-- Tabs by category (Courses, Brand, Processes, Immigration, General)
-- Each entry is a card showing title + preview of content + delete button
-- "Add Knowledge" dialog: title, category dropdown, large textarea for content
-- Route: `/owner/knowledge-base`, `/admin/knowledge-base`
-- Sidebar: Add "Knowledge Base" link with Brain/BookOpen icon for Owner & Admin only
+### Table: `ai_messages`
+- `id` (uuid, PK), `conversation_id` (uuid, FK → ai_conversations), `role` (text: 'user'/'assistant'), `content` (text), `created_at`
+- RLS: same pattern — users manage own conversation's messages; Admin/Owner read team/all
 
 ---
 
-## Part B: User-Scoped AI with Knowledge Injection
+## Edge Function Update (`ai-chat/index.ts`)
 
-### Frontend Changes (`AIChatPanel.tsx`)
-- Pass the user's JWT token in the Authorization header (use `supabase.auth.getSession()` to get access token)
-- This lets the edge function identify the user and fetch their specific data
+- Accept optional `conversation_id` in request body
+- After authenticating user, if no `conversation_id`: create new conversation, return its ID in response headers
+- Save each user message to `ai_messages` before calling AI
+- After streaming completes, save the full assistant response to `ai_messages`
+- Auto-generate conversation title from first user message (truncate to 50 chars)
 
-### Edge Function Changes (`ai-chat/index.ts`)
-1. **Extract user from JWT** — use Supabase client with service role to verify the token and get user ID + role
-2. **Fetch knowledge base** — query `ai_knowledge_base` table, concatenate all content into system prompt
-3. **Fetch user-specific data** (scoped by role):
-   - If agent: fetch only THEIR students + enrollments
-   - If admin: fetch their personal students + their team's agents/students
-   - If owner: fetch summary stats (counts, not full data dumps to avoid token limits)
-4. **Build enriched system prompt** with:
-   - Company knowledge base documents
-   - User's role and name
-   - User's specific students/enrollments data
-   - Clear instruction: "Only reference the data provided. Do not invent student names or enrollment details."
+---
+
+## Frontend: `AIChatPanel.tsx` Rewrite
+
+- Add conversation list sidebar (left pane inside the Sheet) showing past conversations with titles + dates
+- "New Chat" button at top
+- On selecting a conversation: load its messages from DB and display
+- On sending: save message to DB, stream response, save assistant reply to DB
+- Track `activeConversationId` in state
+
+---
+
+## New Page: `/owner/ai-monitoring` (and `/admin/ai-monitoring`)
+
+### `src/pages/owner/AIMonitoringPage.tsx`
+- Table showing all conversations: User Name, Role, Title, Message Count, Last Activity
+- Click to expand/view full conversation transcript (read-only)
+- Filters: by role (agent/admin), by date range, search in messages
+- Admin version: only shows conversations from their team agents
+- Owner version: shows ALL conversations
+
+### Routing & Sidebar
+- Add routes `/owner/ai-monitoring` and `/admin/ai-monitoring` in App.tsx
+- Add "AI Monitoring" link with MessageSquare icon in sidebar for Owner and Admin
 
 ---
 
 ## Technical Details
 
-### Edge function data fetching (pseudocode)
-```
-// 1. Verify JWT, get userId + role
-// 2. Fetch all knowledge base entries
-// 3. Based on role:
-//    - agent: SELECT students WHERE agent_id = userId (limit 50)
-//              + enrollments for those students with university/course names
-//    - admin: same as agent for own + team agents' students
-//    - owner: SELECT count(*) from students, enrollments grouped by status
-// 4. Inject into system prompt as structured text
-```
-
-### System prompt structure
-```
-[Company Knowledge Base]
---- Courses ---
-{content from knowledge base entries}
---- Brand Guidelines ---
-{content}
-
-[Your Context]
-Role: Agent | Name: John Smith
-Your Students (3):
-- Maria Garcia (email: ...) — Enrollment: Applied at University of London, Business Management
-- ...
-
-[Rules]
-- Only discuss data shown above
-- Never reveal other agents' students
-```
-
-### Files to create/edit
-- `supabase/migrations/xxx_knowledge_base.sql` — new table
-- `src/pages/owner/KnowledgeBasePage.tsx` — new page
-- `supabase/functions/ai-chat/index.ts` — major rewrite with DB fetching + user scoping
-- `src/components/AIChatPanel.tsx` — send JWT token
-- `src/App.tsx` — add routes
-- `src/components/AppSidebar.tsx` — add nav link
+- Messages saved via `adminClient` (service role) in the edge function to bypass RLS
+- Conversation list fetched client-side via supabase client (RLS handles scoping)
+- Admin team scoping: `ai_conversations.user_id IN (SELECT id FROM profiles WHERE admin_id = auth.uid())` + own conversations
+- Owner: `has_role(auth.uid(), 'owner')` → sees all
+- Conversation title: first user message truncated to 50 chars, set on first message
 
