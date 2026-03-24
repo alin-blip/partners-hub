@@ -25,7 +25,7 @@ const IMMIGRATION_OPTIONS = [
 ];
 
 export default function EnrollStudent() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
