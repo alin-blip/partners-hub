@@ -26,7 +26,6 @@ profiles, user_roles, universities, campuses, courses, intakes, students, enroll
 ## Storage
 - `student-documents` bucket (private) — files stored as `{student_id}/{DocType}_{timestamp}.ext`
 - `resource-files` bucket (public) — files stored as `{category}/{timestamp}_{filename}`
-- RLS: Agent=own students, Admin=team students, Owner=all
 
 ## Features Implemented
 - Commission system with tier matching and CRUD in Settings
@@ -36,4 +35,5 @@ profiles, user_roles, universities, campuses, courses, intakes, students, enroll
 - Profile page with password change
 - Forgot password flow on Login page
 - Owner/Admin/Agent can all enroll students personally
-- Resource Hub: categories (Social Media Templates, Guides, FAQ, Training, Brand Assets), upload for Owner/Admin, view/download for all
+- Resource Hub: categories (Social Media, Guides, FAQ, Training, Brand Assets), upload for Owner/Admin
+- AI Knowledge Bot: slide-over chat panel, streaming via ai-chat edge function, markdown rendering, Lovable AI gateway

@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppSidebar } from "@/components/AppSidebar";
+import { AIChatPanel } from "@/components/AIChatPanel";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 
@@ -51,6 +52,7 @@ export function DashboardLayout({ children, allowedRoles }: DashboardLayoutProps
             {children}
           </main>
         </div>
+        <AIChatPanel />
       </div>
     </SidebarProvider>
   );
