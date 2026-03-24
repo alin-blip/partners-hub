@@ -463,6 +463,10 @@ export default function SettingsPage() {
           <TabsContent value="commissions" className="mt-4">
             <CommissionTiersSection deleteItem={deleteItem} />
           </TabsContent>
+
+          <TabsContent value="promotions" className="mt-4">
+            <PromotionsSection deleteItem={deleteItem} />
+          </TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>
