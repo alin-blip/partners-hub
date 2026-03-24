@@ -9,6 +9,7 @@ import {
   PoundSterling,
   UserCircle,
   UserPlus,
+  FolderOpen,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -54,6 +55,7 @@ export function AppSidebar() {
 
   navItems.push(
     { title: "Enroll Student", url: `${prefix}/enroll`, icon: UserPlus },
+    { title: "Resources", url: `${prefix}/resources`, icon: FolderOpen },
     { title: "Profile", url: `${prefix}/profile`, icon: UserCircle }
   );
 
