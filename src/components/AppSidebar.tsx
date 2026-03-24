@@ -54,7 +54,8 @@ export function AppSidebar() {
   if (role === "admin") {
     navItems.push(
       { title: "My Agents", url: "/admin/agents", icon: UserCog },
-      { title: "Knowledge Base", url: "/admin/knowledge-base", icon: Brain }
+      { title: "Knowledge Base", url: "/admin/knowledge-base", icon: Brain },
+      { title: "AI Monitoring", url: "/admin/ai-monitoring", icon: MessageSquare }
     );
   }
 
