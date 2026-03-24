@@ -10,6 +10,7 @@ import {
   UserCircle,
   UserPlus,
   FolderOpen,
+  Brain,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -43,13 +44,15 @@ export function AppSidebar() {
     navItems.push(
       { title: "Agents", url: "/owner/agents", icon: UserCog },
       { title: "Commissions", url: "/owner/commissions", icon: PoundSterling },
+      { title: "Knowledge Base", url: "/owner/knowledge-base", icon: Brain },
       { title: "Settings", url: "/owner/settings", icon: Settings }
     );
   }
 
   if (role === "admin") {
     navItems.push(
-      { title: "My Agents", url: "/admin/agents", icon: UserCog }
+      { title: "My Agents", url: "/admin/agents", icon: UserCog },
+      { title: "Knowledge Base", url: "/admin/knowledge-base", icon: Brain }
     );
   }
 

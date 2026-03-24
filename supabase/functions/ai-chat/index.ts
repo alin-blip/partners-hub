@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
@@ -14,6 +15,9 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
     const { messages } = await req.json();
     if (!messages || !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: "messages array is required" }), {
@@ -22,7 +26,160 @@ serve(async (req) => {
       });
     }
 
-    // Build system prompt with company knowledge
+    // --- Authenticate user from JWT ---
+    const authHeader = req.headers.get("Authorization") || "";
+    const token = authHeader.replace("Bearer ", "");
+
+    const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+    let userId: string | null = null;
+    let userRole: string | null = null;
+    let userName = "User";
+
+    if (token && token !== Deno.env.get("SUPABASE_ANON_KEY")) {
+      // Create a user-scoped client to verify the JWT
+      const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      });
+      const { data: userData, error: userError } = await userClient.auth.getUser();
+      if (!userError && userData?.user) {
+        userId = userData.user.id;
+
+        // Get role
+        const { data: roleData } = await adminClient
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", userId)
+          .single();
+        userRole = roleData?.role || null;
+
+        // Get name
+        const { data: profileData } = await adminClient
+          .from("profiles")
+          .select("full_name")
+          .eq("id", userId)
+          .single();
+        userName = profileData?.full_name || "User";
+      }
+    }
+
+    // --- Fetch Knowledge Base ---
+    const { data: kbEntries } = await adminClient
+      .from("ai_knowledge_base")
+      .select("title, content, category")
+      .order("category");
+
+    let knowledgeSection = "";
+    if (kbEntries && kbEntries.length > 0) {
+      const grouped: Record<string, string[]> = {};
+      for (const entry of kbEntries) {
+        if (!grouped[entry.category]) grouped[entry.category] = [];
+        grouped[entry.category].push(`### ${entry.title}\n${entry.content}`);
+      }
+      knowledgeSection = "\n\n[Company Knowledge Base]\n";
+      for (const [cat, items] of Object.entries(grouped)) {
+        knowledgeSection += `\n--- ${cat.charAt(0).toUpperCase() + cat.slice(1)} ---\n${items.join("\n\n")}\n`;
+      }
+    }
+
+    // --- Fetch User-Scoped Data ---
+    let userDataSection = "";
+    if (userId && userRole) {
+      try {
+        if (userRole === "agent") {
+          // Agent: only their students + enrollments
+          const { data: students } = await adminClient
+            .from("students")
+            .select("id, first_name, last_name, email, phone, immigration_status")
+            .eq("agent_id", userId)
+            .limit(50);
+
+          if (students && students.length > 0) {
+            const studentIds = students.map((s: any) => s.id);
+            const { data: enrollments } = await adminClient
+              .from("enrollments")
+              .select("student_id, status, universities(name), courses(name)")
+              .in("student_id", studentIds);
+
+            const enrollMap: Record<string, any[]> = {};
+            if (enrollments) {
+              for (const e of enrollments) {
+                if (!enrollMap[e.student_id]) enrollMap[e.student_id] = [];
+                enrollMap[e.student_id].push(e);
+              }
+            }
+
+            userDataSection = `\n\n[Your Context]\nRole: Agent | Name: ${userName}\nYour Students (${students.length}):\n`;
+            for (const s of students) {
+              const enrs = enrollMap[s.id] || [];
+              const enrText = enrs.map((e: any) =>
+                `${e.status} at ${(e as any).universities?.name || "?"} — ${(e as any).courses?.name || "?"}`
+              ).join("; ");
+              userDataSection += `- ${s.first_name} ${s.last_name} (${s.email || "no email"})${enrText ? ` — Enrollments: ${enrText}` : ""}\n`;
+            }
+          } else {
+            userDataSection = `\n\n[Your Context]\nRole: Agent | Name: ${userName}\nYou have no students yet.\n`;
+          }
+
+        } else if (userRole === "admin") {
+          // Admin: own students + team agents' students
+          const { data: teamAgents } = await adminClient
+            .from("profiles")
+            .select("id, full_name")
+            .eq("admin_id", userId);
+
+          const agentIds = [userId, ...(teamAgents || []).map((a: any) => a.id)];
+
+          const { data: students } = await adminClient
+            .from("students")
+            .select("id, first_name, last_name, email, agent_id")
+            .in("agent_id", agentIds)
+            .limit(100);
+
+          const { data: enrollments } = await adminClient
+            .from("enrollments")
+            .select("student_id, status")
+            .in("student_id", (students || []).map((s: any) => s.id));
+
+          const statusCounts: Record<string, number> = {};
+          if (enrollments) {
+            for (const e of enrollments) {
+              statusCounts[e.status] = (statusCounts[e.status] || 0) + 1;
+            }
+          }
+
+          userDataSection = `\n\n[Your Context]\nRole: Admin | Name: ${userName}\nTeam Agents: ${(teamAgents || []).map((a: any) => a.full_name).join(", ") || "none"}\nTotal Students: ${(students || []).length}\nEnrollment Status: ${Object.entries(statusCounts).map(([k, v]) => `${k}: ${v}`).join(", ") || "none"}\n`;
+
+        } else if (userRole === "owner") {
+          // Owner: summary stats only
+          const { count: studentCount } = await adminClient
+            .from("students")
+            .select("*", { count: "exact", head: true });
+
+          const { data: enrollments } = await adminClient
+            .from("enrollments")
+            .select("status");
+
+          const statusCounts: Record<string, number> = {};
+          if (enrollments) {
+            for (const e of enrollments) {
+              statusCounts[e.status] = (statusCounts[e.status] || 0) + 1;
+            }
+          }
+
+          const { count: agentCount } = await adminClient
+            .from("user_roles")
+            .select("*", { count: "exact", head: true })
+            .eq("role", "agent");
+
+          userDataSection = `\n\n[Your Context]\nRole: Owner | Name: ${userName}\nTotal Students: ${studentCount || 0}\nTotal Agents: ${agentCount || 0}\nEnrollment Status: ${Object.entries(statusCounts).map(([k, v]) => `${k}: ${v}`).join(", ") || "none"}\n`;
+        }
+      } catch (dataErr) {
+        console.error("Error fetching user data:", dataErr);
+      }
+    }
+
+    // --- Build System Prompt ---
     const systemPrompt = `You are the EduForYou UK AI Assistant — a knowledgeable, friendly helper for agents, admins and the owner of EduForYou UK, a UK-based student recruitment agency.
 
 Your role:
@@ -39,9 +196,12 @@ Key company facts:
 - Commission is calculated per enrolled student based on tier thresholds.
 - Documents required: passport, previous qualifications, English test results, financial evidence.
 - The platform has a Resource Hub with templates, guides, FAQ, training materials and brand assets.
-
-If you don't know something specific about the company, say so honestly and suggest the user contact their admin or the owner.
-Always respond in the same language the user writes in.`;
+${knowledgeSection}${userDataSection}
+[Rules]
+- Only discuss data provided above in [Your Context]. Do not invent student names, enrollment details or statistics.
+- Never reveal other agents' students or data.
+- If you don't know something specific, say so honestly and suggest the user contact their admin or the owner.
+- Always respond in the same language the user writes in.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

@@ -12,6 +12,7 @@ import EnrollStudent from "./pages/agent/EnrollStudent";
 import AdminAgentsPage from "./pages/admin/AdminAgentsPage";
 import AgentsPage from "./pages/owner/AgentsPage";
 import SettingsPage from "./pages/owner/SettingsPage";
+import KnowledgeBasePage from "./pages/owner/KnowledgeBasePage";
 import CommissionsPage from "./pages/owner/CommissionsPage";
 import StudentsPage from "./pages/shared/StudentsPage";
 import EnrollmentsPage from "./pages/shared/EnrollmentsPage";
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/owner/agents" element={<AgentsPage />} />
             <Route path="/owner/settings" element={<SettingsPage />} />
             <Route path="/owner/commissions" element={<CommissionsPage />} />
+            <Route path="/owner/knowledge-base" element={<KnowledgeBasePage />} />
             <Route path="/owner/enroll" element={<EnrollStudent />} />
             <Route path="/owner/profile" element={<ProfilePage />} />
             <Route path="/owner/resources" element={<ResourcesPage />} />
@@ -52,6 +54,7 @@ const App = () => (
             <Route path="/admin/enrollments" element={<EnrollmentsPage />} />
             <Route path="/admin/agents" element={<AdminAgentsPage />} />
             <Route path="/admin/enroll" element={<EnrollStudent />} />
+            <Route path="/admin/knowledge-base" element={<KnowledgeBasePage />} />
             <Route path="/admin/profile" element={<ProfilePage />} />
             <Route path="/admin/resources" element={<ResourcesPage />} />
             
