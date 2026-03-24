@@ -12,6 +12,7 @@ import EnrollStudent from "./pages/agent/EnrollStudent";
 import AdminAgentsPage from "./pages/admin/AdminAgentsPage";
 import AgentsPage from "./pages/owner/AgentsPage";
 import SettingsPage from "./pages/owner/SettingsPage";
+import KnowledgeBasePage from "./pages/owner/KnowledgeBasePage";
 import CommissionsPage from "./pages/owner/CommissionsPage";
 import StudentsPage from "./pages/shared/StudentsPage";
 import EnrollmentsPage from "./pages/shared/EnrollmentsPage";
