@@ -46,6 +46,7 @@ export function AppSidebar() {
       { title: "Agents", url: "/owner/agents", icon: UserCog },
       { title: "Commissions", url: "/owner/commissions", icon: PoundSterling },
       { title: "Knowledge Base", url: "/owner/knowledge-base", icon: Brain },
+      { title: "AI Monitoring", url: "/owner/ai-monitoring", icon: MessageSquare },
       { title: "Settings", url: "/owner/settings", icon: Settings }
     );
   }
