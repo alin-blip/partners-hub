@@ -40,6 +40,7 @@ const App = () => (
             <Route path="/owner/agents" element={<AgentsPage />} />
             <Route path="/owner/settings" element={<SettingsPage />} />
             <Route path="/owner/commissions" element={<CommissionsPage />} />
+            <Route path="/owner/enroll" element={<EnrollStudent />} />
             <Route path="/owner/profile" element={<ProfilePage />} />
             
             {/* Admin routes */}
