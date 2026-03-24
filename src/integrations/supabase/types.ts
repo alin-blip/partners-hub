@@ -256,6 +256,45 @@ export type Database = {
           },
         ]
       }
+      promotions: {
+        Row: {
+          bonus_amount: number
+          bonus_percentage: number | null
+          created_at: string
+          created_by: string | null
+          deadline: string
+          description: string | null
+          id: string
+          is_active: boolean
+          target_students: number
+          title: string
+        }
+        Insert: {
+          bonus_amount?: number
+          bonus_percentage?: number | null
+          created_at?: string
+          created_by?: string | null
+          deadline: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          target_students?: number
+          title: string
+        }
+        Update: {
+          bonus_amount?: number
+          bonus_percentage?: number | null
+          created_at?: string
+          created_by?: string | null
+          deadline?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          target_students?: number
+          title?: string
+        }
+        Relationships: []
+      }
       students: {
         Row: {
           agent_id: string

@@ -5,6 +5,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Users, ClipboardList, Trophy, PoundSterling } from "lucide-react";
+import { PromoBanner } from "@/components/PromoBanner";
 import { calcCommission } from "@/lib/commissions";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -63,6 +64,8 @@ export default function AgentDashboard() {
   return (
     <DashboardLayout allowedRoles={["agent"]}>
       <div className="space-y-6">
+        <PromoBanner />
+
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold tracking-tight">My Dashboard</h1>
           <Button

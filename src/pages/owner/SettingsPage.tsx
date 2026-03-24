@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2 } from "lucide-react";
+import { format } from "date-fns";
 
 function CrudSection({
   title,
@@ -210,6 +211,159 @@ function CommissionTiersSection({ deleteItem }: { deleteItem: any }) {
   );
 }
 
+function PromotionsSection({ deleteItem }: { deleteItem: any }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+
+  const { data: promotions = [] } = useQuery({
+    queryKey: ["promotions-settings"],
+    queryFn: async () => {
+      const { data } = await supabase.from("promotions" as any).select("*").order("created_at", { ascending: false });
+      return (data || []) as any[];
+    },
+  });
+
+  const addPromo = useMutation({
+    mutationFn: async (d: any) => {
+      const { error } = await (supabase.from("promotions" as any) as any).insert({
+        title: d.title,
+        description: d.description || null,
+        deadline: d.deadline,
+        bonus_amount: Number(d.bonus_amount),
+        bonus_percentage: d.bonus_percentage ? Number(d.bonus_percentage) : null,
+        target_students: Number(d.target_students),
+        is_active: true,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["promotions-settings"] });
+      qc.invalidateQueries({ queryKey: ["active-promotions"] });
+      toast({ title: "Promotion added" });
+    },
+  });
+
+  const toggleActive = useMutation({
+    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+      const { error } = await (supabase.from("promotions" as any) as any).update({ is_active }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["promotions-settings"] });
+      qc.invalidateQueries({ queryKey: ["active-promotions"] });
+      toast({ title: "Promotion updated" });
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-3">
+        <CardTitle className="text-base">Promotions</CardTitle>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90">
+              <Plus className="w-3 h-3 mr-1" /> Add
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Promotion</DialogTitle>
+            </DialogHeader>
+            <form
+              className="space-y-4 pt-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                addPromo.mutate(Object.fromEntries(formData));
+                setOpen(false);
+              }}
+            >
+              <div className="space-y-2">
+                <Label>Title</Label>
+                <Input name="title" required placeholder="e.g. Spring Bonus Campaign" />
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Input name="description" placeholder="Recruteaza si obtine 5 studenti admisi..." />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Target Students</Label>
+                  <Input name="target_students" type="number" required min={1} defaultValue={5} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Bonus Amount (£)</Label>
+                  <Input name="bonus_amount" type="number" required min={0} step="0.01" defaultValue={500} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Bonus % Commission</Label>
+                  <Input name="bonus_percentage" type="number" min={0} max={100} placeholder="e.g. 25" defaultValue={25} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Deadline</Label>
+                  <Input name="deadline" type="datetime-local" required />
+                </div>
+              </div>
+              <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
+                Save
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </CardHeader>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Title</TableHead>
+              <TableHead>Target</TableHead>
+              <TableHead>Bonus</TableHead>
+              <TableHead>Deadline</TableHead>
+              <TableHead>Active</TableHead>
+              <TableHead className="w-16" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {promotions.map((p: any) => (
+              <TableRow key={p.id}>
+                <TableCell className="font-medium">{p.title}</TableCell>
+                <TableCell>{p.target_students} students</TableCell>
+                <TableCell>£{p.bonus_amount}{p.bonus_percentage ? ` + ${p.bonus_percentage}%` : ""}</TableCell>
+                <TableCell className="text-sm">{format(new Date(p.deadline), "dd MMM yyyy HH:mm")}</TableCell>
+                <TableCell>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={p.is_active ? "text-green-600" : "text-muted-foreground"}
+                    onClick={() => toggleActive.mutate({ id: p.id, is_active: !p.is_active })}
+                  >
+                    {p.is_active ? "Active" : "Inactive"}
+                  </Button>
+                </TableCell>
+                <TableCell>
+                  <Button variant="ghost" size="icon" onClick={() => deleteItem.mutate({ table: "promotions", id: p.id })}>
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+            {promotions.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
+                  No promotions yet
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -301,6 +455,7 @@ export default function SettingsPage() {
             <TabsTrigger value="courses">Courses</TabsTrigger>
             <TabsTrigger value="intakes">Intakes</TabsTrigger>
             <TabsTrigger value="commissions">Commission Tiers</TabsTrigger>
+            <TabsTrigger value="promotions">Promotions</TabsTrigger>
           </TabsList>
 
           <TabsContent value="universities" className="mt-4">
@@ -461,6 +616,10 @@ export default function SettingsPage() {
 
           <TabsContent value="commissions" className="mt-4">
             <CommissionTiersSection deleteItem={deleteItem} />
+          </TabsContent>
+
+          <TabsContent value="promotions" className="mt-4">
+            <PromotionsSection deleteItem={deleteItem} />
           </TabsContent>
         </Tabs>
       </div>

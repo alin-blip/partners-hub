@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
+import { PromoBanner } from "@/components/PromoBanner";
 
 const chartConfig: ChartConfig = {
   students: { label: "Students", color: "hsl(var(--primary))" },
@@ -194,6 +195,7 @@ export default function OwnerDashboard() {
   return (
     <DashboardLayout allowedRoles={["owner"]}>
       <div className="space-y-6">
+        <PromoBanner />
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

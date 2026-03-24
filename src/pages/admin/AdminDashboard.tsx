@@ -5,6 +5,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Users, UserCheck, ClipboardList } from "lucide-react";
+import { PromoBanner } from "@/components/PromoBanner";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -50,6 +51,7 @@ export default function AdminDashboard() {
   return (
     <DashboardLayout allowedRoles={["admin"]}>
       <div className="space-y-6">
+        <PromoBanner />
         <h1 className="text-2xl font-bold tracking-tight">Team Dashboard</h1>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
