@@ -133,8 +133,10 @@ export default function EnrollStudent() {
   const selectedCourse = courses.find((c: any) => c.id === courseId);
   const selectedIntake = intakes.find((i: any) => i.id === intakeId);
 
+  const prefix = role === "owner" ? "/owner" : role === "admin" ? "/admin" : "/agent";
+
   return (
-    <DashboardLayout allowedRoles={["agent"]}>
+    <DashboardLayout allowedRoles={["agent", "admin", "owner"]}>
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
