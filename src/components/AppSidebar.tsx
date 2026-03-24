@@ -8,6 +8,7 @@ import {
   GraduationCap,
   PoundSterling,
   UserCircle,
+  UserPlus,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -51,7 +52,10 @@ export function AppSidebar() {
     );
   }
 
-  navItems.push({ title: "Profile", url: `${prefix}/profile`, icon: UserCircle });
+  navItems.push(
+    { title: "Enroll Student", url: `${prefix}/enroll`, icon: UserPlus },
+    { title: "Profile", url: `${prefix}/profile`, icon: UserCircle }
+  );
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">

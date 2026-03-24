@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,7 +25,7 @@ const IMMIGRATION_OPTIONS = [
 ];
 
 export default function EnrollStudent() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -117,8 +117,11 @@ export default function EnrollStudent() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["agent-students"] });
       queryClient.invalidateQueries({ queryKey: ["agent-enrollments"] });
+      queryClient.invalidateQueries({ queryKey: ["students"] });
+      queryClient.invalidateQueries({ queryKey: ["enrollments"] });
       toast({ title: "Student enrolled!", description: "The application has been submitted." });
-      navigate("/agent/dashboard");
+      const navPrefix = role === "owner" ? "/owner" : role === "admin" ? "/admin" : "/agent";
+      navigate(`${navPrefix}/dashboard`);
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -133,8 +136,10 @@ export default function EnrollStudent() {
   const selectedCourse = courses.find((c: any) => c.id === courseId);
   const selectedIntake = intakes.find((i: any) => i.id === intakeId);
 
+  const prefix = role === "owner" ? "/owner" : role === "admin" ? "/admin" : "/agent";
+
   return (
-    <DashboardLayout allowedRoles={["agent"]}>
+    <DashboardLayout allowedRoles={["agent", "admin", "owner"]}>
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>

@@ -40,6 +40,7 @@ const App = () => (
             <Route path="/owner/agents" element={<AgentsPage />} />
             <Route path="/owner/settings" element={<SettingsPage />} />
             <Route path="/owner/commissions" element={<CommissionsPage />} />
+            <Route path="/owner/enroll" element={<EnrollStudent />} />
             <Route path="/owner/profile" element={<ProfilePage />} />
             
             {/* Admin routes */}
@@ -48,6 +49,7 @@ const App = () => (
             <Route path="/admin/students/:id" element={<StudentDetailPage />} />
             <Route path="/admin/enrollments" element={<EnrollmentsPage />} />
             <Route path="/admin/agents" element={<AdminAgentsPage />} />
+            <Route path="/admin/enroll" element={<EnrollStudent />} />
             <Route path="/admin/profile" element={<ProfilePage />} />
             
             {/* Agent routes */}
