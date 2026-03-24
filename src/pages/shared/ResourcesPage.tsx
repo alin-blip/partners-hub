@@ -133,7 +133,7 @@ export default function ResourcesPage() {
   const filtered = activeTab === "all" ? resources : resources.filter((r: any) => r.category === activeTab);
 
   return (
-    <DashboardLayout title="Resource Hub" allowedRoles={["owner", "admin", "agent"]}>
+    <DashboardLayout allowedRoles={["owner", "admin", "agent"]}>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">

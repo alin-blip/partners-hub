@@ -55,6 +55,7 @@ export function AppSidebar() {
 
   navItems.push(
     { title: "Enroll Student", url: `${prefix}/enroll`, icon: UserPlus },
+    { title: "Resources", url: `${prefix}/resources`, icon: FolderOpen },
     { title: "Profile", url: `${prefix}/profile`, icon: UserCircle }
   );
 

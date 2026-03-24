@@ -62,6 +62,7 @@ const App = () => (
             <Route path="/agent/enrollments" element={<EnrollmentsPage />} />
             <Route path="/agent/enroll" element={<EnrollStudent />} />
             <Route path="/agent/profile" element={<ProfilePage />} />
+            <Route path="/agent/resources" element={<ResourcesPage />} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
