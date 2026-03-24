@@ -63,6 +63,8 @@ export default function AgentDashboard() {
   return (
     <DashboardLayout allowedRoles={["agent"]}>
       <div className="space-y-6">
+        <PromoBanner />
+
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold tracking-tight">My Dashboard</h1>
           <Button
