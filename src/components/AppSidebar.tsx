@@ -11,6 +11,7 @@ import {
   UserPlus,
   FolderOpen,
   Brain,
+  MessageSquare,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -45,6 +46,7 @@ export function AppSidebar() {
       { title: "Agents", url: "/owner/agents", icon: UserCog },
       { title: "Commissions", url: "/owner/commissions", icon: PoundSterling },
       { title: "Knowledge Base", url: "/owner/knowledge-base", icon: Brain },
+      { title: "AI Monitoring", url: "/owner/ai-monitoring", icon: MessageSquare },
       { title: "Settings", url: "/owner/settings", icon: Settings }
     );
   }
@@ -52,7 +54,8 @@ export function AppSidebar() {
   if (role === "admin") {
     navItems.push(
       { title: "My Agents", url: "/admin/agents", icon: UserCog },
-      { title: "Knowledge Base", url: "/admin/knowledge-base", icon: Brain }
+      { title: "Knowledge Base", url: "/admin/knowledge-base", icon: Brain },
+      { title: "AI Monitoring", url: "/admin/ai-monitoring", icon: MessageSquare }
     );
   }
 
