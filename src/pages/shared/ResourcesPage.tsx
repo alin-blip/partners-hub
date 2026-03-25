@@ -197,7 +197,40 @@ export default function ResourcesPage() {
             ))}
           </TabsList>
 
-          <TabsContent value={activeTab} className="mt-4">
+          <TabsContent value={activeTab} className="mt-4 space-y-6">
+            {/* British Council Banner - show on Training or All tab */}
+            {(activeTab === "training" || activeTab === "all") && (
+              <Card className="overflow-hidden border-2 border-[hsl(170,80%,45%)]">
+                <div className="flex flex-col sm:flex-row">
+                  <div className="sm:w-48 shrink-0">
+                    <img
+                      src={britishCouncilImg}
+                      alt="British Council UK Agent Quality Framework - I am a UK Certified Counsellor"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="flex-1 p-5 flex flex-col justify-center gap-3">
+                    <Badge className="w-fit bg-green-100 text-green-700 hover:bg-green-100">
+                      <GraduationCap className="h-3 w-3 mr-1" /> Training
+                    </Badge>
+                    <h3 className="text-lg font-bold">Obține Gratuit Certificarea British Council</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Înregistrează-te pe platforma UK Agent Quality Framework și obține certificarea de UK Certified Counsellor — gratuit.
+                    </p>
+                    <a
+                      href="https://agent-counsellor-ukhub.britishcouncil.org/Account/Register"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Button className="w-fit">
+                        <ExternalLink className="h-4 w-4 mr-2" /> Înregistrează-te Gratuit
+                      </Button>
+                    </a>
+                  </div>
+                </div>
+              </Card>
+            )}
+
             {isLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {[1, 2, 3].map(i => (
