@@ -8,7 +8,6 @@ import {
   GraduationCap,
   PoundSterling,
   UserCircle,
-  UserPlus,
   FolderOpen,
   Brain,
   MessageSquare,
@@ -80,7 +79,6 @@ export function AppSidebar() {
   if (role === "admin") mainItems.push({ title: "Documents", url: "/admin/documents", icon: FileText });
 
   const actionItems: NavItem[] = [
-    { title: "Enroll Student", url: `${prefix}/enroll`, icon: UserPlus },
     { title: "Create Image", url: `${prefix}/create-image`, icon: ImageIcon },
     { title: "Resources", url: `${prefix}/resources`, icon: FolderOpen },
   ];

@@ -8,7 +8,6 @@ import Login from "./pages/Login";
 import OwnerDashboard from "./pages/owner/OwnerDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AgentDashboard from "./pages/agent/AgentDashboard";
-import EnrollStudent from "./pages/agent/EnrollStudent";
 import AdminAgentsPage from "./pages/admin/AdminAgentsPage";
 import AgentsPage from "./pages/owner/AgentsPage";
 import SettingsPage from "./pages/owner/SettingsPage";
@@ -47,7 +46,7 @@ const App = () => (
             <Route path="/owner/commissions" element={<CommissionsPage />} />
             <Route path="/owner/knowledge-base" element={<KnowledgeBasePage />} />
             <Route path="/owner/ai-monitoring" element={<AIMonitoringPage />} />
-            <Route path="/owner/enroll" element={<EnrollStudent />} />
+            
             <Route path="/owner/profile" element={<ProfilePage />} />
             <Route path="/owner/resources" element={<ResourcesPage />} />
             <Route path="/owner/create-image" element={<CreateImagePage />} />
@@ -59,7 +58,7 @@ const App = () => (
             <Route path="/admin/students/:id" element={<StudentDetailPage />} />
             <Route path="/admin/enrollments" element={<EnrollmentsPage />} />
             <Route path="/admin/agents" element={<AdminAgentsPage />} />
-            <Route path="/admin/enroll" element={<EnrollStudent />} />
+            
             <Route path="/admin/profile" element={<ProfilePage />} />
             <Route path="/admin/resources" element={<ResourcesPage />} />
             <Route path="/admin/create-image" element={<CreateImagePage />} />
@@ -70,7 +69,7 @@ const App = () => (
             <Route path="/agent/students" element={<StudentsPage />} />
             <Route path="/agent/students/:id" element={<StudentDetailPage />} />
             <Route path="/agent/enrollments" element={<EnrollmentsPage />} />
-            <Route path="/agent/enroll" element={<EnrollStudent />} />
+            
             <Route path="/agent/profile" element={<ProfilePage />} />
             <Route path="/agent/resources" element={<ResourcesPage />} />
             <Route path="/agent/create-image" element={<CreateImagePage />} />

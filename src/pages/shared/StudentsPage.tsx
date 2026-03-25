@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
+import { EnrollStudentDialog } from "@/components/EnrollStudentDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,7 +14,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { format } from "date-fns";
-import { Download, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Download, Search, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 
 const PAGE_SIZE = 20;
 const IMMIGRATION_OPTIONS = ["All", "Pre-settled", "Settled", "British Citizen", "Visa Holder", "Refugee", "Other"];
@@ -25,6 +26,7 @@ export default function StudentsPage() {
   const [search, setSearch] = useState("");
   const [immigrationFilter, setImmigrationFilter] = useState("All");
   const [page, setPage] = useState(0);
+  const [enrollOpen, setEnrollOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["all-students", search, immigrationFilter, page],
@@ -57,7 +59,7 @@ export default function StudentsPage() {
     const headers = ["First Name", "Last Name", "Email", "Phone", "Immigration Status", "Created"];
     const rows = students.map((s: any) => [
       s.first_name, s.last_name, s.email || "", s.phone || "", s.immigration_status || "",
-      format(new Date(s.created_at), "yyyy-MM-dd"),
+      s.created_at ? format(new Date(s.created_at), "yyyy-MM-dd") : "",
     ]);
     const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -74,11 +76,16 @@ export default function StudentsPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold tracking-tight">Students</h1>
-          {role === "owner" && (
-            <Button variant="outline" size="sm" onClick={handleExport}>
-              <Download className="w-4 h-4 mr-1" /> Export CSV
+          <div className="flex items-center gap-2">
+            {role === "owner" && (
+              <Button variant="outline" size="sm" onClick={handleExport}>
+                <Download className="w-4 h-4 mr-1" /> Export CSV
+              </Button>
+            )}
+            <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90" onClick={() => setEnrollOpen(true)}>
+              <Plus className="w-4 h-4 mr-1" /> Add Student
             </Button>
-          )}
+          </div>
         </div>
 
         {/* Search & Filter */}
@@ -125,7 +132,7 @@ export default function StudentsPage() {
                   <TableCell className="text-muted-foreground">{s.phone || "—"}</TableCell>
                   <TableCell>{s.immigration_status || "—"}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">
-                    {format(new Date(s.created_at), "dd MMM yyyy")}
+                    {s.created_at ? format(new Date(s.created_at), "dd MMM yyyy") : "—"}
                   </TableCell>
                 </TableRow>
               ))}
@@ -157,6 +164,8 @@ export default function StudentsPage() {
           </div>
         )}
       </div>
+
+      <EnrollStudentDialog open={enrollOpen} onOpenChange={setEnrollOpen} />
     </DashboardLayout>
   );
 }
