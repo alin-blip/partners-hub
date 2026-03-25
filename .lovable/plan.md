@@ -1,45 +1,67 @@
 
 
-# Plan: Organizare Optimă Documente Studenți în Lovable Cloud
+# Plan: Reorganizare Sidebar + Restricții Acces
 
-## Ce avem acum
-- Bucket `student-documents` (privat, securizat) — documentele sunt deja aici
-- Structura: `{student_id}/{docType}_{timestamp}.ext` — fără organizare pe agent
+## Problema actuală
+- Owner are **13 linkuri** într-o listă plată — greu de navigat
+- Admin are **11 linkuri**
+- Knowledge Base și AI Monitoring sunt accesibile Admin-ului, dar ar trebui să fie doar Owner
+- "Enroll Student" și "Create Image" sunt acțiuni de creare amestecate cu paginile de vizualizare
 
-## Ce îmbunătățim
+## Propunere: Grupuri vizuale cu secțiuni
 
-### 1. Structură de foldere organizată
-Schimbăm path-ul de stocare la: `{agent_name}_{agent_id}/{student_name}_{student_id}/{docType}_{timestamp}.ext`
+```text
+┌─────────────────────┐
+│ 🎓 EduForYou UK     │
+├─── MAIN ────────────┤
+│  Dashboard          │
+│  Students           │
+│  Enrollments        │
+│  Documents          │
+├─── ACTIONS ─────────┤
+│  Enroll Student     │
+│  Create Image       │
+│  Resources          │
+├─── MANAGEMENT ──────┤  ← Owner only
+│  Agents             │
+│  Commissions        │
+│  Knowledge Base     │
+│  AI Monitoring      │
+│  Settings           │
+├─── TEAM ────────────┤  ← Admin only
+│  My Agents          │
+├─────────────────────┤
+│  Profile            │
+│  Sign Out           │
+└─────────────────────┘
+```
 
-Exemplu: `John_Smith_abc123/Maria_Garcia_def456/Passport_1711234567.pdf`
+**Agent** vede doar MAIN + ACTIONS + footer (Profile/Sign Out) = **7 items, 2 grupuri**
+**Admin** vede MAIN + ACTIONS + TEAM = **8 items, 3 grupuri**
+**Owner** vede MAIN + ACTIONS + MANAGEMENT = **12 items, 3 grupuri**
 
-Așa, dacă vreodată exportezi bucket-ul, ai foldere clare pe agent > student.
+## Restricții acces
 
-### 2. Tabel `student_documents` pentru tracking metadata
-În loc să ne bazăm doar pe Storage API (care nu păstrează metadata), creăm un tabel DB:
+- **Knowledge Base**: doar Owner (scoatem din Admin sidebar + `allowedRoles` devine `["owner"]`)
+- **AI Monitoring**: doar Owner (la fel)
+- Admin pierde acces la aceste 2 pagini → sidebar-ul Admin scade la **8 items**
 
-- `id` (uuid), `student_id` (uuid, FK), `agent_id` (uuid), `doc_type` (text), `file_name` (text — original), `file_path` (text — storage path), `file_size` (bigint), `uploaded_by` (uuid), `created_at`
-- RLS: Agent=proprii studenți, Admin=echipă, Owner=toate
+## Ce se modifică
 
-Beneficii: căutare, filtrare, raportare, nu pierzi niciodată track-ul documentelor chiar dacă Storage API are probleme.
+### `src/components/AppSidebar.tsx`
+- Împărțim linkurile în grupuri separate cu `SidebarGroup` + `SidebarGroupLabel` (Main, Actions, Management/Team)
+- Profile mutat în footer lângă Sign Out
+- Knowledge Base și AI Monitoring rămân doar la Owner
 
-### 3. Pagină centralizată documente (Owner/Admin)
-Un nou tab sau secțiune în admin unde Owner-ul vede TOATE documentele din platformă, filtrate pe agent/student/tip document.
+### `src/pages/owner/KnowledgeBasePage.tsx`
+- `allowedRoles` de la `["owner", "admin"]` → `["owner"]`
 
-### 4. Storage RLS policies
-Adăugăm politici pe bucket-ul `student-documents` pentru ca fiecare agent să acceseze doar documentele studenților proprii.
+### `src/pages/owner/AIMonitoringPage.tsx`
+- `allowedRoles` de la `["owner", "admin"]` → `["owner"]`
 
----
+### `src/App.tsx`
+- Eliminăm rutele `/admin/knowledge-base` și `/admin/ai-monitoring`
 
-## Fișiere de modificat
-
-- `supabase/migrations/xxx_student_documents.sql` — tabel nou + RLS + storage policies
-- `src/pages/shared/StudentDetailPage.tsx` — upload/download/delete folosind noul tabel + path structurat
-- `src/pages/owner/DocumentsPage.tsx` — pagină nouă centralizată
-- `src/App.tsx` + `src/components/AppSidebar.tsx` — routing + nav
-
-## Note
-- Documentele existente rămân unde sunt (backward compatible)
-- Noile documente vor folosi structura organizată
-- Backup: Lovable Cloud are backup automat. Documentele sunt sigure.
+### Opțional
+- Documents rămâne vizibil și pentru Admin (are sens să vadă documentele echipei)
 
