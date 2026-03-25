@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Plus, Trash2, BookOpen, GraduationCap, Palette, Settings2, Globe, FileText, Download, Loader2, Check, X } from "lucide-react";
+import { Plus, Trash2, BookOpen, GraduationCap, Palette, Settings2, Globe, FileText, Download, Loader2, Check, Pencil, Search } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -54,6 +54,16 @@ export default function KnowledgeBasePage() {
   const [content, setContent] = useState("");
   const [category, setCategory] = useState("general");
 
+  // Edit state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
+  const [editCategory, setEditCategory] = useState("general");
+
+  // Filter state
+  const [searchFilter, setSearchFilter] = useState("");
+
   // Import state
   const [importOpen, setImportOpen] = useState(false);
   const [importUrl, setImportUrl] = useState("www.globalbanking.ac.uk");
@@ -74,6 +84,17 @@ export default function KnowledgeBasePage() {
       return data as KBEntry[];
     },
   });
+
+  // Extract unique university names from titles (pattern: "UniversityName — ...")
+  const universityNames = useMemo(() => {
+    const names = new Set<string>();
+    entries.forEach((e) => {
+      if (e.category === "courses" && e.title.includes(" — ")) {
+        names.add(e.title.split(" — ")[0].trim());
+      }
+    });
+    return [...names].sort();
+  }, [entries]);
 
   const addMutation = useMutation({
     mutationFn: async () => {
@@ -96,6 +117,28 @@ export default function KnowledgeBasePage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const editMutation = useMutation({
+    mutationFn: async () => {
+      if (!editId) return;
+      const { error } = await supabase
+        .from("ai_knowledge_base")
+        .update({
+          title: editTitle.trim(),
+          content: editContent.trim(),
+          category: editCategory,
+        })
+        .eq("id", editId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ai-knowledge-base"] });
+      toast.success("Entry updated");
+      setEditOpen(false);
+      setEditId(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("ai_knowledge_base").delete().eq("id", id);
@@ -110,6 +153,14 @@ export default function KnowledgeBasePage() {
 
   const canManage = role === "owner" || role === "admin";
 
+  const openEdit = (entry: KBEntry) => {
+    setEditId(entry.id);
+    setEditTitle(entry.title);
+    setEditContent(entry.content);
+    setEditCategory(entry.category);
+    setEditOpen(true);
+  };
+
   const handleScrape = async () => {
     setImportStep("scraping");
     try {
@@ -123,7 +174,6 @@ export default function KnowledgeBasePage() {
       setScrapedCourses(courses);
       setSelectedCourses(new Set(courses.map((_: any, i: number) => i)));
 
-      // Try to infer university name from URL
       const urlLower = importUrl.toLowerCase();
       if (urlLower.includes("globalbanking")) setUniversityName("Global Banking School");
       else {
@@ -174,6 +224,17 @@ export default function KnowledgeBasePage() {
       else next.add(idx);
       return next;
     });
+  };
+
+  const getFilteredEntries = (tab: string) => {
+    let filtered = entries.filter((e) => tab === "all" || e.category === tab);
+    if (searchFilter) {
+      const lower = searchFilter.toLowerCase();
+      filtered = filtered.filter(
+        (e) => e.title.toLowerCase().includes(lower) || e.content.toLowerCase().includes(lower)
+      );
+    }
+    return filtered;
   };
 
   return (
@@ -375,6 +436,75 @@ export default function KnowledgeBasePage() {
         )}
       </div>
 
+      {/* Edit Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Knowledge Entry</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!editTitle.trim() || !editContent.trim()) return;
+              editMutation.mutate();
+            }}
+            className="space-y-4"
+          >
+            <div className="space-y-2">
+              <Label>Title</Label>
+              <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} required />
+            </div>
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select value={editCategory} onValueChange={setEditCategory}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Content</Label>
+              <Textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} rows={10} required />
+            </div>
+            <Button type="submit" className="w-full" disabled={editMutation.isPending}>
+              {editMutation.isPending ? "Saving…" : "Update Entry"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Search/Filter bar */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={searchFilter}
+            onChange={(e) => setSearchFilter(e.target.value)}
+            placeholder="Search entries by title or content…"
+            className="pl-9"
+          />
+        </div>
+        {universityNames.length > 0 && (
+          <Select
+            value={searchFilter && universityNames.includes(searchFilter) ? searchFilter : "all"}
+            onValueChange={(v) => setSearchFilter(v === "all" ? "" : v)}
+          >
+            <SelectTrigger className="w-full sm:w-[220px]">
+              <SelectValue placeholder="Filter by university" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Universities</SelectItem>
+              {universityNames.map((name) => (
+                <SelectItem key={name} value={name}>{name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+
       <Tabs defaultValue="all">
         <TabsList>
           <TabsTrigger value="all">All ({entries.length})</TabsTrigger>
@@ -388,19 +518,19 @@ export default function KnowledgeBasePage() {
           })}
         </TabsList>
 
-        {["all", ...CATEGORIES.map((c) => c.value)].map((tab) => (
-          <TabsContent key={tab} value={tab} className="mt-4">
-            {isLoading ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-40 rounded-lg" />
-                ))}
-              </div>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2">
-                {entries
-                  .filter((e) => tab === "all" || e.category === tab)
-                  .map((entry) => {
+        {["all", ...CATEGORIES.map((c) => c.value)].map((tab) => {
+          const filtered = getFilteredEntries(tab);
+          return (
+            <TabsContent key={tab} value={tab} className="mt-4">
+              {isLoading ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-40 rounded-lg" />
+                  ))}
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {filtered.map((entry) => {
                     const cat = CATEGORIES.find((c) => c.value === entry.category);
                     const Icon = cat?.icon || FileText;
                     return (
@@ -412,14 +542,24 @@ export default function KnowledgeBasePage() {
                               <CardTitle className="text-sm">{entry.title}</CardTitle>
                             </div>
                             {canManage && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-destructive"
-                                onClick={() => deleteMutation.mutate(entry.id)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => openEdit(entry)}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-destructive"
+                                  onClick={() => deleteMutation.mutate(entry.id)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
                             )}
                           </div>
                           <CardDescription className="text-xs capitalize">{entry.category}</CardDescription>
@@ -432,16 +572,21 @@ export default function KnowledgeBasePage() {
                       </Card>
                     );
                   })}
-                {entries.filter((e) => tab === "all" || e.category === tab).length === 0 && (
-                  <div className="col-span-2 text-center py-12 text-muted-foreground">
-                    <BookOpen className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                    <p className="text-sm">No knowledge entries in this category yet.</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </TabsContent>
-        ))}
+                  {filtered.length === 0 && (
+                    <div className="col-span-2 text-center py-12 text-muted-foreground">
+                      <BookOpen className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                      <p className="text-sm">
+                        {searchFilter
+                          ? "No entries match your search."
+                          : "No knowledge entries in this category yet."}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </TabsContent>
+          );
+        })}
       </Tabs>
     </DashboardLayout>
   );
