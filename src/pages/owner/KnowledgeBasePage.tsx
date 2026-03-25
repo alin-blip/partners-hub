@@ -89,7 +89,7 @@ export default function KnowledgeBasePage() {
   const canManage = role === "owner" || role === "admin";
 
   return (
-    <DashboardLayout allowedRoles={["owner", "admin"]}>
+    <DashboardLayout allowedRoles={["owner"]}>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">AI Knowledge Base</h1>
