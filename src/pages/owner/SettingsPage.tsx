@@ -538,12 +538,21 @@ export default function SettingsPage() {
 
   const deleteItem = useMutation({
     mutationFn: async ({ table, id }: { table: string; id: string }) => {
+      // For universities, delete related data first
+      if (table === "universities") {
+        await supabase.from("intakes").delete().eq("university_id", id);
+        await supabase.from("courses").delete().eq("university_id", id);
+        await supabase.from("campuses").delete().eq("university_id", id);
+      }
       const { error } = await supabase.from(table as any).delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries();
       toast({ title: "Deleted" });
+    },
+    onError: (e: any) => {
+      toast({ title: "Error deleting", description: e.message, variant: "destructive" });
     },
   });
 
