@@ -12,6 +12,7 @@ import {
   FolderOpen,
   Brain,
   MessageSquare,
+  ImageIcon,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
