@@ -538,12 +538,24 @@ export type Database = {
           date_of_birth: string | null
           email: string | null
           first_name: string
+          full_address: string | null
+          gender: string | null
           id: string
           immigration_status: string | null
           last_name: string
+          nationality: string | null
+          next_of_kin_name: string | null
+          next_of_kin_phone: string | null
+          next_of_kin_relationship: string | null
+          ni_number: string | null
           notes: string | null
           phone: string | null
+          previous_funding_years: number | null
           qualifications: string | null
+          share_code: string | null
+          study_pattern: string | null
+          title: string | null
+          uk_entry_date: string | null
           updated_at: string
         }
         Insert: {
@@ -552,12 +564,24 @@ export type Database = {
           date_of_birth?: string | null
           email?: string | null
           first_name: string
+          full_address?: string | null
+          gender?: string | null
           id?: string
           immigration_status?: string | null
           last_name: string
+          nationality?: string | null
+          next_of_kin_name?: string | null
+          next_of_kin_phone?: string | null
+          next_of_kin_relationship?: string | null
+          ni_number?: string | null
           notes?: string | null
           phone?: string | null
+          previous_funding_years?: number | null
           qualifications?: string | null
+          share_code?: string | null
+          study_pattern?: string | null
+          title?: string | null
+          uk_entry_date?: string | null
           updated_at?: string
         }
         Update: {
@@ -566,12 +590,24 @@ export type Database = {
           date_of_birth?: string | null
           email?: string | null
           first_name?: string
+          full_address?: string | null
+          gender?: string | null
           id?: string
           immigration_status?: string | null
           last_name?: string
+          nationality?: string | null
+          next_of_kin_name?: string | null
+          next_of_kin_phone?: string | null
+          next_of_kin_relationship?: string | null
+          ni_number?: string | null
           notes?: string | null
           phone?: string | null
+          previous_funding_years?: number | null
           qualifications?: string | null
+          share_code?: string | null
+          study_pattern?: string | null
+          title?: string | null
+          uk_entry_date?: string | null
           updated_at?: string
         }
         Relationships: [
