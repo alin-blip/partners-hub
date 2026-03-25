@@ -213,6 +213,132 @@ function CommissionTiersSection({ deleteItem }: { deleteItem: any }) {
   );
 }
 
+function BrandSettingsSection() {
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const [uploading, setUploading] = useState(false);
+
+  const { data: brand, isLoading } = useQuery({
+    queryKey: ["brand-settings"],
+    queryFn: async () => {
+      const { data } = await supabase.from("brand_settings" as any).select("*").limit(1).single();
+      return data as any;
+    },
+  });
+
+  const [brandPrompt, setBrandPrompt] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
+  const [initialized, setInitialized] = useState(false);
+
+  if (brand && !initialized) {
+    setBrandPrompt(brand.brand_prompt || "");
+    setLogoUrl(brand.logo_url || "");
+    setInitialized(true);
+  }
+
+  const saveBrand = useMutation({
+    mutationFn: async () => {
+      if (!brand?.id) throw new Error("No brand settings found");
+      const { error } = await (supabase.from("brand_settings" as any) as any)
+        .update({ brand_prompt: brandPrompt, logo_url: logoUrl || null, updated_at: new Date().toISOString() })
+        .eq("id", brand.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["brand-settings"] });
+      toast({ title: "Brand settings saved" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Max 5MB", variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `logo.${ext}`;
+      const { error } = await supabase.storage.from("brand-assets").upload(path, file, { upsert: true });
+      if (error) throw error;
+      const { data: pub } = supabase.storage.from("brand-assets").getPublicUrl(path);
+      const url = `${pub.publicUrl}?t=${Date.now()}`;
+      setLogoUrl(url);
+      toast({ title: "Logo uploaded — click Save to apply" });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (isLoading) return <div className="py-8 text-center text-muted-foreground">Loading…</div>;
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Palette className="w-4 h-4" />
+            Brand Guidelines for AI
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Brand Prompt / Style Instructions</Label>
+            <Textarea
+              value={brandPrompt}
+              onChange={(e) => setBrandPrompt(e.target.value)}
+              placeholder="e.g. Use navy blue (#1a1a2e) and orange (#e94560) colors, modern minimalist style, include company name EduForYou UK. Professional tone, clean layouts."
+              rows={4}
+            />
+            <p className="text-xs text-muted-foreground">
+              These instructions will be automatically included in every AI image generation to ensure brand consistency.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Company Logo</Label>
+            <div className="flex items-center gap-4">
+              {logoUrl && (
+                <div className="w-20 h-20 border rounded-lg flex items-center justify-center bg-muted overflow-hidden">
+                  <img src={logoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
+                </div>
+              )}
+              <div className="space-y-2">
+                <label className="cursor-pointer">
+                  <input type="file" accept="image/png,image/jpeg,image/svg+xml" className="hidden" onChange={handleLogoUpload} />
+                  <Button variant="outline" size="sm" asChild disabled={uploading}>
+                    <span>
+                      {uploading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Upload className="w-4 h-4 mr-1" />}
+                      {uploading ? "Uploading…" : "Upload Logo"}
+                    </span>
+                  </Button>
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  PNG with transparent background recommended, min 200×200px
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <Button
+            onClick={() => saveBrand.mutate()}
+            disabled={saveBrand.isPending}
+            className="bg-accent text-accent-foreground hover:bg-accent/90"
+          >
+            {saveBrand.isPending ? "Saving…" : "Save Brand Settings"}
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function PromotionsSection({ deleteItem }: { deleteItem: any }) {
   const { toast } = useToast();
   const qc = useQueryClient();
