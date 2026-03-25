@@ -144,7 +144,7 @@ export default function AdminAgentsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
-                      {format(new Date(agent.created_at), "dd MMM yyyy")}
+                      {agent.created_at ? format(new Date(agent.created_at), "dd MMM yyyy") : "—"}
                     </TableCell>
                     <TableCell>
                       <Button
