@@ -1,78 +1,78 @@
 
 
-# Plan: Scrape GBS Website & Bulk Import Courses + Knowledge Base
+## Plan: Revamp Enrollment Form + Fix GBS Campus Names
 
-## Overview
-Use Firecrawl to scrape www.globalbanking.ac.uk, extract all courses, campuses/locations, and course details, then:
-1. Bulk insert into `universities`, `campuses`, `courses` tables
-2. Auto-generate Knowledge Base entries per university and per course
+Two main changes: (1) update GBS campus data, (2) expand the students table and enrollment form with new fields.
 
-## Steps
+---
 
-### 1. Connect Firecrawl
-Link the existing Firecrawl connection to this project so edge functions can use `FIRECRAWL_API_KEY`.
+### 1. Fix GBS Campus Names
 
-### 2. Create Edge Function `scrape-university`
-A new edge function that:
-- Accepts a URL (e.g. `www.globalbanking.ac.uk`)
-- Uses Firecrawl **map** to discover all course/programme pages
-- Uses Firecrawl **scrape** (with JSON schema extraction) on each course page to extract structured data: course name, level (undergraduate/postgraduate), study mode, campus/location, duration, entry requirements, description
-- Returns the structured data
+Update the campuses table data for Global Banking School to use specific campus names:
+- "London - Stratford" instead of "London"
+- "London - Greenford" instead of generic London entry
 
-### 3. Create Edge Function `bulk-import-university`
-Accepts the scraped structured data and:
-- Creates/finds the university in `universities` table ("Global Banking School")
-- Creates/finds campuses from locations found
-- Inserts all courses linked to the university
-- Creates Knowledge Base entries:
-  - One overview entry per university (category: "courses")
-  - One entry per course with full details (category: "courses")
-- Returns a summary of what was imported
+This is a data update (using insert/update tool, not migration).
 
-### 4. New UI: "Import from Website" button on Settings or Knowledge Base page
-- Owner clicks "Import from Website"
-- Enters university website URL
-- System scrapes, shows preview of found courses/locations
-- Owner confirms → bulk import runs
-- Shows success summary with counts
+---
 
-## Files to create/modify
+### 2. Add New Fields to Students Table
 
-| File | Action |
-|------|--------|
-| `supabase/functions/scrape-university/index.ts` | New — Firecrawl scrape + extract |
-| `supabase/functions/bulk-import-university/index.ts` | New — DB inserts |
-| `src/pages/owner/KnowledgeBasePage.tsx` | Add "Import from Website" button + dialog |
-| `src/App.tsx` | No change needed |
+**Database migration** to add these columns to `students`:
 
-## Knowledge Base structure per university
-- **"GBS — Overview"** (category: courses): General info, all locations, programme list
-- **"GBS — BSc Banking & Finance"** (category: courses): Full course details, entry requirements, duration, study modes
-- One entry per course found
+| Column | Type | Nullable |
+|--------|------|----------|
+| `title` | text | yes |
+| `nationality` | text | yes |
+| `gender` | text | yes |
+| `full_address` | text | yes |
+| `uk_entry_date` | date | yes |
+| `share_code` | text | yes |
+| `ni_number` | text | yes |
+| `previous_funding_years` | integer | yes |
+| `study_pattern` | text | yes |
+| `next_of_kin_name` | text | yes |
+| `next_of_kin_phone` | text | yes |
+| `next_of_kin_relationship` | text | yes |
 
-## Technical details
+---
 
-### Firecrawl flow
-1. `map(url)` → get all URLs on the site
-2. Filter URLs containing `/courses/`, `/programmes/`, or similar patterns
-3. `scrape(url, { formats: [{ type: 'json', schema: courseSchema }] })` on each course URL
-4. Aggregate results
+### 3. Revamp EnrollStudentDialog
 
-### Course schema for extraction
-```json
-{
-  "name": "string",
-  "level": "string (undergraduate/postgraduate/foundation)",
-  "study_mode": "string (full-time/part-time/blended)",
-  "duration": "string",
-  "campus_locations": ["string"],
-  "entry_requirements": "string",
-  "description": "string"
-}
-```
+Expand from 3 steps to 4 steps:
 
-### Security
-- Edge functions validate JWT (owner only)
-- Rate limited: one scrape at a time
-- Preview before import (no auto-insert)
+**Step 1 — Institution & Course** (same as now)
+- University, Campus, Course, Intake, Study Pattern (Weekdays/Weekend/Evenings)
+
+**Step 2 — Applicant Details** (expanded)
+- Title, First Name, Last Name, Nationality, Gender
+- Date of Birth, Email, Mobile
+- Full UK Address
+- UK Entry Date
+- Immigration Status, Share Code, NI Number
+- Previous Funding (how many years)
+
+**Step 3 — Next of Kin**
+- Full Name, Phone, Relationship
+
+**Step 4 — Review & Submit**
+- Summary of all fields, submit button
+
+Documents are NOT required at enrollment (can be added later from student detail page, as currently works).
+
+---
+
+### 4. Update EnrollStudent Page
+
+The standalone `/agent/enroll` page (`src/pages/agent/EnrollStudent.tsx`) has the same form — it will receive the same field additions.
+
+---
+
+### Technical Details
+
+- Migration adds 12 nullable columns to `students` table (no breaking changes)
+- `EnrollStudentDialog.tsx` — add state for all new fields, restructure steps
+- `EnrollStudent.tsx` — mirror the same changes
+- `StudentDetailPage.tsx` — display new fields in the detail view and edit form
+- Campus data update via SQL UPDATE on campuses table for GBS entries
 
