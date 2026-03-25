@@ -31,48 +31,76 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 
+type NavItem = { title: string; url: string; icon: React.ElementType };
+
+function SidebarNavGroup({ label, items, collapsed }: { label: string; items: NavItem[]; collapsed: boolean }) {
+  if (items.length === 0) return null;
+  return (
+    <SidebarGroup>
+      <SidebarGroupLabel className="text-sidebar-foreground/40 uppercase text-[10px] tracking-widest px-4 pt-4 pb-1">
+        {!collapsed && label}
+      </SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          {items.map((item) => (
+            <SidebarMenuItem key={item.title}>
+              <SidebarMenuButton asChild>
+                <NavLink
+                  to={item.url}
+                  end={item.url.endsWith("dashboard")}
+                  className="text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
+                  activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                >
+                  <item.icon className="mr-2 h-4 w-4 shrink-0" />
+                  {!collapsed && <span>{item.title}</span>}
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  );
+}
+
 export function AppSidebar() {
   const { role, profile, signOut } = useAuth();
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const prefix = role === "owner" ? "/owner" : role === "admin" ? "/admin" : "/agent";
 
-  const navItems = [
+  const mainItems: NavItem[] = [
     { title: "Dashboard", url: `${prefix}/dashboard`, icon: LayoutDashboard },
     { title: "Students", url: `${prefix}/students`, icon: Users },
     { title: "Enrollments", url: `${prefix}/enrollments`, icon: ClipboardList },
   ];
 
-  if (role === "owner") {
-    navItems.push(
-      { title: "Agents", url: "/owner/agents", icon: UserCog },
-      { title: "Documents", url: "/owner/documents", icon: FileText },
-      { title: "Commissions", url: "/owner/commissions", icon: PoundSterling },
-      { title: "Knowledge Base", url: "/owner/knowledge-base", icon: Brain },
-      { title: "AI Monitoring", url: "/owner/ai-monitoring", icon: MessageSquare },
-      { title: "Settings", url: "/owner/settings", icon: Settings }
-    );
-  }
+  // Documents visible to owner & admin
+  if (role === "owner") mainItems.push({ title: "Documents", url: "/owner/documents", icon: FileText });
+  if (role === "admin") mainItems.push({ title: "Documents", url: "/admin/documents", icon: FileText });
 
-  if (role === "admin") {
-    navItems.push(
-      { title: "My Agents", url: "/admin/agents", icon: UserCog },
-      { title: "Documents", url: "/admin/documents", icon: FileText },
-      { title: "Knowledge Base", url: "/admin/knowledge-base", icon: Brain },
-      { title: "AI Monitoring", url: "/admin/ai-monitoring", icon: MessageSquare }
-    );
-  }
-
-  navItems.push(
+  const actionItems: NavItem[] = [
     { title: "Enroll Student", url: `${prefix}/enroll`, icon: UserPlus },
     { title: "Create Image", url: `${prefix}/create-image`, icon: ImageIcon },
     { title: "Resources", url: `${prefix}/resources`, icon: FolderOpen },
-    { title: "Profile", url: `${prefix}/profile`, icon: UserCircle }
-  );
+  ];
+
+  const managementItems: NavItem[] = role === "owner" ? [
+    { title: "Agents", url: "/owner/agents", icon: UserCog },
+    { title: "Commissions", url: "/owner/commissions", icon: PoundSterling },
+    { title: "Knowledge Base", url: "/owner/knowledge-base", icon: Brain },
+    { title: "AI Monitoring", url: "/owner/ai-monitoring", icon: MessageSquare },
+    { title: "Settings", url: "/owner/settings", icon: Settings },
+  ] : [];
+
+  const teamItems: NavItem[] = role === "admin" ? [
+    { title: "My Agents", url: "/admin/agents", icon: UserCog },
+  ] : [];
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">
       <SidebarContent className="bg-sidebar text-sidebar-foreground">
+        {/* Brand header */}
         <SidebarGroup>
           <SidebarGroupLabel className="text-sidebar-foreground/60 px-4 pt-5 pb-3">
             <div className="flex items-center gap-2">
@@ -80,30 +108,31 @@ export function AppSidebar() {
               {!collapsed && <span className="font-bold text-sm tracking-tight text-sidebar-foreground">EduForYou UK</span>}
             </div>
           </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      end={item.url.endsWith("dashboard")}
-                      className="text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
-                      activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
-                    >
-                      <item.icon className="mr-2 h-4 w-4 shrink-0" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
         </SidebarGroup>
+
+        <SidebarNavGroup label="Main" items={mainItems} collapsed={collapsed} />
+        <SidebarNavGroup label="Actions" items={actionItems} collapsed={collapsed} />
+        <SidebarNavGroup label="Management" items={managementItems} collapsed={collapsed} />
+        <SidebarNavGroup label="Team" items={teamItems} collapsed={collapsed} />
       </SidebarContent>
+
       <SidebarFooter className="bg-sidebar text-sidebar-foreground border-t border-sidebar-border p-3">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <NavLink
+                to={`${prefix}/profile`}
+                className="text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
+                activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+              >
+                <UserCircle className="mr-2 h-4 w-4 shrink-0" />
+                {!collapsed && <span>Profile</span>}
+              </NavLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
         {!collapsed && profile && (
-          <div className="mb-2 px-1">
+          <div className="mb-1 mt-1 px-1">
             <p className="text-xs font-medium truncate">{profile.full_name}</p>
             <p className="text-[10px] text-sidebar-foreground/50 truncate">{profile.email}</p>
           </div>
