@@ -750,6 +750,10 @@ export default function SettingsPage() {
           <TabsContent value="promotions" className="mt-4">
             <PromotionsSection deleteItem={deleteItem} />
           </TabsContent>
+
+          <TabsContent value="brand" className="mt-4">
+            <BrandSettingsSection />
+          </TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>
