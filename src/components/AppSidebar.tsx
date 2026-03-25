@@ -13,6 +13,7 @@ import {
   Brain,
   MessageSquare,
   Image as ImageIcon,
+  FileText,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -45,6 +46,7 @@ export function AppSidebar() {
   if (role === "owner") {
     navItems.push(
       { title: "Agents", url: "/owner/agents", icon: UserCog },
+      { title: "Documents", url: "/owner/documents", icon: FileText },
       { title: "Commissions", url: "/owner/commissions", icon: PoundSterling },
       { title: "Knowledge Base", url: "/owner/knowledge-base", icon: Brain },
       { title: "AI Monitoring", url: "/owner/ai-monitoring", icon: MessageSquare },
@@ -55,6 +57,7 @@ export function AppSidebar() {
   if (role === "admin") {
     navItems.push(
       { title: "My Agents", url: "/admin/agents", icon: UserCog },
+      { title: "Documents", url: "/admin/documents", icon: FileText },
       { title: "Knowledge Base", url: "/admin/knowledge-base", icon: Brain },
       { title: "AI Monitoring", url: "/admin/ai-monitoring", icon: MessageSquare }
     );

@@ -23,6 +23,10 @@ import { format } from "date-fns";
 const IMMIGRATION_OPTIONS = ["Pre-settled", "Settled", "British Citizen", "Visa Holder", "Refugee", "Other"];
 const DOC_TYPES = ["Passport", "Transcript", "Offer Letter", "Visa", "Qualification Certificate", "Other"];
 
+function sanitizeName(name: string) {
+  return name.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 30);
+}
+
 export default function StudentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { role, user } = useAuth();
@@ -66,9 +70,11 @@ export default function StudentDetailPage() {
   const { data: documents = [], refetch: refetchDocs } = useQuery({
     queryKey: ["student-documents", id],
     queryFn: async () => {
-      const { data, error } = await supabase.storage
-        .from("student-documents")
-        .list(id!, { sortBy: { column: "created_at", order: "desc" } });
+      const { data, error } = await supabase
+        .from("student_documents")
+        .select("*")
+        .eq("student_id", id!)
+        .order("created_at", { ascending: false });
       if (error) return [];
       return data || [];
     },
@@ -103,35 +109,64 @@ export default function StudentDetailPage() {
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !id) return;
+    if (!file || !id || !student || !user) return;
     setUploading(true);
-    const ext = file.name.split(".").pop();
-    const path = `${id}/${selectedDocType}_${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from("student-documents").upload(path, file);
-    setUploading(false);
-    if (error) {
-      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
-    } else {
+
+    try {
+      // Build structured path: agentName_agentId/studentName_studentId/docType_timestamp.ext
+      const agentName = sanitizeName(agentProfile?.full_name || "unknown");
+      const studentName = sanitizeName(`${student.first_name}_${student.last_name}`);
+      const ext = file.name.split(".").pop();
+      const storagePath = `${agentName}_${student.agent_id}/${studentName}_${id}/${selectedDocType}_${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("student-documents")
+        .upload(storagePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // Save metadata to student_documents table
+      const { error: dbError } = await supabase
+        .from("student_documents")
+        .insert({
+          student_id: id,
+          agent_id: student.agent_id,
+          doc_type: selectedDocType,
+          file_name: file.name,
+          file_path: storagePath,
+          file_size: file.size,
+          uploaded_by: user.id,
+        });
+
+      if (dbError) throw dbError;
+
       toast({ title: "Document uploaded" });
       refetchDocs();
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
-    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleDownload = async (name: string) => {
-    const { data } = await supabase.storage.from("student-documents").download(`${id}/${name}`);
+  const handleDownload = async (doc: any) => {
+    const { data } = await supabase.storage.from("student-documents").download(doc.file_path);
     if (data) {
       const url = URL.createObjectURL(data);
       const a = document.createElement("a");
       a.href = url;
-      a.download = name;
+      a.download = doc.file_name;
       a.click();
       URL.revokeObjectURL(url);
     }
   };
 
-  const handleDeleteDoc = async (name: string) => {
-    const { error } = await supabase.storage.from("student-documents").remove([`${id}/${name}`]);
+  const handleDeleteDoc = async (doc: any) => {
+    // Delete from storage
+    await supabase.storage.from("student-documents").remove([doc.file_path]);
+    // Delete from DB
+    const { error } = await supabase.from("student_documents").delete().eq("id", doc.id);
     if (error) {
       toast({ title: "Delete failed", description: error.message, variant: "destructive" });
     } else {
@@ -325,20 +360,25 @@ export default function StudentDetailPage() {
             ) : (
               <div className="space-y-2">
                 {documents.map((doc: any) => (
-                  <div key={doc.name} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+                  <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
                     <div className="flex items-center gap-3">
                       <FileText className="w-4 h-4 text-muted-foreground" />
                       <div>
-                        <p className="text-sm font-medium">{doc.name.split("_")[0]}</p>
-                        <p className="text-xs text-muted-foreground">{doc.name}</p>
+                        <p className="text-sm font-medium">{doc.doc_type}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {doc.file_name} {doc.file_size ? `• ${(doc.file_size / 1024).toFixed(0)} KB` : ""}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(doc.created_at), "dd MMM yyyy HH:mm")}
+                        </p>
                       </div>
                     </div>
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownload(doc.name)}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownload(doc)}>
                         <Download className="w-3.5 h-3.5" />
                       </Button>
                       {canEdit && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteDoc(doc.name)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteDoc(doc)}>
                           <Trash2 className="w-3.5 h-3.5 text-destructive" />
                         </Button>
                       )}

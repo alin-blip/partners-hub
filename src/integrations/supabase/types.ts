@@ -487,6 +487,50 @@ export type Database = {
           },
         ]
       }
+      student_documents: {
+        Row: {
+          agent_id: string
+          created_at: string
+          doc_type: string
+          file_name: string
+          file_path: string
+          file_size: number | null
+          id: string
+          student_id: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          doc_type?: string
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          id?: string
+          student_id: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          doc_type?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          student_id?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_documents_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       students: {
         Row: {
           agent_id: string
