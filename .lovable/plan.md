@@ -1,67 +1,96 @@
 
 
-# Plan: AI Chat Persistence + Owner Chat Monitoring
+# Plan: AI Image Generator with Brand + Agent Photos
 
 ## What We're Building
 
-1. **Chat conversation persistence** — Every message (user + assistant) saved to DB, conversations resumable across sessions
-2. **Conversation history sidebar** — Users can see past conversations, start new ones, resume old ones
-3. **Owner/Admin monitoring page** — Owner sees ALL conversations from all users; Admin sees their team's conversations. Full tracking of what agents/admins ask the AI.
+1. **Edge function `generate-image`** — Uses `google/gemini-3.1-flash-image-preview` (Nano Banana 2) for fast, high-quality image generation
+2. **Page `/[role]/create-image`** — Presets (Social Media Post, Story, Flyer, Banner), prompt input, gallery of saved results
+3. **Brand settings** — Owner uploads company logo + defines brand prompt in Settings; logo and style auto-injected into every generation
+4. **Agent photo** — Each user can upload a profile photo (in Profile page); when generating images, they can toggle "Include my photo" so the AI composites their face into the design
+5. **Photo guidelines** — Clear instructions shown on upload: accepted formats, recommended dimensions, tips for best results
+6. **Daily limit** — 5 images per user per day, enforced in edge function
 
 ---
 
-## Database
+## Database Changes
 
-### Table: `ai_conversations`
-- `id` (uuid, PK), `user_id` (uuid, NOT NULL), `title` (text, default 'New conversation'), `created_at`, `updated_at`
-- RLS: Users CRUD own; Admin SELECT team's (via profiles.admin_id); Owner SELECT all
+### Table: `brand_settings` (single-row config)
+- `id` (uuid, PK), `brand_prompt` (text), `logo_url` (text, nullable), `updated_at`
+- RLS: Owner full CRUD; all authenticated SELECT
 
-### Table: `ai_messages`
-- `id` (uuid, PK), `conversation_id` (uuid, FK → ai_conversations), `role` (text: 'user'/'assistant'), `content` (text), `created_at`
-- RLS: same pattern — users manage own conversation's messages; Admin/Owner read team/all
+### Table: `generated_images`
+- `id` (uuid, PK), `user_id` (uuid), `prompt` (text), `preset` (text), `image_path` (text), `created_at`
+- RLS: Users manage own; Admin reads team; Owner reads all
 
----
+### Column on `profiles`: add `avatar_url` (text, nullable)
+- For storing the agent's uploaded photo URL
 
-## Edge Function Update (`ai-chat/index.ts`)
-
-- Accept optional `conversation_id` in request body
-- After authenticating user, if no `conversation_id`: create new conversation, return its ID in response headers
-- Save each user message to `ai_messages` before calling AI
-- After streaming completes, save the full assistant response to `ai_messages`
-- Auto-generate conversation title from first user message (truncate to 50 chars)
+### Storage buckets
+- `brand-assets` (public) — for logo
+- `generated-images` (public) — for AI-generated images
+- `avatars` (public) — for agent profile photos
 
 ---
 
-## Frontend: `AIChatPanel.tsx` Rewrite
+## Profile Page: Agent Photo Upload
 
-- Add conversation list sidebar (left pane inside the Sheet) showing past conversations with titles + dates
-- "New Chat" button at top
-- On selecting a conversation: load its messages from DB and display
-- On sending: save message to DB, stream response, save assistant reply to DB
-- Track `activeConversationId` in state
-
----
-
-## New Page: `/owner/ai-monitoring` (and `/admin/ai-monitoring`)
-
-### `src/pages/owner/AIMonitoringPage.tsx`
-- Table showing all conversations: User Name, Role, Title, Message Count, Last Activity
-- Click to expand/view full conversation transcript (read-only)
-- Filters: by role (agent/admin), by date range, search in messages
-- Admin version: only shows conversations from their team agents
-- Owner version: shows ALL conversations
-
-### Routing & Sidebar
-- Add routes `/owner/ai-monitoring` and `/admin/ai-monitoring` in App.tsx
-- Add "AI Monitoring" link with MessageSquare icon in sidebar for Owner and Admin
+Add to `ProfilePage.tsx`:
+- Photo upload section with preview
+- **Photo guidelines displayed**: "Upload a clear headshot (JPG/PNG, min 400x400px, max 5MB). Face should be centered, well-lit, plain background recommended. This photo will be used when generating personalized marketing images."
+- Upload to `avatars` bucket, save URL to `profiles.avatar_url`
 
 ---
 
-## Technical Details
+## Settings Page: Brand Tab
 
-- Messages saved via `adminClient` (service role) in the edge function to bypass RLS
-- Conversation list fetched client-side via supabase client (RLS handles scoping)
-- Admin team scoping: `ai_conversations.user_id IN (SELECT id FROM profiles WHERE admin_id = auth.uid())` + own conversations
-- Owner: `has_role(auth.uid(), 'owner')` → sees all
-- Conversation title: first user message truncated to 50 chars, set on first message
+Add "Brand / AI" tab in `SettingsPage.tsx`:
+- **Brand Prompt** textarea — style instructions (e.g., "Use navy blue and orange, modern style, include EduForYou UK branding")
+- **Logo Upload** — upload to `brand-assets` bucket, preview shown, save URL to `brand_settings.logo_url`
+- Logo guidelines: "PNG with transparent background recommended, min 200x200px"
+
+---
+
+## Edge Function: `generate-image`
+
+1. Authenticate user via JWT
+2. Count today's images for user — if >= 5, return 429
+3. Fetch `brand_settings` (brand_prompt, logo_url)
+4. Fetch user's `avatar_url` from profiles (if user toggled "Include my photo")
+5. Build prompt combining: preset instructions + user prompt + brand guidelines
+6. Call Lovable AI with `google/gemini-3.1-flash-image-preview`, `modalities: ["image", "text"]`
+   - If agent photo requested: include agent photo as image input with instruction "Place this person's photo prominently in the design"
+   - If logo exists: include logo as image input with instruction "Include this logo in a corner of the design"
+7. Extract base64 image, upload to `generated-images` bucket
+8. Save record to `generated_images` table
+9. Return public URL
+
+### Preset definitions
+- **Social Media Post**: "1080x1080 square social media post"
+- **Story**: "1080x1920 vertical story"
+- **Flyer**: "A5 portrait flyer"
+- **Banner**: "1200x628 horizontal banner"
+
+---
+
+## Frontend: `/[role]/create-image`
+
+- Preset selector (4 cards with icons)
+- Prompt textarea
+- Toggle: "Include my photo" (disabled if no avatar_url with tooltip "Upload your photo in Profile first")
+- "Generate" button + remaining count badge (e.g., "3/5 remaining today")
+- Result display with download button
+- Gallery grid below: previously generated images with date/prompt info
+
+---
+
+## Files to create/edit
+
+- `supabase/migrations/xxx_image_generator.sql` — brand_settings, generated_images, profiles.avatar_url, storage buckets
+- `supabase/functions/generate-image/index.ts` — new edge function
+- `src/pages/shared/CreateImagePage.tsx` — new page
+- `src/pages/shared/ProfilePage.tsx` — add photo upload section
+- `src/pages/owner/SettingsPage.tsx` — add Brand tab
+- `src/App.tsx` — add routes
+- `src/components/AppSidebar.tsx` — add nav link
 
