@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
 
     console.log('Step 3: Extracting course data with AI...');
 
-    const aiRes = await fetch('https://ai.lovable.dev/chat/completions', {
+    const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${lovableApiKey}`,
