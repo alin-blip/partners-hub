@@ -14,7 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Plus, Trash2, BookOpen, GraduationCap, Palette, Settings2, Globe, FileText } from "lucide-react";
+import { Plus, Trash2, BookOpen, GraduationCap, Palette, Settings2, Globe, FileText, Download, Loader2, Check, X } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const CATEGORIES = [
   { value: "courses", label: "Courses", icon: GraduationCap },
@@ -33,6 +35,17 @@ type KBEntry = {
   created_by: string | null;
 };
 
+type ScrapedCourse = {
+  name: string;
+  level: string;
+  study_mode: string;
+  duration: string;
+  campus_locations: string[];
+  entry_requirements: string;
+  description: string;
+  source_url: string;
+};
+
 export default function KnowledgeBasePage() {
   const { role, user } = useAuth();
   const queryClient = useQueryClient();
@@ -40,6 +53,15 @@ export default function KnowledgeBasePage() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [category, setCategory] = useState("general");
+
+  // Import state
+  const [importOpen, setImportOpen] = useState(false);
+  const [importUrl, setImportUrl] = useState("www.globalbanking.ac.uk");
+  const [importStep, setImportStep] = useState<"input" | "scraping" | "preview" | "importing" | "done">("input");
+  const [scrapedCourses, setScrapedCourses] = useState<ScrapedCourse[]>([]);
+  const [selectedCourses, setSelectedCourses] = useState<Set<number>>(new Set());
+  const [importSummary, setImportSummary] = useState<any>(null);
+  const [universityName, setUniversityName] = useState("");
 
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ["ai-knowledge-base"],
@@ -88,6 +110,72 @@ export default function KnowledgeBasePage() {
 
   const canManage = role === "owner" || role === "admin";
 
+  const handleScrape = async () => {
+    setImportStep("scraping");
+    try {
+      const { data, error } = await supabase.functions.invoke("scrape-university", {
+        body: { url: importUrl },
+      });
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error || "Scrape failed");
+
+      const courses = data.courses || [];
+      setScrapedCourses(courses);
+      setSelectedCourses(new Set(courses.map((_: any, i: number) => i)));
+
+      // Try to infer university name from URL
+      const urlLower = importUrl.toLowerCase();
+      if (urlLower.includes("globalbanking")) setUniversityName("Global Banking School");
+      else {
+        const domain = importUrl.replace(/https?:\/\//, "").replace("www.", "").split(".")[0];
+        setUniversityName(domain.charAt(0).toUpperCase() + domain.slice(1));
+      }
+
+      setImportStep("preview");
+      toast.success(`Found ${courses.length} courses`);
+    } catch (e: any) {
+      toast.error(e.message || "Scraping failed");
+      setImportStep("input");
+    }
+  };
+
+  const handleImport = async () => {
+    setImportStep("importing");
+    try {
+      const selected = scrapedCourses.filter((_, i) => selectedCourses.has(i));
+      const { data, error } = await supabase.functions.invoke("bulk-import-university", {
+        body: { university_name: universityName, courses: selected },
+      });
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error || "Import failed");
+
+      setImportSummary(data.summary);
+      setImportStep("done");
+      queryClient.invalidateQueries({ queryKey: ["ai-knowledge-base"] });
+      toast.success("Import completed!");
+    } catch (e: any) {
+      toast.error(e.message || "Import failed");
+      setImportStep("preview");
+    }
+  };
+
+  const resetImport = () => {
+    setImportStep("input");
+    setScrapedCourses([]);
+    setSelectedCourses(new Set());
+    setImportSummary(null);
+    setUniversityName("");
+  };
+
+  const toggleCourse = (idx: number) => {
+    setSelectedCourses((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
+
   return (
     <DashboardLayout allowedRoles={["owner"]}>
       <div className="flex items-center justify-between mb-6">
@@ -98,55 +186,192 @@ export default function KnowledgeBasePage() {
           </p>
         </div>
         {canManage && (
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" /> Add Knowledge
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Add Knowledge Entry</DialogTitle>
-              </DialogHeader>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (!title.trim() || !content.trim()) return;
-                  addMutation.mutate();
-                }}
-                className="space-y-4"
-              >
-                <div className="space-y-2">
-                  <Label>Title</Label>
-                  <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. University of London — Course List" required />
-                </div>
-                <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Select value={category} onValueChange={setCategory}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {CATEGORIES.map((c) => (
-                        <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Content</Label>
-                  <Textarea
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    placeholder="Paste course details, brand guidelines, process steps, etc."
-                    rows={10}
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={addMutation.isPending}>
-                  {addMutation.isPending ? "Saving…" : "Save Entry"}
+          <div className="flex gap-2">
+            <Dialog open={importOpen} onOpenChange={(open) => { setImportOpen(open); if (!open) resetImport(); }}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Download className="h-4 w-4 mr-2" /> Import from Website
                 </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
+                <DialogHeader>
+                  <DialogTitle>
+                    {importStep === "input" && "Import Courses from Website"}
+                    {importStep === "scraping" && "Scanning website…"}
+                    {importStep === "preview" && "Review Found Courses"}
+                    {importStep === "importing" && "Importing…"}
+                    {importStep === "done" && "Import Complete"}
+                  </DialogTitle>
+                </DialogHeader>
+
+                {importStep === "input" && (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>University Website URL</Label>
+                      <Input
+                        value={importUrl}
+                        onChange={(e) => setImportUrl(e.target.value)}
+                        placeholder="e.g. www.globalbanking.ac.uk"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      We'll scan the website to find all courses, campuses, and programme details.
+                      Found data will be added to your database and knowledge base.
+                    </p>
+                    <Button onClick={handleScrape} className="w-full" disabled={!importUrl.trim()}>
+                      <Globe className="h-4 w-4 mr-2" /> Start Scanning
+                    </Button>
+                  </div>
+                )}
+
+                {importStep === "scraping" && (
+                  <div className="flex flex-col items-center justify-center py-12 gap-4">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                    <p className="text-sm text-muted-foreground">Scanning website for courses…</p>
+                    <p className="text-xs text-muted-foreground">This may take 1-2 minutes</p>
+                  </div>
+                )}
+
+                {importStep === "preview" && (
+                  <div className="flex flex-col gap-4 min-h-0">
+                    <div className="space-y-2">
+                      <Label>University Name</Label>
+                      <Input value={universityName} onChange={(e) => setUniversityName(e.target.value)} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">
+                        {scrapedCourses.length} courses found — {selectedCourses.size} selected
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (selectedCourses.size === scrapedCourses.length) setSelectedCourses(new Set());
+                          else setSelectedCourses(new Set(scrapedCourses.map((_, i) => i)));
+                        }}
+                      >
+                        {selectedCourses.size === scrapedCourses.length ? "Deselect All" : "Select All"}
+                      </Button>
+                    </div>
+                    <ScrollArea className="flex-1 max-h-[40vh] border rounded-md">
+                      <div className="p-2 space-y-1">
+                        {scrapedCourses.map((course, idx) => (
+                          <label
+                            key={idx}
+                            className="flex items-start gap-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer"
+                          >
+                            <Checkbox
+                              checked={selectedCourses.has(idx)}
+                              onCheckedChange={() => toggleCourse(idx)}
+                              className="mt-0.5"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{course.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {course.level} · {course.study_mode}
+                                {course.duration && ` · ${course.duration}`}
+                              </p>
+                              {course.campus_locations?.length > 0 && (
+                                <p className="text-xs text-muted-foreground">
+                                  📍 {course.campus_locations.join(", ")}
+                                </p>
+                              )}
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                    <Button onClick={handleImport} disabled={selectedCourses.size === 0 || !universityName.trim()}>
+                      <Check className="h-4 w-4 mr-2" /> Import {selectedCourses.size} Courses
+                    </Button>
+                  </div>
+                )}
+
+                {importStep === "importing" && (
+                  <div className="flex flex-col items-center justify-center py-12 gap-4">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                    <p className="text-sm text-muted-foreground">Importing courses and creating knowledge base entries…</p>
+                  </div>
+                )}
+
+                {importStep === "done" && importSummary && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <Card className="p-3">
+                        <p className="text-xs text-muted-foreground">Courses Added</p>
+                        <p className="text-2xl font-bold">{importSummary.coursesInserted}</p>
+                      </Card>
+                      <Card className="p-3">
+                        <p className="text-xs text-muted-foreground">Skipped (Duplicates)</p>
+                        <p className="text-2xl font-bold">{importSummary.coursesSkipped}</p>
+                      </Card>
+                      <Card className="p-3">
+                        <p className="text-xs text-muted-foreground">Campuses Created</p>
+                        <p className="text-2xl font-bold">{importSummary.campusesCreated}</p>
+                      </Card>
+                      <Card className="p-3">
+                        <p className="text-xs text-muted-foreground">KB Entries Created</p>
+                        <p className="text-2xl font-bold">{importSummary.knowledgeBaseEntries}</p>
+                      </Card>
+                    </div>
+                    <Button onClick={() => { setImportOpen(false); resetImport(); }} className="w-full">
+                      Done
+                    </Button>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" /> Add Knowledge
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Add Knowledge Entry</DialogTitle>
+                </DialogHeader>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!title.trim() || !content.trim()) return;
+                    addMutation.mutate();
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="space-y-2">
+                    <Label>Title</Label>
+                    <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. University of London — Course List" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Category</Label>
+                    <Select value={category} onValueChange={setCategory}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {CATEGORIES.map((c) => (
+                          <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Content</Label>
+                    <Textarea
+                      value={content}
+                      onChange={(e) => setContent(e.target.value)}
+                      placeholder="Paste course details, brand guidelines, process steps, etc."
+                      rows={10}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={addMutation.isPending}>
+                    {addMutation.isPending ? "Saving…" : "Save Entry"}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         )}
       </div>
 
