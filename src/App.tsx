@@ -46,7 +46,7 @@ const App = () => (
             <Route path="/owner/commissions" element={<CommissionsPage />} />
             <Route path="/owner/knowledge-base" element={<KnowledgeBasePage />} />
             <Route path="/owner/ai-monitoring" element={<AIMonitoringPage />} />
-            <Route path="/owner/enroll" element={<EnrollStudent />} />
+            
             <Route path="/owner/profile" element={<ProfilePage />} />
             <Route path="/owner/resources" element={<ResourcesPage />} />
             <Route path="/owner/create-image" element={<CreateImagePage />} />
