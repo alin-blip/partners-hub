@@ -8,7 +8,6 @@ import {
   GraduationCap,
   PoundSterling,
   UserCircle,
-  UserPlus,
   FolderOpen,
   Brain,
   MessageSquare,
