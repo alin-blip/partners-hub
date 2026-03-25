@@ -62,6 +62,7 @@ const App = () => (
             <Route path="/admin/ai-monitoring" element={<AIMonitoringPage />} />
             <Route path="/admin/profile" element={<ProfilePage />} />
             <Route path="/admin/resources" element={<ResourcesPage />} />
+            <Route path="/admin/create-image" element={<CreateImagePage />} />
             
             {/* Agent routes */}
             <Route path="/agent/dashboard" element={<AgentDashboard />} />
