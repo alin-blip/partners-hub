@@ -20,6 +20,7 @@ import EnrollmentsPage from "./pages/shared/EnrollmentsPage";
 import StudentDetailPage from "./pages/shared/StudentDetailPage";
 import ProfilePage from "./pages/shared/ProfilePage";
 import ResourcesPage from "./pages/shared/ResourcesPage";
+import CreateImagePage from "./pages/shared/CreateImagePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -48,6 +49,7 @@ const App = () => (
             <Route path="/owner/enroll" element={<EnrollStudent />} />
             <Route path="/owner/profile" element={<ProfilePage />} />
             <Route path="/owner/resources" element={<ResourcesPage />} />
+            <Route path="/owner/create-image" element={<CreateImagePage />} />
             
             {/* Admin routes */}
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
@@ -60,6 +62,7 @@ const App = () => (
             <Route path="/admin/ai-monitoring" element={<AIMonitoringPage />} />
             <Route path="/admin/profile" element={<ProfilePage />} />
             <Route path="/admin/resources" element={<ResourcesPage />} />
+            <Route path="/admin/create-image" element={<CreateImagePage />} />
             
             {/* Agent routes */}
             <Route path="/agent/dashboard" element={<AgentDashboard />} />
@@ -69,6 +72,7 @@ const App = () => (
             <Route path="/agent/enroll" element={<EnrollStudent />} />
             <Route path="/agent/profile" element={<ProfilePage />} />
             <Route path="/agent/resources" element={<ResourcesPage />} />
+            <Route path="/agent/create-image" element={<CreateImagePage />} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>

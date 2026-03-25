@@ -108,6 +108,27 @@ export type Database = {
           },
         ]
       }
+      brand_settings: {
+        Row: {
+          brand_prompt: string
+          id: string
+          logo_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          brand_prompt?: string
+          id?: string
+          logo_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          brand_prompt?: string
+          id?: string
+          logo_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       campuses: {
         Row: {
           city: string | null
@@ -274,6 +295,33 @@ export type Database = {
           },
         ]
       }
+      generated_images: {
+        Row: {
+          created_at: string
+          id: string
+          image_path: string
+          preset: string
+          prompt: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_path: string
+          preset?: string
+          prompt: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_path?: string
+          preset?: string
+          prompt?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       intakes: {
         Row: {
           application_deadline: string | null
@@ -312,6 +360,7 @@ export type Database = {
       profiles: {
         Row: {
           admin_id: string | null
+          avatar_url: string | null
           created_at: string
           email: string
           full_name: string
@@ -322,6 +371,7 @@ export type Database = {
         }
         Insert: {
           admin_id?: string | null
+          avatar_url?: string | null
           created_at?: string
           email: string
           full_name: string
@@ -332,6 +382,7 @@ export type Database = {
         }
         Update: {
           admin_id?: string | null
+          avatar_url?: string | null
           created_at?: string
           email?: string
           full_name?: string

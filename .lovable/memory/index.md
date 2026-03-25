@@ -1,6 +1,3 @@
-# Memory: index.md
-Updated: now
-
 EduForYou UK Agent Management Platform - design system and architecture decisions
 
 ## Design System
@@ -19,15 +16,20 @@ EduForYou UK Agent Management Platform - design system and architecture decision
 
 ## Route Structure
 - /owner/dashboard, /admin/dashboard, /agent/dashboard
-- Shared: /[role]/students, /[role]/enrollments, /[role]/resources, /[role]/profile, /[role]/enroll
-- Owner only: /owner/agents, /owner/settings, /owner/commissions, /owner/knowledge-base
-- Admin only: /admin/agents, /admin/knowledge-base
+- Shared: /[role]/students, /[role]/enrollments, /[role]/create-image
+- Owner only: /owner/agents, /owner/settings
+- Agent only: /agent/enroll
 
 ## Key Tables
-profiles, user_roles, universities, campuses, courses, intakes, students, enrollments, commission_tiers, promotions, resources, ai_knowledge_base
+profiles (with avatar_url), user_roles, universities, campuses, courses, intakes, students, enrollments, commission_tiers, brand_settings, generated_images, ai_conversations, ai_messages
 
-## AI Chat
-- Edge function `ai-chat` with user-scoped context via JWT
-- Fetches ai_knowledge_base + role-scoped student/enrollment data
-- Agent sees only own students, Admin sees team, Owner sees summary stats
-- AIChatPanel sends JWT for auth, streams SSE with markdown rendering
+## Storage Buckets
+student-documents (private), resource-files (public), brand-assets (public), generated-images (public), avatars (public)
+
+## AI Features
+- AI Chat: edge function ai-chat, persisted in ai_conversations + ai_messages
+- AI Image Generator: edge function generate-image, uses google/gemini-3.1-flash-image-preview
+  - 5 images/user/day limit
+  - Brand settings (prompt + logo) auto-injected
+  - Agent photo can be included in generated images
+  - Presets: social_post, story, flyer, banner

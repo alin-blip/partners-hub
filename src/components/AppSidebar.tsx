@@ -12,6 +12,7 @@ import {
   FolderOpen,
   Brain,
   MessageSquare,
+  Image as ImageIcon,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -61,6 +62,7 @@ export function AppSidebar() {
 
   navItems.push(
     { title: "Enroll Student", url: `${prefix}/enroll`, icon: UserPlus },
+    { title: "Create Image", url: `${prefix}/create-image`, icon: ImageIcon },
     { title: "Resources", url: `${prefix}/resources`, icon: FolderOpen },
     { title: "Profile", url: `${prefix}/profile`, icon: UserCircle }
   );
