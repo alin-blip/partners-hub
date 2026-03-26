@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Calendar } from "lucide-react";
 
 const IMMIGRATION_OPTIONS = [
   "Pre-settled", "Settled", "British Citizen", "Visa Holder", "Refugee", "Other",
