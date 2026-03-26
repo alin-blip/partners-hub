@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,7 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Globe, Copy, ExternalLink } from "lucide-react";
+import { Save, Globe, Copy, ExternalLink, Download, QrCode } from "lucide-react";
+import { QRCodeCanvas } from "qrcode.react";
 
 export default function CardSettingsSection() {
   const { user, profile } = useAuth();
