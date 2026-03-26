@@ -29,11 +29,23 @@ export default function PublicApplicationPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [nationality, setNationality] = useState("");
-  const [courseInterest, setCourseInterest] = useState("");
 
-  // Universities for dropdown
-  const [universities, setUniversities] = useState<{ id: string; name: string }[]>([]);
+  // Cascading dropdowns
+  const [universities, setUniversities] = useState<any[]>([]);
+  const [campuses, setCampuses] = useState<any[]>([]);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [intakes, setIntakes] = useState<any[]>([]);
+  const [timetableOptions, setTimetableOptions] = useState<any[]>([]);
 
+  const [universityId, setUniversityId] = useState("");
+  const [campusId, setCampusId] = useState("");
+  const [courseId, setCourseId] = useState("");
+  const [intakeId, setIntakeId] = useState("");
+  const [timetableOption, setTimetableOption] = useState("");
+
+  const [selectedUni, setSelectedUni] = useState<any>(null);
+
+  // Load agent + universities on mount
   useEffect(() => {
     if (!slug) return;
     (async () => {
@@ -43,13 +55,8 @@ export default function PublicApplicationPage() {
         .eq("slug", slug)
         .single();
 
-      if (!prof) {
-        setNotFound(true);
-        setLoading(false);
-        return;
-      }
+      if (!prof) { setNotFound(true); setLoading(false); return; }
 
-      // Check card is published
       const { data: card } = await supabase
         .from("agent_card_settings")
         .select("is_public")
@@ -57,30 +64,56 @@ export default function PublicApplicationPage() {
         .eq("is_public", true)
         .single();
 
-      if (!card) {
-        setNotFound(true);
-        setLoading(false);
-        return;
-      }
+      if (!card) { setNotFound(true); setLoading(false); return; }
 
       setAgent(prof);
 
-      // Fetch universities
       const { data: unis } = await supabase
         .from("universities")
-        .select("id, name")
+        .select("id, name, timetable_available, timetable_message")
         .eq("is_active", true)
         .order("name");
       setUniversities(unis || []);
-
       setLoading(false);
     })();
   }, [slug]);
+
+  // Load campuses + courses + intakes + timetable when university changes
+  useEffect(() => {
+    if (!universityId) {
+      setCampuses([]); setCourses([]); setIntakes([]); setTimetableOptions([]);
+      setCampusId(""); setCourseId(""); setIntakeId(""); setTimetableOption("");
+      setSelectedUni(null);
+      return;
+    }
+    setCampusId(""); setCourseId(""); setIntakeId(""); setTimetableOption("");
+    setSelectedUni(universities.find(u => u.id === universityId) || null);
+
+    (async () => {
+      const [campusRes, courseRes, intakeRes, ttRes] = await Promise.all([
+        supabase.from("campuses").select("id, name, city").eq("university_id", universityId).order("name"),
+        supabase.from("courses").select("id, name, level, study_mode").eq("university_id", universityId).order("name"),
+        supabase.from("intakes").select("id, label, start_date").eq("university_id", universityId).order("start_date"),
+        supabase.from("timetable_options").select("id, label").eq("university_id", universityId).order("label"),
+      ]);
+      setCampuses(campusRes.data || []);
+      setCourses(courseRes.data || []);
+      setIntakes(intakeRes.data || []);
+      setTimetableOptions(ttRes.data || []);
+    })();
+  }, [universityId, universities]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!agent) return;
     setSubmitting(true);
+
+    // Build course_interest text summary
+    const uniName = universities.find(u => u.id === universityId)?.name || "";
+    const campusName = campuses.find(c => c.id === campusId)?.name || "";
+    const courseName = courses.find(c => c.id === courseId)?.name || "";
+    const intakeLabel = intakes.find(i => i.id === intakeId)?.label || "";
+    const parts = [uniName, campusName, courseName, intakeLabel, timetableOption].filter(Boolean);
 
     const { error } = await supabase.from("leads").insert({
       agent_id: agent.id,
@@ -89,14 +122,17 @@ export default function PublicApplicationPage() {
       email: email.trim().toLowerCase(),
       phone: phone.trim() || null,
       nationality: nationality.trim() || null,
-      course_interest: courseInterest || null,
+      course_interest: parts.join(" — ") || null,
+      university_id: universityId || null,
+      campus_id: campusId || null,
+      course_id: courseId || null,
+      intake_id: intakeId || null,
+      timetable_option: timetableOption || null,
       status: "new",
     } as any);
 
     setSubmitting(false);
-    if (!error) {
-      setSubmitted(true);
-    }
+    if (!error) setSubmitted(true);
   };
 
   if (loading) {
@@ -156,6 +192,7 @@ export default function PublicApplicationPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Personal info */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>First Name *</Label>
@@ -170,31 +207,97 @@ export default function PublicApplicationPage() {
               <Label>Email *</Label>
               <Input type="email" value={email} onChange={e => setEmail(e.target.value)} required maxLength={255} placeholder="your@email.com" />
             </div>
-            <div className="space-y-2">
-              <Label>Phone</Label>
-              <Input value={phone} onChange={e => setPhone(e.target.value)} maxLength={20} placeholder="+44..." />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Phone</Label>
+                <Input value={phone} onChange={e => setPhone(e.target.value)} maxLength={20} placeholder="+44..." />
+              </div>
+              <div className="space-y-2">
+                <Label>Nationality</Label>
+                <Input value={nationality} onChange={e => setNationality(e.target.value)} maxLength={100} placeholder="e.g. British" />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Nationality</Label>
-              <Input value={nationality} onChange={e => setNationality(e.target.value)} maxLength={100} placeholder="e.g. British" />
-            </div>
-            <div className="space-y-2">
-              <Label>Course Interest</Label>
-              {universities.length > 0 ? (
-                <Select value={courseInterest} onValueChange={setCourseInterest}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a university..." />
-                  </SelectTrigger>
+
+            {/* Course selection */}
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-sm font-medium">Course Interest</h4>
+
+              <div className="space-y-2">
+                <Label>University</Label>
+                <Select value={universityId} onValueChange={setUniversityId}>
+                  <SelectTrigger><SelectValue placeholder="Select university..." /></SelectTrigger>
                   <SelectContent>
                     {universities.map(u => (
-                      <SelectItem key={u.id} value={u.name}>{u.name}</SelectItem>
+                      <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              ) : (
-                <Input value={courseInterest} onChange={e => setCourseInterest(e.target.value)} maxLength={200} placeholder="What course are you interested in?" />
+              </div>
+
+              {universityId && campuses.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Campus / Location</Label>
+                  <Select value={campusId} onValueChange={setCampusId}>
+                    <SelectTrigger><SelectValue placeholder="Select campus..." /></SelectTrigger>
+                    <SelectContent>
+                      {campuses.map(c => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}{c.city ? ` — ${c.city}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {universityId && courses.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Course</Label>
+                  <Select value={courseId} onValueChange={setCourseId}>
+                    <SelectTrigger><SelectValue placeholder="Select course..." /></SelectTrigger>
+                    <SelectContent>
+                      {courses.map(c => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name} ({c.level} — {c.study_mode})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {universityId && intakes.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Intake</Label>
+                  <Select value={intakeId} onValueChange={setIntakeId}>
+                    <SelectTrigger><SelectValue placeholder="Select intake..." /></SelectTrigger>
+                    <SelectContent>
+                      {intakes.map(i => (
+                        <SelectItem key={i.id} value={i.id}>{i.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {universityId && selectedUni?.timetable_available && timetableOptions.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Timetable Preference</Label>
+                  <Select value={timetableOption} onValueChange={setTimetableOption}>
+                    <SelectTrigger><SelectValue placeholder="Select timetable..." /></SelectTrigger>
+                    <SelectContent>
+                      {timetableOptions.map(t => (
+                        <SelectItem key={t.id} value={t.label}>{t.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedUni?.timetable_message && (
+                    <p className="text-[10px] text-muted-foreground">{selectedUni.timetable_message}</p>
+                  )}
+                </div>
               )}
             </div>
+
             <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={submitting}>
               {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
               {submitting ? "Submitting..." : "Submit Application"}
