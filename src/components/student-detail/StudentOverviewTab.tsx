@@ -157,6 +157,7 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
               {student.share_code && <div><p className="text-muted-foreground text-xs mb-0.5">Share Code</p><p className="font-medium">{student.share_code}</p></div>}
               {student.ni_number && <div><p className="text-muted-foreground text-xs mb-0.5">NI Number</p><p className="font-medium">{student.ni_number}</p></div>}
               {student.previous_funding_years != null && <div><p className="text-muted-foreground text-xs mb-0.5">Previous Funding</p><p className="font-medium">{student.previous_funding_years} year(s)</p></div>}
+              {(student as any).crn && <div><p className="text-muted-foreground text-xs mb-0.5">CRN</p><p className="font-medium">{(student as any).crn}</p></div>}
               {student.study_pattern && <div><p className="text-muted-foreground text-xs mb-0.5">Study Pattern</p><p className="font-medium">{student.study_pattern}</p></div>}
               <div><p className="text-muted-foreground text-xs mb-0.5">Qualifications</p><p className="font-medium">{student.qualifications || "—"}</p></div>
               <div><p className="text-muted-foreground text-xs mb-0.5">Agent</p><p className="font-medium">{agentName || "—"}</p></div>
