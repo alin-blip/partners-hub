@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -15,7 +15,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Upload, Loader2, FileText, Check } from "lucide-react";
+import { Upload, Loader2, FileText, Check, X } from "lucide-react";
 
 type DocType = "courses" | "timetable" | "campuses" | "intakes";
 
@@ -40,6 +40,17 @@ const COLUMNS: Record<DocType, string[]> = {
   intakes: ["label", "start_date", "application_deadline"],
 };
 
+const ACCEPTED = ".pdf,.xlsx,.xls,.docx,.doc,.jpg,.jpeg,.png,.webp";
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve((reader.result as string).split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export function DocumentProcessorDialog({ open, onOpenChange, universities, defaultDocType }: Props) {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -47,53 +58,93 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [docType, setDocType] = useState<DocType>(defaultDocType || "courses");
   const [universityId, setUniversityId] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
+  const [processProgress, setProcessProgress] = useState({ done: 0, total: 0 });
   const [items, setItems] = useState<any[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const reset = () => {
     setStep(1);
-    setFile(null);
+    setFiles([]);
     setItems([]);
     setSelected(new Set());
     setProcessing(false);
     setSaving(false);
+    setDragOver(false);
+    setProcessProgress({ done: 0, total: 0 });
   };
 
+  const addFiles = useCallback((newFiles: FileList | File[]) => {
+    const arr = Array.from(newFiles);
+    setFiles((prev) => {
+      const existing = new Set(prev.map((f) => f.name + f.size));
+      const unique = arr.filter((f) => !existing.has(f.name + f.size));
+      return [...prev, ...unique];
+    });
+  }, []);
+
+  const removeFile = (idx: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
+  }, [addFiles]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+  }, []);
+
   const handleProcess = async () => {
-    if (!file || !universityId) return;
+    if (files.length === 0 || !universityId) return;
     setProcessing(true);
+    setProcessProgress({ done: 0, total: files.length });
+
+    const allItems: any[] = [];
 
     try {
-      const reader = new FileReader();
-      const base64 = await new Promise<string>((resolve, reject) => {
-        reader.onload = () => {
-          const result = reader.result as string;
-          resolve(result.split(",")[1]);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const base64 = await readFileAsBase64(file);
 
-      const { data, error } = await supabase.functions.invoke("process-settings-document", {
-        body: { file_base64: base64, file_type: file.type, document_type: docType },
-      });
+        const { data, error } = await supabase.functions.invoke("process-settings-document", {
+          body: { file_base64: base64, file_type: file.type, document_type: docType },
+        });
 
-      if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || "Processing failed");
+        if (error) throw error;
+        if (!data?.success) throw new Error(data?.error || `Processing failed for ${file.name}`);
 
-      const extracted = data.items || [];
-      setItems(extracted);
-      setSelected(new Set(extracted.map((_: any, i: number) => i)));
+        const extracted = data.items || [];
+        // Tag items with source file for reference
+        extracted.forEach((item: any) => { item._source = file.name; });
+        allItems.push(...extracted);
+
+        setProcessProgress({ done: i + 1, total: files.length });
+      }
+
+      setItems(allItems);
+      setSelected(new Set(allItems.map((_: any, i: number) => i)));
       setStep(2);
 
-      if (extracted.length === 0) {
-        toast({ title: "No data found", description: "AI could not extract items from this document.", variant: "destructive" });
+      if (allItems.length === 0) {
+        toast({ title: "No data found", description: "AI could not extract items from the uploaded documents.", variant: "destructive" });
+      } else {
+        toast({ title: `${allItems.length} items extracted from ${files.length} file(s)` });
       }
     } catch (err: any) {
-      toast({ title: "Error", description: err.message || "Failed to process document", variant: "destructive" });
+      toast({ title: "Error", description: err.message || "Failed to process documents", variant: "destructive" });
     } finally {
       setProcessing(false);
     }
@@ -122,13 +173,11 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
     setSaving(true);
 
     try {
-      let tableName: string;
-      let queryKey: string;
+      // Strip internal _source field
+      const clean = toInsert.map(({ _source, ...rest }) => rest);
 
       if (docType === "courses") {
-        tableName = "courses";
-        queryKey = "all-courses";
-        const rows = toInsert.map((item) => ({
+        const rows = clean.map((item) => ({
           university_id: universityId,
           name: item.name,
           level: item.level || "undergraduate",
@@ -136,29 +185,26 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
         }));
         const { error } = await supabase.from("courses").insert(rows);
         if (error) throw error;
+        qc.invalidateQueries({ queryKey: ["all-courses"] });
       } else if (docType === "timetable") {
-        tableName = "timetable_options";
-        queryKey = "timetable-options";
-        const rows = toInsert.map((item) => ({
+        const rows = clean.map((item) => ({
           university_id: universityId,
           label: item.label,
         }));
         const { error } = await supabase.from("timetable_options").insert(rows);
         if (error) throw error;
+        qc.invalidateQueries({ queryKey: ["timetable-options"] });
       } else if (docType === "campuses") {
-        tableName = "campuses";
-        queryKey = "all-campuses";
-        const rows = toInsert.map((item) => ({
+        const rows = clean.map((item) => ({
           university_id: universityId,
           name: item.name,
           city: item.city || null,
         }));
         const { error } = await supabase.from("campuses").insert(rows);
         if (error) throw error;
+        qc.invalidateQueries({ queryKey: ["all-campuses"] });
       } else {
-        tableName = "intakes";
-        queryKey = "all-intakes";
-        const rows = toInsert.map((item) => ({
+        const rows = clean.map((item) => ({
           university_id: universityId,
           label: item.label,
           start_date: item.start_date,
@@ -166,9 +212,9 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
         }));
         const { error } = await supabase.from("intakes").insert(rows);
         if (error) throw error;
+        qc.invalidateQueries({ queryKey: ["all-intakes"] });
       }
 
-      qc.invalidateQueries({ queryKey: [queryKey] });
       toast({ title: `${toInsert.length} items added successfully` });
       setStep(3);
     } catch (err: any) {
@@ -218,21 +264,58 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
             </div>
 
             <div className="space-y-2">
-              <Label>Upload File (PDF, XLSX, DOCX, Image)</Label>
-              <Input
-                type="file"
-                accept=".pdf,.xlsx,.xls,.docx,.doc,.jpg,.jpeg,.png,.webp"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-              />
-              {file && (
-                <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  <FileText className="h-3 w-3" /> {file.name} ({(file.size / 1024).toFixed(0)} KB)
+              <Label>Upload Files (PDF, XLSX, DOCX, Image)</Label>
+              <div
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onClick={() => fileInputRef.current?.click()}
+                className={`relative cursor-pointer rounded-lg border-2 border-dashed p-8 text-center transition-colors
+                  ${dragOver ? "border-primary bg-primary/5" : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50"}`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept={ACCEPTED}
+                  className="hidden"
+                  onChange={(e) => { if (e.target.files?.length) addFiles(e.target.files); e.target.value = ""; }}
+                />
+                <Upload className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
+                <p className="text-sm font-medium">Drag & drop files here or click to browse</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Support for multiple files · PDF, XLSX, DOCX, JPG, PNG
                 </p>
+              </div>
+
+              {files.length > 0 && (
+                <div className="space-y-1 mt-2">
+                  {files.map((f, idx) => (
+                    <div key={f.name + f.size} className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-1.5">
+                      <FileText className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate flex-1">{f.name}</span>
+                      <span className="text-xs shrink-0">({(f.size / 1024).toFixed(0)} KB)</span>
+                      <button onClick={(e) => { e.stopPropagation(); removeFile(idx); }} className="shrink-0 hover:text-destructive">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
-            <Button onClick={handleProcess} disabled={!file || !universityId || processing} className="w-full">
-              {processing ? <><Loader2 className="h-4 w-4 animate-spin" /> Processing with AI...</> : <><Upload className="h-4 w-4" /> Process Document</>}
+            <Button onClick={handleProcess} disabled={files.length === 0 || !universityId || processing} className="w-full">
+              {processing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Processing {processProgress.done}/{processProgress.total} files...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4" />
+                  Process {files.length > 0 ? `${files.length} Document${files.length > 1 ? "s" : ""}` : "Documents"}
+                </>
+              )}
             </Button>
           </div>
         )}
@@ -240,18 +323,19 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
         {step === 2 && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Found {items.length} items. Edit if needed, then select and confirm.
+              Found {items.length} items from {files.length} file(s). Edit if needed, then select and confirm.
             </p>
 
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10">
-                    <Checkbox checked={selected.size === items.length} onCheckedChange={toggleAll} />
+                    <Checkbox checked={selected.size === items.length && items.length > 0} onCheckedChange={toggleAll} />
                   </TableHead>
                   {cols.map((c) => (
                     <TableHead key={c} className="capitalize">{c.replace(/_/g, " ")}</TableHead>
                   ))}
+                  <TableHead>Source</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -269,6 +353,9 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
                         />
                       </TableCell>
                     ))}
+                    <TableCell>
+                      <span className="text-xs text-muted-foreground truncate max-w-[120px] block">{item._source}</span>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
