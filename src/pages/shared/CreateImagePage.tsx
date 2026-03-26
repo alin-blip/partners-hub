@@ -114,7 +114,7 @@ export default function CreateImagePage() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ prompt, preset: selectedPreset, includePhoto }),
+          body: JSON.stringify({ prompt, preset: selectedPreset, includePhoto, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }),
         }
       );
 
