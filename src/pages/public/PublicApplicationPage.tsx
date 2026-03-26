@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { GraduationCap, CheckCircle2, Loader2 } from "lucide-react";
 
 interface AgentInfo {
@@ -29,6 +30,7 @@ export default function PublicApplicationPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [nationality, setNationality] = useState("");
+  const [gdprConsent, setGdprConsent] = useState(false);
 
   // Cascading dropdowns
   const [universities, setUniversities] = useState<any[]>([]);
@@ -298,13 +300,27 @@ export default function PublicApplicationPage() {
               )}
             </div>
 
-            <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={submitting}>
+            {/* GDPR Consent */}
+            <div className="flex items-start gap-3 rounded-md border p-3 bg-muted/50">
+              <Checkbox
+                id="gdpr"
+                checked={gdprConsent}
+                onCheckedChange={(v) => setGdprConsent(v === true)}
+                className="mt-0.5"
+                required
+              />
+              <label htmlFor="gdpr" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
+                I consent to <strong>{agent.full_name}</strong> and <strong>EduForYou UK</strong> collecting and processing
+                my personal data for the purpose of my education enquiry. I understand my data will be stored securely and
+                used only to contact me regarding course applications, eligibility, and related services. I can withdraw
+                my consent at any time by contacting the agent directly.
+              </label>
+            </div>
+
+            <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={submitting || !gdprConsent}>
               {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
               {submitting ? "Submitting..." : "Submit Application"}
             </Button>
-            <p className="text-[10px] text-muted-foreground text-center">
-              By submitting this form you agree to be contacted by {agent.full_name} regarding your education enquiry.
-            </p>
           </form>
         </CardContent>
       </Card>
