@@ -15,8 +15,9 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  Search, UserPlus, ArrowRight, Phone, Mail, Globe, Calendar,
+  Search, UserPlus, ArrowRight, Phone, Mail, StickyNote,
 } from "lucide-react";
 import { format } from "date-fns";
 
