@@ -138,6 +138,7 @@ export function AppSidebar() {
             <p className="text-[10px] text-sidebar-foreground/50 truncate">{profile.email}</p>
           </div>
         )}
+        <FeedbackDialog />
         <Button
           variant="ghost"
           size="sm"
