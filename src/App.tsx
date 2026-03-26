@@ -66,7 +66,7 @@ const App = () => (
             <Route path="/admin/profile" element={<ProfilePage />} />
             <Route path="/admin/resources" element={<ResourcesPage />} />
             <Route path="/admin/create-image" element={<CreateImagePage />} />
-            <Route path="/admin/documents" element={<DocumentsPage />} />
+            
             
             {/* Agent routes */}
             <Route path="/agent/dashboard" element={<AgentDashboard />} />
