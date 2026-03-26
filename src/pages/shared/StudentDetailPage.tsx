@@ -5,12 +5,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, User, FileText, GraduationCap, DollarSign, MessageSquare } from "lucide-react";
+import { ArrowLeft, User, FileText, GraduationCap, DollarSign, MessageSquare, Sparkles } from "lucide-react";
 import { StudentOverviewTab } from "@/components/student-detail/StudentOverviewTab";
 import { StudentDocumentsTab } from "@/components/student-detail/StudentDocumentsTab";
 import { StudentEnrollmentsTab } from "@/components/student-detail/StudentEnrollmentsTab";
 import { StudentFundingTab } from "@/components/student-detail/StudentFundingTab";
 import { StudentNotesTab } from "@/components/student-detail/StudentNotesTab";
+import { StudentAIDocumentsTab } from "@/components/student-detail/StudentAIDocumentsTab";
 
 export default function StudentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -60,12 +61,13 @@ export default function StudentDetailPage() {
         </div>
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview" className="gap-1.5"><User className="w-3.5 h-3.5" /> Overview</TabsTrigger>
             <TabsTrigger value="documents" className="gap-1.5"><FileText className="w-3.5 h-3.5" /> Documents</TabsTrigger>
             <TabsTrigger value="enrollments" className="gap-1.5"><GraduationCap className="w-3.5 h-3.5" /> Enrollments</TabsTrigger>
             <TabsTrigger value="funding" className="gap-1.5"><DollarSign className="w-3.5 h-3.5" /> Funding</TabsTrigger>
             <TabsTrigger value="notes" className="gap-1.5"><MessageSquare className="w-3.5 h-3.5" /> Notes</TabsTrigger>
+            <TabsTrigger value="ai-docs" className="gap-1.5"><Sparkles className="w-3.5 h-3.5" /> AI Docs</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -86,6 +88,10 @@ export default function StudentDetailPage() {
 
           <TabsContent value="notes">
             <StudentNotesTab studentId={student.id} studentName={`${student.first_name} ${student.last_name}`} canSendRequests={canChangeStatus} />
+          </TabsContent>
+
+          <TabsContent value="ai-docs">
+            <StudentAIDocumentsTab studentId={student.id} studentName={`${student.first_name} ${student.last_name}`} />
           </TabsContent>
         </Tabs>
       </div>
