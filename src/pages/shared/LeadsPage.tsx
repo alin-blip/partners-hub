@@ -85,7 +85,7 @@ export default function LeadsPage() {
   const convertToStudent = useMutation({
     mutationFn: async (lead: any) => {
       // Create student record
-      const { error: studentErr } = await supabase.from("students").insert({
+      const { data: student, error: studentErr } = await supabase.from("students").insert({
         agent_id: lead.agent_id,
         first_name: lead.first_name,
         last_name: lead.last_name,
@@ -93,8 +93,21 @@ export default function LeadsPage() {
         phone: lead.phone || null,
         nationality: lead.nationality || null,
         notes: lead.course_interest ? `Course interest: ${lead.course_interest}` : null,
-      });
+      }).select("id").single();
       if (studentErr) throw studentErr;
+
+      // If lead has university + course, also create enrollment
+      if (lead.university_id && lead.course_id && student) {
+        const { error: enrollErr } = await supabase.from("enrollments").insert({
+          student_id: student.id,
+          university_id: lead.university_id,
+          course_id: lead.course_id,
+          campus_id: lead.campus_id || null,
+          intake_id: lead.intake_id || null,
+          status: "applied",
+        });
+        if (enrollErr) console.error("Enrollment creation failed:", enrollErr);
+      }
 
       // Update lead status to converted
       const { error: updateErr } = await supabase
@@ -106,6 +119,7 @@ export default function LeadsPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["leads"] });
       qc.invalidateQueries({ queryKey: ["students"] });
+      qc.invalidateQueries({ queryKey: ["enrollments"] });
       toast({ title: "Lead converted to student!" });
       setConvertLead(null);
     },

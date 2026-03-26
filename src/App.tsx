@@ -27,7 +27,7 @@ import MessagesPage from "./pages/shared/MessagesPage";
 import DigitalCardPage from "./pages/shared/DigitalCardPage";
 
 import FeedbackPage from "./pages/owner/FeedbackPage";
-import LeadsPage from "./pages/owner/LeadsPage";
+import LeadsPage from "./pages/shared/LeadsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -78,7 +78,7 @@ const App = () => (
             <Route path="/admin/resources" element={<ResourcesPage />} />
             <Route path="/admin/create-image" element={<CreateImagePage />} />
             <Route path="/admin/digital-card" element={<DigitalCardPage />} />
-            
+            <Route path="/admin/leads" element={<LeadsPage />} />
             
             {/* Agent routes */}
             <Route path="/agent/dashboard" element={<AgentDashboard />} />
@@ -91,6 +91,7 @@ const App = () => (
             <Route path="/agent/resources" element={<ResourcesPage />} />
             <Route path="/agent/create-image" element={<CreateImagePage />} />
             <Route path="/agent/digital-card" element={<DigitalCardPage />} />
+            <Route path="/agent/leads" element={<LeadsPage />} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>

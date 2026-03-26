@@ -107,6 +107,7 @@ export function AppSidebar() {
   const mainItems: NavItem[] = [
     { title: "Dashboard", url: `${prefix}/dashboard`, icon: LayoutDashboard },
     { title: "Students", url: `${prefix}/students`, icon: Users },
+    { title: "Leads", url: `${prefix}/leads`, icon: ContactRound },
     { title: "Enrollments", url: `${prefix}/enrollments`, icon: ClipboardList },
     { title: "Messages", url: `${prefix}/messages`, icon: Mail, badge: unreadCount },
   ];
@@ -119,7 +120,7 @@ export function AppSidebar() {
   ];
 
   const managementItems: NavItem[] = role === "owner" ? [
-    { title: "Leads", url: "/owner/leads", icon: ContactRound },
+    { title: "Agents", url: "/owner/agents", icon: UserCog },
     { title: "Agents", url: "/owner/agents", icon: UserCog },
     { title: "Commissions", url: "/owner/commissions", icon: PoundSterling },
     { title: "Knowledge Base", url: "/owner/knowledge-base", icon: Brain },

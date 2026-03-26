@@ -671,39 +671,54 @@ export type Database = {
       leads: {
         Row: {
           agent_id: string
+          campus_id: string | null
+          course_id: string | null
           course_interest: string | null
           created_at: string
           email: string
           first_name: string
           id: string
+          intake_id: string | null
           last_name: string
           nationality: string | null
           phone: string | null
           status: string
+          timetable_option: string | null
+          university_id: string | null
         }
         Insert: {
           agent_id: string
+          campus_id?: string | null
+          course_id?: string | null
           course_interest?: string | null
           created_at?: string
           email: string
           first_name: string
           id?: string
+          intake_id?: string | null
           last_name: string
           nationality?: string | null
           phone?: string | null
           status?: string
+          timetable_option?: string | null
+          university_id?: string | null
         }
         Update: {
           agent_id?: string
+          campus_id?: string | null
+          course_id?: string | null
           course_interest?: string | null
           created_at?: string
           email?: string
           first_name?: string
           id?: string
+          intake_id?: string | null
           last_name?: string
           nationality?: string | null
           phone?: string | null
           status?: string
+          timetable_option?: string | null
+          university_id?: string | null
         }
         Relationships: []
       }
