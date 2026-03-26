@@ -729,6 +729,7 @@ export type Database = {
         Row: {
           agent_id: string
           created_at: string
+          crn: string | null
           date_of_birth: string | null
           email: string | null
           first_name: string
@@ -755,6 +756,7 @@ export type Database = {
         Insert: {
           agent_id: string
           created_at?: string
+          crn?: string | null
           date_of_birth?: string | null
           email?: string | null
           first_name: string
@@ -781,6 +783,7 @@ export type Database = {
         Update: {
           agent_id?: string
           created_at?: string
+          crn?: string | null
           date_of_birth?: string | null
           email?: string | null
           first_name?: string

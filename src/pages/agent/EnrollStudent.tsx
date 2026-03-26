@@ -58,6 +58,7 @@ export default function EnrollStudent() {
   const [previousFundingYears, setPreviousFundingYears] = useState("");
   const [qualifications, setQualifications] = useState("");
   const [notes, setNotes] = useState("");
+  const [crn, setCrn] = useState("");
 
   // Step 3
   const [nokName, setNokName] = useState("");
@@ -131,7 +132,8 @@ export default function EnrollStudent() {
           ni_number: niNumber || null,
           previous_funding_years: previousFundingYears ? parseInt(previousFundingYears) : null,
           study_pattern: studyPattern.length > 0 ? studyPattern.join(", ") : null,
-          qualifications: qualifications || null, notes: notes || null,
+           qualifications: qualifications || null, notes: notes || null,
+           crn: crn || null,
           next_of_kin_name: nokName || null, next_of_kin_phone: nokPhone || null,
           next_of_kin_relationship: nokRelationship || null,
         } as any)
@@ -330,6 +332,13 @@ export default function EnrollStudent() {
                 <div className="space-y-2"><Label>NI Number</Label><Input value={niNumber} onChange={(e) => setNiNumber(e.target.value)} placeholder="e.g. QQ 12 34 56 C" /></div>
                 <div className="space-y-2"><Label>Previous Funding (years)</Label><Input type="number" min="0" value={previousFundingYears} onChange={(e) => setPreviousFundingYears(e.target.value)} placeholder="0" /></div>
               </div>
+              {previousFundingYears && parseInt(previousFundingYears) > 0 && (
+                <div className="space-y-2">
+                  <Label>CRN (Customer Reference Number)</Label>
+                  <Input value={crn} onChange={(e) => setCrn(e.target.value)} placeholder="e.g. 1234567890" />
+                  <p className="text-xs text-muted-foreground">Numărul de referință SFE al studentului</p>
+                </div>
+              )}
               <div className="space-y-2"><Label>Qualifications</Label><Textarea value={qualifications} onChange={(e) => setQualifications(e.target.value)} placeholder="Previous qualifications…" /></div>
               <div className="space-y-2"><Label>Notes</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Additional notes…" /></div>
               <div className="flex justify-between pt-2">
@@ -429,6 +438,7 @@ export default function EnrollStudent() {
                 {email && (<><span className="text-muted-foreground">Email</span><span className="font-medium">{email}</span></>)}
                 {phone && (<><span className="text-muted-foreground">Mobile</span><span className="font-medium">{phone}</span></>)}
                 {immigrationStatus && (<><span className="text-muted-foreground">Immigration</span><span className="font-medium">{immigrationStatus}</span></>)}
+                {crn && (<><span className="text-muted-foreground">CRN</span><span className="font-medium">{crn}</span></>)}
               </div>
 
               {(nokName || nokPhone) && (
