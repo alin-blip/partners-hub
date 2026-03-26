@@ -83,6 +83,7 @@ export default function CreateImagePage() {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [captions, setCaptions] = useState<Record<string, string>>({});
   const [captionLoading, setCaptionLoading] = useState<Record<string, boolean>>({});
+  const [captionLanguage, setCaptionLanguage] = useState("Romanian");
 
   const hasAvatar = !!(profile as any)?.avatar_url;
 
