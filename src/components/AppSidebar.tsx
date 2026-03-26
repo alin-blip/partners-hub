@@ -13,7 +13,9 @@ import {
   MessageSquare,
   Image as ImageIcon,
   FileText,
+  MessageSquareHeart,
 } from "lucide-react";
+import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -88,6 +90,7 @@ export function AppSidebar() {
     { title: "Commissions", url: "/owner/commissions", icon: PoundSterling },
     { title: "Knowledge Base", url: "/owner/knowledge-base", icon: Brain },
     { title: "AI Monitoring", url: "/owner/ai-monitoring", icon: MessageSquare },
+    { title: "Feedback", url: "/owner/feedback", icon: MessageSquareHeart },
     { title: "Settings", url: "/owner/settings", icon: Settings },
   ] : [];
 
@@ -135,6 +138,7 @@ export function AppSidebar() {
             <p className="text-[10px] text-sidebar-foreground/50 truncate">{profile.email}</p>
           </div>
         )}
+        <FeedbackDialog />
         <Button
           variant="ghost"
           size="sm"
