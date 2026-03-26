@@ -438,6 +438,7 @@ export default function EnrollStudent() {
                 {email && (<><span className="text-muted-foreground">Email</span><span className="font-medium">{email}</span></>)}
                 {phone && (<><span className="text-muted-foreground">Mobile</span><span className="font-medium">{phone}</span></>)}
                 {immigrationStatus && (<><span className="text-muted-foreground">Immigration</span><span className="font-medium">{immigrationStatus}</span></>)}
+                {crn && (<><span className="text-muted-foreground">CRN</span><span className="font-medium">{crn}</span></>)}
               </div>
 
               {(nokName || nokPhone) && (
