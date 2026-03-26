@@ -284,7 +284,9 @@ export default function MessagesPage() {
                         <div className={`max-w-[70%] rounded-lg px-3 py-2 ${
                           isMine ? "bg-accent text-accent-foreground" : "bg-muted"
                         }`}>
-                          <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                          <p className="text-sm whitespace-pre-wrap">
+                            {renderMessageContent(msg.content, isMine)}
+                          </p>
                           <p className={`text-[10px] mt-1 ${isMine ? "text-accent-foreground/60" : "text-muted-foreground"}`}>
                             {format(new Date(msg.created_at), "HH:mm")}
                           </p>
