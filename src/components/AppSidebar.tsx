@@ -14,6 +14,7 @@ import {
   Image as ImageIcon,
   Mail,
   MessageSquareHeart,
+  CreditCard,
 } from "lucide-react";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { NavLink } from "@/components/NavLink";
