@@ -347,6 +347,32 @@ export default function LeadsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Notes dialog */}
+      <Dialog open={!!notesLead} onOpenChange={() => setNotesLead(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Notes — {notesLead?.first_name} {notesLead?.last_name}</DialogTitle>
+            <DialogDescription>
+              Add or edit notes for this lead.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            placeholder="Write notes about this lead..."
+            value={notesText}
+            onChange={(e) => setNotesText(e.target.value)}
+            rows={5}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNotesLead(null)}>Cancel</Button>
+            <Button
+              className="bg-accent text-accent-foreground hover:bg-accent/90"
+              disabled={saveNotes.isPending}
+              onClick={() => notesLead && saveNotes.mutate({ id: notesLead.id, notes: notesText })}
+            >
+              {saveNotes.isPending ? "Saving..." : "Save Notes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
-  );
-}
