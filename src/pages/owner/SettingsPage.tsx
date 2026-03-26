@@ -494,25 +494,7 @@ function PromotionsSection({ deleteItem }: { deleteItem: any }) {
 }
 
 function UniversitiesSection({ universities, addUni, deleteItem }: { universities: any[]; addUni: any; deleteItem: any }) {
-  const { toast } = useToast();
-  const qc = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
-
-  const toggleTimetable = useMutation({
-    mutationFn: async ({ id, timetable_available }: { id: string; timetable_available: boolean }) => {
-      const { error } = await supabase.from("universities").update({ timetable_available } as any).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["universities"] }); },
-  });
-
-  const updateMessage = useMutation({
-    mutationFn: async ({ id, timetable_message }: { id: string; timetable_message: string }) => {
-      const { error } = await supabase.from("universities").update({ timetable_message: timetable_message || null } as any).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["universities"] }); toast({ title: "Message saved" }); },
-  });
 
   return (
     <Card>
@@ -547,8 +529,6 @@ function UniversitiesSection({ universities, addUni, deleteItem }: { universitie
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Active</TableHead>
-              <TableHead>Timetable Available</TableHead>
-              <TableHead>Timetable Message</TableHead>
               <TableHead className="w-16" />
             </TableRow>
           </TableHeader>
@@ -558,28 +538,6 @@ function UniversitiesSection({ universities, addUni, deleteItem }: { universitie
                 <TableCell className="font-medium">{u.name}</TableCell>
                 <TableCell>{u.is_active ? "Yes" : "No"}</TableCell>
                 <TableCell>
-                  <Switch
-                    checked={u.timetable_available !== false}
-                    onCheckedChange={(checked) => toggleTimetable.mutate({ id: u.id, timetable_available: checked })}
-                  />
-                </TableCell>
-                <TableCell>
-                  {u.timetable_available === false && (
-                    <div className="flex gap-2">
-                      <Input
-                        defaultValue={u.timetable_message || ""}
-                        placeholder="e.g. Studentul își alege programul după test"
-                        className="text-xs h-8"
-                        onBlur={(e) => {
-                          if (e.target.value !== (u.timetable_message || "")) {
-                            updateMessage.mutate({ id: u.id, timetable_message: e.target.value });
-                          }
-                        }}
-                      />
-                    </div>
-                  )}
-                </TableCell>
-                <TableCell>
                   <Button variant="ghost" size="icon" onClick={() => deleteItem.mutate({ table: "universities", id: u.id })}>
                     <Trash2 className="w-4 h-4 text-destructive" />
                   </Button>
@@ -588,7 +546,87 @@ function UniversitiesSection({ universities, addUni, deleteItem }: { universitie
             ))}
             {universities.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground py-6">No universities yet</TableCell>
+                <TableCell colSpan={3} className="text-center text-muted-foreground py-6">No universities yet</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TimetableSection({ universities }: { universities: any[] }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  const toggleTimetable = useMutation({
+    mutationFn: async ({ id, timetable_available }: { id: string; timetable_available: boolean }) => {
+      const { error } = await supabase.from("universities").update({ timetable_available } as any).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["universities"] }); },
+  });
+
+  const updateMessage = useMutation({
+    mutationFn: async ({ id, timetable_message }: { id: string; timetable_message: string }) => {
+      const { error } = await supabase.from("universities").update({ timetable_message: timetable_message || null } as any).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["universities"] }); toast({ title: "Message saved" }); },
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Calendar className="w-4 h-4" />
+          Timetable Settings
+        </CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Configure per-university whether students can select a study pattern during enrollment, or display a custom message instead.
+        </p>
+      </CardHeader>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>University</TableHead>
+              <TableHead>Timetable Selectable</TableHead>
+              <TableHead>Custom Message (when disabled)</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {universities.map((u: any) => (
+              <TableRow key={u.id}>
+                <TableCell className="font-medium">{u.name}</TableCell>
+                <TableCell>
+                  <Switch
+                    checked={u.timetable_available !== false}
+                    onCheckedChange={(checked) => toggleTimetable.mutate({ id: u.id, timetable_available: checked })}
+                  />
+                </TableCell>
+                <TableCell>
+                  {u.timetable_available === false ? (
+                    <Input
+                      defaultValue={u.timetable_message || ""}
+                      placeholder="e.g. Studentul își alege programul după testul de admitere"
+                      className="text-sm"
+                      onBlur={(e) => {
+                        if (e.target.value !== (u.timetable_message || "")) {
+                          updateMessage.mutate({ id: u.id, timetable_message: e.target.value });
+                        }
+                      }}
+                    />
+                  ) : (
+                    <span className="text-muted-foreground text-sm">—</span>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+            {universities.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={3} className="text-center text-muted-foreground py-6">No universities yet. Add universities first.</TableCell>
               </TableRow>
             )}
           </TableBody>
@@ -699,11 +737,16 @@ export default function SettingsPage() {
             <TabsTrigger value="intakes">Intakes</TabsTrigger>
             <TabsTrigger value="commissions">Commission Tiers</TabsTrigger>
             <TabsTrigger value="promotions">Promotions</TabsTrigger>
+            <TabsTrigger value="timetable">Timetable</TabsTrigger>
             <TabsTrigger value="brand">Brand / AI</TabsTrigger>
           </TabsList>
 
           <TabsContent value="universities" className="mt-4">
             <UniversitiesSection universities={universities} addUni={addUni} deleteItem={deleteItem} />
+          </TabsContent>
+
+          <TabsContent value="timetable" className="mt-4">
+            <TimetableSection universities={universities} />
           </TabsContent>
 
           <TabsContent value="campuses" className="mt-4">
