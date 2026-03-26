@@ -681,6 +681,7 @@ export type Database = {
           intake_id: string | null
           last_name: string
           nationality: string | null
+          notes: string | null
           phone: string | null
           status: string
           timetable_option: string | null
@@ -698,6 +699,7 @@ export type Database = {
           intake_id?: string | null
           last_name: string
           nationality?: string | null
+          notes?: string | null
           phone?: string | null
           status?: string
           timetable_option?: string | null
@@ -715,6 +717,7 @@ export type Database = {
           intake_id?: string | null
           last_name?: string
           nationality?: string | null
+          notes?: string | null
           phone?: string | null
           status?: string
           timetable_option?: string | null

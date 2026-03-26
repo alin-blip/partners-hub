@@ -15,8 +15,9 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  Search, UserPlus, ArrowRight, Phone, Mail, Globe, Calendar,
+  Search, UserPlus, ArrowRight, Phone, Mail, StickyNote,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -37,6 +38,8 @@ export default function LeadsPage() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [convertLead, setConvertLead] = useState<any | null>(null);
+  const [notesLead, setNotesLead] = useState<any | null>(null);
+  const [notesText, setNotesText] = useState("");
 
   const { data: leads = [], isLoading } = useQuery({
     queryKey: ["leads"],
@@ -82,9 +85,24 @@ export default function LeadsPage() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const saveNotes = useMutation({
+    mutationFn: async ({ id, notes }: { id: string; notes: string }) => {
+      const { error } = await supabase
+        .from("leads")
+        .update({ notes } as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["leads"] });
+      toast({ title: "Notes saved" });
+      setNotesLead(null);
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   const convertToStudent = useMutation({
     mutationFn: async (lead: any) => {
-      // Create student record
       const { data: student, error: studentErr } = await supabase.from("students").insert({
         agent_id: lead.agent_id,
         first_name: lead.first_name,
@@ -96,7 +114,6 @@ export default function LeadsPage() {
       }).select("id").single();
       if (studentErr) throw studentErr;
 
-      // If lead has university + course, also create enrollment
       if (lead.university_id && lead.course_id && student) {
         const { error: enrollErr } = await supabase.from("enrollments").insert({
           student_id: student.id,
@@ -109,7 +126,6 @@ export default function LeadsPage() {
         if (enrollErr) console.error("Enrollment creation failed:", enrollErr);
       }
 
-      // Update lead status to converted
       const { error: updateErr } = await supabase
         .from("leads")
         .update({ status: "converted" } as any)
@@ -255,6 +271,16 @@ export default function LeadsPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs h-7"
+                              onClick={() => { setNotesLead(lead); setNotesText(lead.notes || ""); }}
+                            >
+                              <StickyNote className="w-3 h-3 mr-1" />
+                              Notes
+                              {lead.notes && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-accent inline-block" />}
+                            </Button>
                             {nextStatus && nextStatus !== "converted" && (
                               <Button
                                 variant="ghost"
@@ -317,6 +343,34 @@ export default function LeadsPage() {
             >
               <UserPlus className="w-4 h-4 mr-1" />
               {convertToStudent.isPending ? "Converting..." : "Convert to Student"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Notes dialog */}
+      <Dialog open={!!notesLead} onOpenChange={() => setNotesLead(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Notes — {notesLead?.first_name} {notesLead?.last_name}</DialogTitle>
+            <DialogDescription>
+              Add or edit notes for this lead.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            placeholder="Write notes about this lead..."
+            value={notesText}
+            onChange={(e) => setNotesText(e.target.value)}
+            rows={5}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNotesLead(null)}>Cancel</Button>
+            <Button
+              className="bg-accent text-accent-foreground hover:bg-accent/90"
+              disabled={saveNotes.isPending}
+              onClick={() => notesLead && saveNotes.mutate({ id: notesLead.id, notes: notesText })}
+            >
+              {saveNotes.isPending ? "Saving..." : "Save Notes"}
             </Button>
           </DialogFooter>
         </DialogContent>
