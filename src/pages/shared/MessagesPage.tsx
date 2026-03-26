@@ -154,6 +154,21 @@ export default function MessagesPage() {
     return 0;
   };
 
+  // Render @mentions as highlighted spans
+  const renderMessageContent = (content: string, isMine: boolean) => {
+    const parts = content.split(/(@[\p{L}\p{N}]+(?: [\p{L}\p{N}]+)*)/u);
+    return parts.map((part, i) => {
+      if (part.startsWith("@") && part.length > 1) {
+        return (
+          <span key={i} className={`font-semibold ${isMine ? "text-accent-foreground" : "text-accent"}`}>
+            {part}
+          </span>
+        );
+      }
+      return part;
+    });
+  };
+
   const getInitials = (name?: string) => {
     if (!name) return "?";
     return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
