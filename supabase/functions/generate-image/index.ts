@@ -22,13 +22,10 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("Missing authorization");
 
-    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: { user }, error: authErr } = await userClient.auth.getUser();
-    if (authErr || !user) throw new Error("Unauthorized");
-
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authErr } = await adminClient.auth.getUser(token);
+    if (authErr || !user) throw new Error("Unauthorized");
 
     const { prompt, preset, includePhoto } = await req.json();
     if (!prompt || !preset) throw new Error("Missing prompt or preset");
