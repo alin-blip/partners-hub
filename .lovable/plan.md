@@ -1,58 +1,37 @@
 
 
-## Plan: Admin Team Promo Banner
+## Plan: Enhanced Student Communication & Status Management
 
-### What changes
-Add support for **admin-level promotions** — team-based targets (e.g., "20 enrollments from your team = £1000 bonus"). The `PromoBanner` will work for both agents (personal target) and admins (team target).
+### What you get
+The existing **Notes** tab on the student detail page already supports notes, document requests, and funding updates. We'll enhance it into a proper communication hub where owner/admin can:
 
-### Database
+1. **Send action requests to agents** — new note types: "status_update_request", "info_request", "action_required"
+2. **Quick-set enrollment status** directly from the Notes tab — a compact status changer at the top without switching to the Enrollments tab
+3. **Note visibility control** — mark notes as urgent/priority so they stand out
+4. **Agent sees requests highlighted** — urgent requests show with a red/orange indicator
 
-**Add columns to `promotions` table:**
-- `target_role` (text, default `'agent'`) — determines if promo is for agents or admins
-- When `target_role = 'admin'`, the target counts team enrollments instead of personal ones
+### Changes
 
-**Extend `agent_promotions` table** to also work for admins (the table name stays, but admins can also have records — the `agent_id` column works for any user ID).
+**`src/components/student-detail/StudentNotesTab.tsx`**:
+- Add new note types for owner/admin: `info_request` (request info from agent), `action_required` (ask agent to do something), `status_update` (log a status change with context)
+- Add a priority/urgent toggle for owner/admin notes — saves to a new column or uses styling based on note_type
+- Show a quick enrollment status selector at the top of the Notes tab (for owner/admin only) so they can change status and auto-log a "status_change" note in one action
+- Style action_required and info_request notes with stronger visual indicators (orange/red borders)
 
-No new tables needed — reuse existing `promotions` + `agent_promotions`.
-
-### Migration SQL
+**Database migration** — add `is_urgent` boolean column to `student_notes`:
 ```sql
-ALTER TABLE public.promotions 
-  ADD COLUMN target_role text NOT NULL DEFAULT 'agent';
+ALTER TABLE public.student_notes ADD COLUMN is_urgent boolean NOT NULL DEFAULT false;
 ```
 
-### PromoBanner.tsx changes
+**`src/components/student-detail/StudentNotesTab.tsx`** detailed changes:
+- New note types in `NOTE_TYPE_CONFIG`: `info_request`, `action_required`, `status_update`
+- Quick status changer: dropdown with current enrollment status + "Update & Log" button that updates enrollment status AND creates a status_change note simultaneously
+- Urgent toggle (checkbox/switch) for owner/admin when creating notes
+- Urgent notes render with orange-left-border and a small "URGENT" badge
 
-1. **Remove `if (role !== "agent") return null`** — allow both agent and admin
-2. **Fetch TWO promos** — one where `target_role = role` (agent gets agent promos, admin gets admin promos)
-3. **For admin qualifying count**: count enrollments from the admin's team agents (students where `agent_id` is in the admin's team), not just their own
-4. **Auto-create `agent_promotions` record** for admins too (same 30-day personal deadline logic)
-5. Keep the same visual design — progress bar, countdown, congratulations state
-
-### Admin enrollment counting logic
-```typescript
-// For admin: get team agent IDs first, then count enrollments for their students
-const { data: teamAgents } = await supabase
-  .from("profiles")
-  .select("id")
-  .eq("admin_id", user.id);
-
-const agentIds = teamAgents?.map(a => a.id) || [];
-
-const { count } = await supabase
-  .from("enrollments")
-  .select("id, students!inner(agent_id)", { count: "exact", head: true })
-  .in("students.agent_id", agentIds)
-  .in("status", QUALIFYING_STATUSES)
-  .gte("created_at", agentPromo.started_at)
-  .lte("created_at", agentPromo.personal_deadline);
-```
-
-### Owner Settings page
-The existing `PromotionsSection` in `SettingsPage.tsx` needs a new field to select `target_role` (agent or admin) when creating/editing a promotion.
+### No new tables — reuses existing `student_notes` + `enrollments`
 
 ### Files to modify
-- New migration — add `target_role` column to `promotions`
-- `src/components/PromoBanner.tsx` — support both roles, team counting for admin
-- `src/pages/owner/SettingsPage.tsx` — add `target_role` dropdown in promotions CRUD
+- New migration — add `is_urgent` to `student_notes`
+- `src/components/student-detail/StudentNotesTab.tsx` — new note types, quick status changer, urgent toggle, enhanced styling
 
