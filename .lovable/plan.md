@@ -1,74 +1,74 @@
 
 
-## Plan: AI Document Processor for Settings
+## Audit: EduForYou (yours) vs Puapi — Feature Comparison
 
-### Overview
-Add a document upload + AI processing feature to Platform Settings. The owner uploads a document (PDF, Excel, image) received from a university, selects the data type (Courses, Timetable Options, Campuses, Intakes), and the AI extracts structured data. The owner then reviews, edits, and confirms before saving to the database.
+### What you HAVE already
 
-### Architecture
+| Feature | Status |
+|---|---|
+| Student file management (full CRUD) | ✅ |
+| AI Chat personalizat | ✅ |
+| Document storage per student | ✅ |
+| Commission system with tiers | ✅ |
+| Multi-role: Owner / Admin / Agent | ✅ |
+| AI image generation for marketing | ✅ |
+| AI caption generation | ✅ |
+| Knowledge base for AI | ✅ |
+| AI monitoring (conversations) | ✅ |
+| Resources page (tutorials/guides) | ✅ |
+| Feedback system | ✅ |
+| Profile with avatar | ✅ |
+| Document processor (AI import) | ✅ |
+| Promotions / bonuses | ✅ |
+| Multi-step enrollment form | ✅ |
+| University/Campus/Course/Intake/Timetable settings | ✅ |
+| Brand settings (logo, voice) | ✅ |
 
-```text
-Upload Doc → Edge Function (parse + AI extract) → Preview Table → Owner confirms → Save to DB
-```
+### What Puapi HAS that you DON'T (yet)
 
-### 1. New Edge Function: `process-settings-document`
+| Puapi Feature | Priority | Difficulty |
+|---|---|---|
+| **Agent landing page / digital card** (public link per agent with contact, WhatsApp, social links, "Book consultation", "Check Eligibility", "Apply Now") | HIGH | Medium |
+| **Lead management system** (track potential students before they become applicants) | HIGH | Medium |
+| **SMS & Email system** with automations | MEDIUM | High |
+| **Task management** for team | MEDIUM | Medium |
+| **Consent form digital** (GDPR compliant, auto-generated) | MEDIUM | Low |
+| **CV & Personal Statement generation** with AI | MEDIUM | Low (you already have AI infra) |
+| **Clock-in system** for office staff | LOW | Medium |
+| **Calendar planner with booking** | LOW | High |
+| **Accounting & invoicing** | LOW | High |
+| **Student form → file conversion** (public form that creates a student record) | HIGH | Medium |
+| **Mobile app** (iOS/Android) | LOW | Very High |
 
-- Accepts: file (base64 or form-data), `document_type` (courses/timetable/campuses/intakes), `university_id`
-- Uses Lovable AI (gemini-2.5-flash) to extract structured data based on document type
-- For PDFs: extract text content, send to AI for structured parsing
-- Returns JSON array of extracted items with fields matching the target table schema
+### Recommended Implementation Order
 
-**AI prompt per type:**
-- **Courses**: extract `name`, `level`, `study_mode`
-- **Timetable Options**: extract `label` (group/pattern names with times)
-- **Campuses**: extract `name`, `city`
-- **Intakes**: extract `label`, `start_date`, `application_deadline`
+The highest-impact, lowest-effort features to close the gap:
 
-### 2. New Component: `DocumentProcessorDialog.tsx`
+**Phase 1 — Quick wins (can implement now)**
+1. **Agent Digital Card / Landing Page** — Public page at `/card/:agent-slug` showing agent photo, name, role, phone, WhatsApp, email, social links, "Book Consultation" and "Apply Now" buttons. Uses existing profile + new fields (WhatsApp, social links, booking URL). This is their key differentiator and very doable.
+2. **Public Student Application Form** — A public form at `/apply/:agent-ref` that creates a student record directly (no login needed). Replaces manual enrollment for self-service.
+3. **GDPR Consent Form** — Auto-generated digital consent as part of the enrollment flow.
 
-A dialog with a multi-step flow:
+**Phase 2 — Medium effort**
+4. **Lead Management** — New `leads` table with status pipeline (New → Contacted → Qualified → Converted). Leads convert to students.
+5. **AI CV & Personal Statement Generator** — Edge function using existing AI infra to generate documents from student data.
+6. **Task Management** — Simple kanban/list for team task tracking.
 
-**Step 1 - Upload**
-- File input (PDF, XLSX, images, DOCX)
-- Select document type (Courses, Timetable, Campuses, Intakes)
-- Select university
-- "Process" button
+**Phase 3 — Larger features**
+7. **Email automations** (enrollment status changes trigger emails)
+8. **Calendar/Booking** integration
+9. **Invoicing basics**
 
-**Step 2 - Review**
-- Table showing extracted items with editable fields
-- Checkboxes to select/deselect individual items
-- Highlight duplicates (items that already exist in DB)
-- Edit inline before confirming
+### What do you want to start with?
 
-**Step 3 - Confirm**
-- "Add Selected" button inserts checked items into the appropriate table
-- Toast with count of items added
-- Invalidate relevant queries
-
-### 3. Integration in SettingsPage
-
-- Add an "Import from Document" button (with Upload icon) at the top of the Settings page, next to the page title
-- Opens `DocumentProcessorDialog` with the current active tab pre-selected as document type
-
-### 4. File Handling
-
-- Read file client-side, convert to base64
-- Send to edge function for AI processing
-- No permanent file storage needed (temporary processing only)
-- Support: PDF, XLSX, DOCX, JPG/PNG (for scanned timetables)
-
-### Technical Details
-
-**Edge function** (`supabase/functions/process-settings-document/index.ts`):
-- Uses `pdf-parse` approach: receive base64 content + file type
-- For images/PDFs: send as content to Gemini with vision capabilities
-- System prompt tailored per document_type to extract the right schema
-- Returns `{ success: true, items: [...] }` with extracted data
-
-**Files to create:**
-- `supabase/functions/process-settings-document/index.ts`
-- `src/components/DocumentProcessorDialog.tsx`
-
-**Files to modify:**
-- `src/pages/owner/SettingsPage.tsx` (add import button)
+I recommend starting with the **Agent Digital Card** (public landing page per agent) since that's the most visible feature from the Puapi screenshot you shared, and it directly helps agents market themselves. It would include:
+- Public route `/card/:slug` (no auth required)
+- Agent photo, name, title, accreditation badge
+- Phone, WhatsApp, Email links
+- "Book a Free Consultation" button (external link or built-in)
+- "Check Eligibility" / "Apply Now" buttons
+- Company info tab with working hours
+- Social media links
+- vCard download ("Add to contacts")
+- New `agent_card_settings` table for social links, booking URL, working hours
 
