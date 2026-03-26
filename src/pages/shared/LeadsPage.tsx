@@ -271,6 +271,16 @@ export default function LeadsPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs h-7"
+                              onClick={() => { setNotesLead(lead); setNotesText(lead.notes || ""); }}
+                            >
+                              <StickyNote className="w-3 h-3 mr-1" />
+                              Notes
+                              {lead.notes && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-accent inline-block" />}
+                            </Button>
                             {nextStatus && nextStatus !== "converted" && (
                               <Button
                                 variant="ghost"
