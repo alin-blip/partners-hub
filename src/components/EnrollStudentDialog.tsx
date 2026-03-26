@@ -75,7 +75,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
     setTitle(""); setFirstName(""); setLastName(""); setNationality(""); setGender("");
     setDob(""); setEmail(""); setPhone(""); setFullAddress("");
     setUkEntryDate(""); setImmigrationStatus(""); setShareCode(""); setNiNumber("");
-    setPreviousFundingYears(""); setQualifications(""); setNotes("");
+    setPreviousFundingYears(""); setCrn(""); setQualifications(""); setNotes("");
     setNokName(""); setNokPhone(""); setNokRelationship("");
     setDocFiles([]); setSelectedDocType("Passport");
   };
