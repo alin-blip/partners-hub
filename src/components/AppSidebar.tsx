@@ -119,6 +119,7 @@ export function AppSidebar() {
   ];
 
   const managementItems: NavItem[] = role === "owner" ? [
+    { title: "Leads", url: "/owner/leads", icon: ContactRound },
     { title: "Agents", url: "/owner/agents", icon: UserCog },
     { title: "Commissions", url: "/owner/commissions", icon: PoundSterling },
     { title: "Knowledge Base", url: "/owner/knowledge-base", icon: Brain },
