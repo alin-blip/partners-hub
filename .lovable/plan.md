@@ -1,47 +1,35 @@
 
 
-## Plan: Email Notifications for Urgent Notes + Urgent Notes Indicator on Students List
+## Plan: Fix Enrollment "Submitting..." Hang
 
-### Two features
+### Problem
+When an agent submits a student enrollment via the dialog on the Students page, the button stays on "Submitting..." indefinitely with no error or success feedback.
 
-**1. Email notification to the agent** when an owner/admin adds an urgent or action_required note on their student. After inserting the note, call the `send-transactional-email` edge function with the agent's email and note details.
+### Root Cause (most likely)
+The mutation in `EnrollStudentDialog.tsx` inserts a student with `.select("id").single()`. If the RLS policy allows the INSERT but the read-back via SELECT fails silently, `student` becomes `null`, and `student.id` on the enrollment insert throws a runtime error. The `toast.error()` call should show this, but it may not be visible or may be swallowed.
 
-**2. Urgent notes count badge** on the Students list table — a small orange badge next to each student's name showing the count of unresolved urgent/action_required notes.
+### Fix
 
----
+**`src/components/EnrollStudentDialog.tsx`** — Improve error handling:
+1. Add explicit null check after student insert: if `!student` throw a clear error ("Failed to create student record")
+2. Add `console.error` in `onError` so we can see the actual failure in console logs
+3. Wrap the entire `mutationFn` in a try-catch with `console.error` for any uncaught issues
+4. Check for errors on the `student_documents` insert (currently ignoring errors)
 
-### Prerequisites — Email Infrastructure
+This is a targeted debugging + hardening fix — 1 file changed.
 
-The project has a verified email domain (`notify.agents-eduforyou.co.uk`) but no transactional email infrastructure yet. Before wiring up notifications:
+### Technical Details
+```typescript
+// Key change: null-guard after insert
+const { data: student, error: studentError } = await supabase
+  .from("students").insert({...}).select("id").single();
+if (studentError) throw studentError;
+if (!student) throw new Error("Failed to create student — please try again");
 
-1. Call `setup_email_infra` to create pgmq queues, RPC wrappers, cron job
-2. Call `scaffold_transactional_email` to create the `send-transactional-email` edge function and template structure
-3. Create a `note-notification` email template
-4. Deploy edge functions
-
-### Implementation
-
-**Database**: No schema changes needed. We'll query `student_notes` for urgent counts.
-
-**New email template** (`supabase/functions/_shared/transactional-email-templates/note-notification.tsx`):
-- Shows student name, note type (Urgent / Action Required / etc.), note content, and a link to the student detail page
-- Styled with the existing brand (navy + orange accent)
-
-**`src/components/student-detail/StudentNotesTab.tsx`**:
-- After successfully inserting an urgent or action_required note, look up the student's `agent_id`, fetch the agent's email from `profiles`, and invoke `send-transactional-email` with:
-  - `templateName: 'note-notification'`
-  - `recipientEmail: agentEmail`
-  - `templateData: { studentName, noteType, content }`
-  - `idempotencyKey: 'note-{noteId}'`
-
-**`src/pages/shared/StudentsPage.tsx`**:
-- Add a second query to fetch urgent note counts grouped by student_id: `SELECT student_id, count(*) FROM student_notes WHERE (is_urgent = true OR note_type IN ('action_required', 'info_request')) GROUP BY student_id`
-- Display a small orange `Badge` with a flame icon + count next to the student name in the table when count > 0
-
-### Files to modify/create
-- Email infrastructure setup (tools — no code files)
-- `supabase/functions/_shared/transactional-email-templates/note-notification.tsx` — new template
-- `supabase/functions/_shared/transactional-email-templates/registry.ts` — register template
-- `src/components/student-detail/StudentNotesTab.tsx` — send email after note insert
-- `src/pages/shared/StudentsPage.tsx` — fetch urgent counts, show badge
+// Key change: log errors for debugging
+onError: (error: Error) => {
+  console.error("Enrollment error:", error);
+  toast.error(error.message);
+},
+```
 
