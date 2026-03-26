@@ -48,11 +48,10 @@ export function PromoBanner() {
   const { data: promo } = useQuery({
     queryKey: ["active-promotion", role],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("promotions")
+      const { data } = await (supabase.from("promotions") as any)
         .select("*")
         .eq("is_active", true)
-        .eq("target_role" as any, role!)
+        .eq("target_role", role!)
         .order("created_at", { ascending: false })
         .limit(1);
       return data?.[0] || null;
