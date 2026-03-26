@@ -117,7 +117,10 @@ export default function PublicApplicationPage() {
     const intakeLabel = intakes.find(i => i.id === intakeId)?.label || "";
     const parts = [uniName, campusName, courseName, intakeLabel, timetableOption].filter(Boolean);
 
+    const leadId = crypto.randomUUID();
+
     const { error } = await supabase.from("leads").insert({
+      id: leadId,
       agent_id: agent.id,
       first_name: firstName.trim(),
       last_name: lastName.trim(),
@@ -133,8 +136,39 @@ export default function PublicApplicationPage() {
       status: "new",
     } as any);
 
+    if (!error) {
+      // Send email notification to the agent
+      const { data: agentProfile } = await supabase
+        .from("profiles")
+        .select("email")
+        .eq("id", agent.id)
+        .single();
+
+      if (agentProfile?.email) {
+        const leadName = `${firstName.trim()} ${lastName.trim()}`;
+        const courseInterest = parts.join(" — ") || undefined;
+
+        await supabase.functions.invoke("send-transactional-email", {
+          body: {
+            templateName: "new-lead-notification",
+            recipientEmail: agentProfile.email,
+            idempotencyKey: `new-lead-${leadId}`,
+            templateData: {
+              leadName,
+              leadEmail: email.trim().toLowerCase(),
+              leadPhone: phone.trim() || undefined,
+              nationality: nationality.trim() || undefined,
+              courseInterest,
+              leadsUrl: `${window.location.origin}/agent/leads`,
+            },
+          },
+        });
+      }
+
+      setSubmitted(true);
+    }
+
     setSubmitting(false);
-    if (!error) setSubmitted(true);
   };
 
   if (loading) {
