@@ -496,22 +496,6 @@ function PromotionsSection({ deleteItem }: { deleteItem: any }) {
 function UniversitiesSection({ universities, addUni, deleteItem }: { universities: any[]; addUni: any; deleteItem: any }) {
   const [addOpen, setAddOpen] = useState(false);
 
-  const toggleTimetable = useMutation({
-    mutationFn: async ({ id, timetable_available }: { id: string; timetable_available: boolean }) => {
-      const { error } = await supabase.from("universities").update({ timetable_available } as any).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["universities"] }); },
-  });
-
-  const updateMessage = useMutation({
-    mutationFn: async ({ id, timetable_message }: { id: string; timetable_message: string }) => {
-      const { error } = await supabase.from("universities").update({ timetable_message: timetable_message || null } as any).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["universities"] }); toast({ title: "Message saved" }); },
-  });
-
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-3">
