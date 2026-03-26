@@ -304,10 +304,10 @@ export default function MessagesPage() {
                   onSubmit={(e) => { e.preventDefault(); sendMessage.mutate(); }}
                   className="flex gap-2"
                 >
-                  <Textarea
+                  <MentionTextarea
                     value={messageText}
-                    onChange={(e) => setMessageText(e.target.value)}
-                    placeholder="Type a message…"
+                    onChange={setMessageText}
+                    placeholder="Type a message… Use @ to mention a student"
                     rows={1}
                     className="resize-none min-h-[40px]"
                     onKeyDown={(e) => {
