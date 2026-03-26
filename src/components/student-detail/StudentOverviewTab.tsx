@@ -123,6 +123,13 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
             <div className="space-y-2"><Label>Share Code</Label><Input value={editData.share_code} onChange={(e) => setEditData({ ...editData, share_code: e.target.value })} /></div>
             <div className="space-y-2"><Label>NI Number</Label><Input value={editData.ni_number} onChange={(e) => setEditData({ ...editData, ni_number: e.target.value })} /></div>
             <div className="space-y-2"><Label>Previous Funding (years)</Label><Input type="number" min="0" value={editData.previous_funding_years} onChange={(e) => setEditData({ ...editData, previous_funding_years: e.target.value })} /></div>
+            {editData.previous_funding_years && parseInt(editData.previous_funding_years) > 0 && (
+              <div className="space-y-2">
+                <Label>CRN (Customer Reference Number)</Label>
+                <Input value={editData.crn} onChange={(e) => setEditData({ ...editData, crn: e.target.value })} placeholder="e.g. 1234567890" />
+                <p className="text-xs text-muted-foreground">Numărul de referință SFE al studentului</p>
+              </div>
+            )}
             <div className="space-y-2"><Label>Study Pattern</Label><Input value={editData.study_pattern} onChange={(e) => setEditData({ ...editData, study_pattern: e.target.value })} /></div>
             <div className="space-y-2 sm:col-span-2"><Label>Qualifications</Label><Textarea value={editData.qualifications} onChange={(e) => setEditData({ ...editData, qualifications: e.target.value })} /></div>
             <div className="space-y-2 sm:col-span-2"><Label>Notes</Label><Textarea value={editData.notes} onChange={(e) => setEditData({ ...editData, notes: e.target.value })} /></div>
