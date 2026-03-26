@@ -17,7 +17,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Upload, Loader2, Palette, Calendar } from "lucide-react";
+import { Plus, Trash2, Upload, Loader2, Palette, Calendar, FileUp } from "lucide-react";
+import { DocumentProcessorDialog } from "@/components/DocumentProcessorDialog";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
 import { Textarea } from "@/components/ui/textarea";
