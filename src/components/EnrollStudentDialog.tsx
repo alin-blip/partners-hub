@@ -55,6 +55,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
   const [shareCode, setShareCode] = useState("");
   const [niNumber, setNiNumber] = useState("");
   const [previousFundingYears, setPreviousFundingYears] = useState("");
+  const [crn, setCrn] = useState("");
   const [qualifications, setQualifications] = useState("");
   const [notes, setNotes] = useState("");
 
