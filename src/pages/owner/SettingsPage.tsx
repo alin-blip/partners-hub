@@ -559,6 +559,15 @@ function UniversitiesSection({ universities, addUni, deleteItem }: { universitie
 function TimetableSection({ universities }: { universities: any[] }) {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const [newOption, setNewOption] = useState<{ uniId: string; label: string }>({ uniId: "", label: "" });
+
+  const { data: timetableOptions = [] } = useQuery({
+    queryKey: ["timetable-options"],
+    queryFn: async () => {
+      const { data } = await supabase.from("timetable_options" as any).select("*").order("label");
+      return (data || []) as any[];
+    },
+  });
 
   const toggleTimetable = useMutation({
     mutationFn: async ({ id, timetable_available }: { id: string; timetable_available: boolean }) => {
@@ -576,63 +585,165 @@ function TimetableSection({ universities }: { universities: any[] }) {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["universities"] }); toast({ title: "Message saved" }); },
   });
 
+  const addOption = useMutation({
+    mutationFn: async ({ university_id, label }: { university_id: string; label: string }) => {
+      const { error } = await (supabase.from("timetable_options" as any) as any).insert({ university_id, label });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["timetable-options"] });
+      setNewOption({ uniId: "", label: "" });
+      toast({ title: "Timetable option added" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteOption = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase.from("timetable_options" as any) as any).delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["timetable-options"] });
+      toast({ title: "Option removed" });
+    },
+  });
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
-          <Calendar className="w-4 h-4" />
-          Timetable Settings
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Configure per-university whether students can select a study pattern during enrollment, or display a custom message instead.
-        </p>
-      </CardHeader>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>University</TableHead>
-              <TableHead>Timetable Selectable</TableHead>
-              <TableHead>Custom Message (when disabled)</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {universities.map((u: any) => (
-              <TableRow key={u.id}>
-                <TableCell className="font-medium">{u.name}</TableCell>
-                <TableCell>
-                  <Switch
-                    checked={u.timetable_available !== false}
-                    onCheckedChange={(checked) => toggleTimetable.mutate({ id: u.id, timetable_available: checked })}
-                  />
-                </TableCell>
-                <TableCell>
-                  {u.timetable_available === false ? (
-                    <Input
-                      defaultValue={u.timetable_message || ""}
-                      placeholder="e.g. Studentul își alege programul după testul de admitere"
-                      className="text-sm"
-                      onBlur={(e) => {
-                        if (e.target.value !== (u.timetable_message || "")) {
-                          updateMessage.mutate({ id: u.id, timetable_message: e.target.value });
-                        }
-                      }}
-                    />
-                  ) : (
-                    <span className="text-muted-foreground text-sm">—</span>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-            {universities.length === 0 && (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            Timetable Settings
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Configure per-university whether students can select a study pattern during enrollment, or display a custom message instead.
+          </p>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={3} className="text-center text-muted-foreground py-6">No universities yet. Add universities first.</TableCell>
+                <TableHead>University</TableHead>
+                <TableHead>Timetable Selectable</TableHead>
+                <TableHead>Custom Message (when disabled)</TableHead>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+            </TableHeader>
+            <TableBody>
+              {universities.map((u: any) => (
+                <TableRow key={u.id}>
+                  <TableCell className="font-medium">{u.name}</TableCell>
+                  <TableCell>
+                    <Switch
+                      checked={u.timetable_available !== false}
+                      onCheckedChange={(checked) => toggleTimetable.mutate({ id: u.id, timetable_available: checked })}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    {u.timetable_available === false ? (
+                      <Input
+                        defaultValue={u.timetable_message || ""}
+                        placeholder="e.g. Studentul își alege programul după testul de admitere"
+                        className="text-sm"
+                        onBlur={(e) => {
+                          if (e.target.value !== (u.timetable_message || "")) {
+                            updateMessage.mutate({ id: u.id, timetable_message: e.target.value });
+                          }
+                        }}
+                      />
+                    ) : (
+                      <span className="text-muted-foreground text-sm">—</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {universities.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-center text-muted-foreground py-6">No universities yet. Add universities first.</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
+              Available Timetable Options
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Add the study patterns / programs students can choose from per university (e.g. Morning, Afternoon, Evening).
+            </p>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Add new option */}
+          <div className="flex items-end gap-3">
+            <div className="space-y-1 flex-1">
+              <Label className="text-xs">University</Label>
+              <select
+                className="w-full h-10 rounded-md border px-3 text-sm"
+                value={newOption.uniId}
+                onChange={(e) => setNewOption((p) => ({ ...p, uniId: e.target.value }))}
+              >
+                <option value="">Select university…</option>
+                {universities.filter((u: any) => u.timetable_available !== false).map((u: any) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1 flex-1">
+              <Label className="text-xs">Program Label</Label>
+              <Input
+                value={newOption.label}
+                onChange={(e) => setNewOption((p) => ({ ...p, label: e.target.value }))}
+                placeholder="e.g. Morning (9:00 - 13:00)"
+              />
+            </div>
+            <Button
+              size="sm"
+              className="bg-accent text-accent-foreground hover:bg-accent/90"
+              disabled={!newOption.uniId || !newOption.label.trim()}
+              onClick={() => addOption.mutate({ university_id: newOption.uniId, label: newOption.label.trim() })}
+            >
+              <Plus className="w-3 h-3 mr-1" /> Add
+            </Button>
+          </div>
+
+          {/* List per university */}
+          {universities.filter((u: any) => u.timetable_available !== false).map((u: any) => {
+            const opts = timetableOptions.filter((o: any) => o.university_id === u.id);
+            if (opts.length === 0) return null;
+            return (
+              <div key={u.id} className="space-y-2">
+                <h4 className="text-sm font-semibold text-muted-foreground">{u.name}</h4>
+                <div className="flex flex-wrap gap-2">
+                  {opts.map((o: any) => (
+                    <div key={o.id} className="flex items-center gap-1 bg-muted rounded-full px-3 py-1 text-sm">
+                      <span>{o.label}</span>
+                      <button
+                        className="ml-1 text-destructive hover:text-destructive/80"
+                        onClick={() => deleteOption.mutate(o.id)}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+
+          {universities.filter((u: any) => u.timetable_available !== false).length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-4">Enable timetable for at least one university above first.</p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
