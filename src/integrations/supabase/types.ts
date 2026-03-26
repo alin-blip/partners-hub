@@ -297,6 +297,10 @@ export type Database = {
           campus_id: string | null
           course_id: string
           created_at: string
+          funding_notes: string | null
+          funding_reference: string | null
+          funding_status: string | null
+          funding_type: string | null
           id: string
           intake_id: string | null
           notes: string | null
@@ -309,6 +313,10 @@ export type Database = {
           campus_id?: string | null
           course_id: string
           created_at?: string
+          funding_notes?: string | null
+          funding_reference?: string | null
+          funding_status?: string | null
+          funding_type?: string | null
           id?: string
           intake_id?: string | null
           notes?: string | null
@@ -321,6 +329,10 @@ export type Database = {
           campus_id?: string | null
           course_id?: string
           created_at?: string
+          funding_notes?: string | null
+          funding_reference?: string | null
+          funding_status?: string | null
+          funding_type?: string | null
           id?: string
           intake_id?: string | null
           notes?: string | null
@@ -626,6 +638,54 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "student_documents_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_notes: {
+        Row: {
+          content: string
+          created_at: string
+          enrollment_id: string | null
+          id: string
+          is_agent_visible: boolean
+          note_type: string
+          student_id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          enrollment_id?: string | null
+          id?: string
+          is_agent_visible?: boolean
+          note_type?: string
+          student_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          enrollment_id?: string | null
+          id?: string
+          is_agent_visible?: boolean
+          note_type?: string
+          student_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_notes_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_notes_student_id_fkey"
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
