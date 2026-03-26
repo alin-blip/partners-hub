@@ -22,6 +22,7 @@ import ProfilePage from "./pages/shared/ProfilePage";
 import ResourcesPage from "./pages/shared/ResourcesPage";
 import CreateImagePage from "./pages/shared/CreateImagePage";
 import UnsubscribePage from "./pages/shared/UnsubscribePage";
+import MessagesPage from "./pages/shared/MessagesPage";
 
 import FeedbackPage from "./pages/owner/FeedbackPage";
 import NotFound from "./pages/NotFound";
@@ -46,6 +47,7 @@ const App = () => (
             <Route path="/owner/students" element={<StudentsPage />} />
             <Route path="/owner/students/:id" element={<StudentDetailPage />} />
             <Route path="/owner/enrollments" element={<EnrollmentsPage />} />
+            <Route path="/owner/messages" element={<MessagesPage />} />
             <Route path="/owner/agents" element={<AgentsPage />} />
             <Route path="/owner/settings" element={<SettingsPage />} />
             <Route path="/owner/commissions" element={<CommissionsPage />} />
@@ -63,6 +65,7 @@ const App = () => (
             <Route path="/admin/students" element={<StudentsPage />} />
             <Route path="/admin/students/:id" element={<StudentDetailPage />} />
             <Route path="/admin/enrollments" element={<EnrollmentsPage />} />
+            <Route path="/admin/messages" element={<MessagesPage />} />
             <Route path="/admin/agents" element={<AdminAgentsPage />} />
             
             <Route path="/admin/profile" element={<ProfilePage />} />
@@ -75,6 +78,7 @@ const App = () => (
             <Route path="/agent/students" element={<StudentsPage />} />
             <Route path="/agent/students/:id" element={<StudentDetailPage />} />
             <Route path="/agent/enrollments" element={<EnrollmentsPage />} />
+            <Route path="/agent/messages" element={<MessagesPage />} />
             
             <Route path="/agent/profile" element={<ProfilePage />} />
             <Route path="/agent/resources" element={<ResourcesPage />} />

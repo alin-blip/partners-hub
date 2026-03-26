@@ -59,6 +59,7 @@ export default function StudentsPage() {
       const { data, error } = await supabase
         .from("student_notes")
         .select("student_id")
+        .is("resolved_at" as any, null)
         .or("is_urgent.eq.true,note_type.in.(action_required,info_request)");
       if (error) throw error;
       const counts: Record<string, number> = {};

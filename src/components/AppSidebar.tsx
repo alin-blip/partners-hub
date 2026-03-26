@@ -12,7 +12,7 @@ import {
   Brain,
   MessageSquare,
   Image as ImageIcon,
-  
+  Mail,
   MessageSquareHeart,
 } from "lucide-react";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
@@ -74,6 +74,7 @@ export function AppSidebar() {
     { title: "Dashboard", url: `${prefix}/dashboard`, icon: LayoutDashboard },
     { title: "Students", url: `${prefix}/students`, icon: Users },
     { title: "Enrollments", url: `${prefix}/enrollments`, icon: ClipboardList },
+    { title: "Messages", url: `${prefix}/messages`, icon: Mail },
   ];
 
 

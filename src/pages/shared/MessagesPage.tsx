@@ -1,0 +1,328 @@
+import { useState, useEffect, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { DashboardLayout } from "@/components/DashboardLayout";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
+import { Send, Plus, MessageCircle, Search } from "lucide-react";
+import { format } from "date-fns";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+} from "@/components/ui/dialog";
+
+export default function MessagesPage() {
+  const { user, role } = useAuth();
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [activeConvo, setActiveConvo] = useState<string | null>(null);
+  const [messageText, setMessageText] = useState("");
+  const [searchUsers, setSearchUsers] = useState("");
+  const [newConvoOpen, setNewConvoOpen] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Fetch conversations
+  const { data: conversations = [] } = useQuery({
+    queryKey: ["direct-conversations"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("direct_conversations")
+        .select("*, p1:participant_1(id, full_name, avatar_url), p2:participant_2(id, full_name, avatar_url)")
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Fetch messages for active conversation
+  const { data: messages = [] } = useQuery({
+    queryKey: ["direct-messages", activeConvo],
+    queryFn: async () => {
+      if (!activeConvo) return [];
+      const { data, error } = await supabase
+        .from("direct_messages")
+        .select("*, sender:sender_id(full_name, avatar_url)")
+        .eq("conversation_id", activeConvo)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!activeConvo,
+  });
+
+  // Fetch users for new conversation
+  const { data: availableUsers = [] } = useQuery({
+    queryKey: ["available-users-for-chat", searchUsers],
+    queryFn: async () => {
+      let query = supabase.from("profiles").select("id, full_name, email, avatar_url").neq("id", user!.id);
+      if (searchUsers.trim()) {
+        query = query.or(`full_name.ilike.%${searchUsers}%,email.ilike.%${searchUsers}%`);
+      }
+      const { data } = await query.order("full_name").limit(20);
+      return data || [];
+    },
+    enabled: newConvoOpen && !!user,
+  });
+
+  // Mark messages as read
+  useEffect(() => {
+    if (!activeConvo || !user || messages.length === 0) return;
+    const unread = messages.filter((m: any) => m.sender_id !== user.id && !m.read_at);
+    if (unread.length === 0) return;
+    const ids = unread.map((m: any) => m.id);
+    supabase
+      .from("direct_messages")
+      .update({ read_at: new Date().toISOString() } as any)
+      .in("id", ids)
+      .then(() => qc.invalidateQueries({ queryKey: ["direct-conversations"] }));
+  }, [activeConvo, messages, user]);
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Realtime subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel("direct-messages-realtime")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "direct_messages" }, () => {
+        qc.invalidateQueries({ queryKey: ["direct-messages", activeConvo] });
+        qc.invalidateQueries({ queryKey: ["direct-conversations"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [activeConvo]);
+
+  const sendMessage = useMutation({
+    mutationFn: async () => {
+      if (!activeConvo || !messageText.trim()) return;
+      const { error } = await supabase.from("direct_messages").insert({
+        conversation_id: activeConvo,
+        sender_id: user!.id,
+        content: messageText.trim(),
+      } as any);
+      if (error) throw error;
+      // Touch conversation updated_at
+      await supabase.from("direct_conversations").update({ updated_at: new Date().toISOString() } as any).eq("id", activeConvo);
+    },
+    onSuccess: () => {
+      setMessageText("");
+      qc.invalidateQueries({ queryKey: ["direct-messages", activeConvo] });
+      qc.invalidateQueries({ queryKey: ["direct-conversations"] });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const startConversation = async (otherUserId: string) => {
+    // Check if conversation already exists
+    const existing = conversations.find((c: any) =>
+      (c.participant_1 === user!.id && c.participant_2 === otherUserId) ||
+      (c.participant_2 === user!.id && c.participant_1 === otherUserId)
+    );
+    if (existing) {
+      setActiveConvo(existing.id);
+      setNewConvoOpen(false);
+      return;
+    }
+    const { data, error } = await supabase.from("direct_conversations").insert({
+      participant_1: user!.id,
+      participant_2: otherUserId,
+    } as any).select().single();
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    qc.invalidateQueries({ queryKey: ["direct-conversations"] });
+    setActiveConvo(data.id);
+    setNewConvoOpen(false);
+  };
+
+  const getOtherParticipant = (convo: any) => {
+    if (convo.p1?.id === user?.id) return convo.p2;
+    return convo.p1;
+  };
+
+  const getUnreadCount = (convo: any) => {
+    // We'd need a separate query for unread counts, but for simplicity
+    // we'll just check the messages array when it's the active convo
+    return 0;
+  };
+
+  const getInitials = (name?: string) => {
+    if (!name) return "?";
+    return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
+  };
+
+  return (
+    <DashboardLayout>
+      <div className="flex h-[calc(100vh-6rem)] gap-0 border rounded-lg bg-card overflow-hidden">
+        {/* Conversation list */}
+        <div className="w-80 border-r flex flex-col shrink-0">
+          <div className="p-3 border-b flex items-center justify-between">
+            <h2 className="font-semibold text-sm">Messages</h2>
+            <Dialog open={newConvoOpen} onOpenChange={setNewConvoOpen}>
+              <DialogTrigger asChild>
+                <Button size="icon" variant="ghost" className="h-8 w-8">
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>New Conversation</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search users…"
+                      value={searchUsers}
+                      onChange={(e) => setSearchUsers(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <ScrollArea className="h-60">
+                    <div className="space-y-1">
+                      {availableUsers.map((u: any) => (
+                        <button
+                          key={u.id}
+                          onClick={() => startConversation(u.id)}
+                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 text-left transition-colors"
+                        >
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="text-xs bg-accent/20 text-accent">{getInitials(u.full_name)}</AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{u.full_name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                          </div>
+                        </button>
+                      ))}
+                      {availableUsers.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-4">No users found</p>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <ScrollArea className="flex-1">
+            {conversations.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <MessageCircle className="w-8 h-8 mb-2 opacity-50" />
+                <p className="text-sm">No conversations yet</p>
+              </div>
+            ) : (
+              <div className="p-1">
+                {conversations.map((convo: any) => {
+                  const other = getOtherParticipant(convo);
+                  const isActive = activeConvo === convo.id;
+                  return (
+                    <button
+                      key={convo.id}
+                      onClick={() => setActiveConvo(convo.id)}
+                      className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors ${
+                        isActive ? "bg-accent/10" : "hover:bg-muted/50"
+                      }`}
+                    >
+                      <Avatar className="h-9 w-9 shrink-0">
+                        <AvatarFallback className="text-xs bg-accent/20 text-accent">{getInitials(other?.full_name)}</AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{other?.full_name || "Unknown"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(convo.updated_at), "dd MMM, HH:mm")}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </ScrollArea>
+        </div>
+
+        {/* Message area */}
+        <div className="flex-1 flex flex-col">
+          {!activeConvo ? (
+            <div className="flex-1 flex items-center justify-center text-muted-foreground">
+              <div className="text-center">
+                <MessageCircle className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p className="text-sm">Select a conversation or start a new one</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Header */}
+              {(() => {
+                const convo = conversations.find((c: any) => c.id === activeConvo);
+                const other = convo ? getOtherParticipant(convo) : null;
+                return (
+                  <div className="p-3 border-b flex items-center gap-3">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="text-xs bg-accent/20 text-accent">{getInitials(other?.full_name)}</AvatarFallback>
+                    </Avatar>
+                    <p className="font-medium text-sm">{other?.full_name || "Unknown"}</p>
+                  </div>
+                );
+              })()}
+
+              {/* Messages */}
+              <ScrollArea className="flex-1 p-4">
+                <div className="space-y-3">
+                  {messages.map((msg: any) => {
+                    const isMine = msg.sender_id === user?.id;
+                    return (
+                      <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
+                        <div className={`max-w-[70%] rounded-lg px-3 py-2 ${
+                          isMine ? "bg-accent text-accent-foreground" : "bg-muted"
+                        }`}>
+                          <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                          <p className={`text-[10px] mt-1 ${isMine ? "text-accent-foreground/60" : "text-muted-foreground"}`}>
+                            {format(new Date(msg.created_at), "HH:mm")}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div ref={messagesEndRef} />
+                </div>
+              </ScrollArea>
+
+              {/* Input */}
+              <div className="p-3 border-t">
+                <form
+                  onSubmit={(e) => { e.preventDefault(); sendMessage.mutate(); }}
+                  className="flex gap-2"
+                >
+                  <Textarea
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    placeholder="Type a message…"
+                    rows={1}
+                    className="resize-none min-h-[40px]"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        sendMessage.mutate();
+                      }
+                    }}
+                  />
+                  <Button type="submit" size="icon" className="shrink-0 bg-accent text-accent-foreground hover:bg-accent/90" disabled={!messageText.trim() || sendMessage.isPending}>
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </form>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </DashboardLayout>
+  );
+}
