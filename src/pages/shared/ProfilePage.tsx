@@ -210,6 +210,5 @@ export default function ProfilePage() {
 
       </div>
     </DashboardLayout>
-    </DashboardLayout>
   );
 }
