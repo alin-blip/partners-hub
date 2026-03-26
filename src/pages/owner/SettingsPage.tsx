@@ -547,8 +547,6 @@ function UniversitiesSection({ universities, addUni, deleteItem }: { universitie
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Active</TableHead>
-              <TableHead>Timetable Available</TableHead>
-              <TableHead>Timetable Message</TableHead>
               <TableHead className="w-16" />
             </TableRow>
           </TableHeader>
@@ -558,28 +556,6 @@ function UniversitiesSection({ universities, addUni, deleteItem }: { universitie
                 <TableCell className="font-medium">{u.name}</TableCell>
                 <TableCell>{u.is_active ? "Yes" : "No"}</TableCell>
                 <TableCell>
-                  <Switch
-                    checked={u.timetable_available !== false}
-                    onCheckedChange={(checked) => toggleTimetable.mutate({ id: u.id, timetable_available: checked })}
-                  />
-                </TableCell>
-                <TableCell>
-                  {u.timetable_available === false && (
-                    <div className="flex gap-2">
-                      <Input
-                        defaultValue={u.timetable_message || ""}
-                        placeholder="e.g. Studentul își alege programul după test"
-                        className="text-xs h-8"
-                        onBlur={(e) => {
-                          if (e.target.value !== (u.timetable_message || "")) {
-                            updateMessage.mutate({ id: u.id, timetable_message: e.target.value });
-                          }
-                        }}
-                      />
-                    </div>
-                  )}
-                </TableCell>
-                <TableCell>
                   <Button variant="ghost" size="icon" onClick={() => deleteItem.mutate({ table: "universities", id: u.id })}>
                     <Trash2 className="w-4 h-4 text-destructive" />
                   </Button>
@@ -588,7 +564,7 @@ function UniversitiesSection({ universities, addUni, deleteItem }: { universitie
             ))}
             {universities.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground py-6">No universities yet</TableCell>
+                <TableCell colSpan={3} className="text-center text-muted-foreground py-6">No universities yet</TableCell>
               </TableRow>
             )}
           </TableBody>
