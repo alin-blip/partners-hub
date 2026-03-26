@@ -141,8 +141,9 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
           next_of_kin_relationship: nokRelationship || null,
         } as any)
         .select("id")
-        .single();
+        .maybeSingle();
       if (studentError) throw studentError;
+      if (!student) throw new Error("Failed to create student record — please try again");
 
       const { error: enrollError } = await supabase.from("enrollments").insert({
         student_id: student.id, university_id: universityId,
@@ -156,11 +157,13 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
         for (const { file, docType } of docFiles) {
           const ext = file.name.split(".").pop();
           const storagePath = `${agentName}_${user!.id}/${studentName}_${student.id}/${docType}_${Date.now()}.${ext}`;
-          await supabase.storage.from("student-documents").upload(storagePath, file);
-          await supabase.from("student_documents").insert({
+          const { error: uploadErr } = await supabase.storage.from("student-documents").upload(storagePath, file);
+          if (uploadErr) console.error("Doc upload error:", uploadErr);
+          const { error: docInsertErr } = await supabase.from("student_documents").insert({
             student_id: student.id, agent_id: user!.id, doc_type: docType,
             file_name: file.name, file_path: storagePath, file_size: file.size, uploaded_by: user!.id,
           });
+          if (docInsertErr) console.error("Doc record error:", docInsertErr);
         }
       }
     },
@@ -172,7 +175,10 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
       resetForm();
       onOpenChange(false);
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => {
+      console.error("Enrollment error:", error);
+      toast.error(error.message);
+    },
   });
 
   const canProceedStep1 = universityId && courseId;
