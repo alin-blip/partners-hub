@@ -434,6 +434,7 @@ function PromotionsSection({ deleteItem }: { deleteItem: any }) {
         bonus_amount: Number(d.bonus_amount),
         bonus_percentage: d.bonus_percentage ? Number(d.bonus_percentage) : null,
         target_students: Number(d.target_students),
+        target_role: d.target_role || "agent",
         is_active: true,
       });
       if (error) throw error;
