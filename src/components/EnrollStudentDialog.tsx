@@ -250,22 +250,29 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
                 </div>
                 <div className="space-y-2">
                   <Label>Study Pattern</Label>
-                  <div className="flex gap-4">
-                    {STUDY_PATTERNS.map((sp) => (
-                      <label key={sp} className="flex items-center gap-2 text-sm">
-                        <Checkbox
-                          checked={studyPattern.includes(sp)}
-                          onCheckedChange={(checked) => {
-                            setStudyPattern(checked
-                              ? [...studyPattern, sp]
-                              : studyPattern.filter((p) => p !== sp)
-                            );
-                          }}
-                        />
-                        {sp}
-                      </label>
-                    ))}
-                  </div>
+                  {(selectedUniversity as any)?.timetable_available === false ? (
+                    <div className="p-3 rounded-md bg-muted text-sm text-muted-foreground border">
+                      <Calendar className="w-4 h-4 inline mr-2" />
+                      {(selectedUniversity as any)?.timetable_message || "Timetable will be assigned by the university."}
+                    </div>
+                  ) : (
+                    <div className="flex gap-4">
+                      {STUDY_PATTERNS.map((sp) => (
+                        <label key={sp} className="flex items-center gap-2 text-sm">
+                          <Checkbox
+                            checked={studyPattern.includes(sp)}
+                            onCheckedChange={(checked) => {
+                              setStudyPattern(checked
+                                ? [...studyPattern, sp]
+                                : studyPattern.filter((p) => p !== sp)
+                              );
+                            }}
+                          />
+                          {sp}
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </>
             )}
