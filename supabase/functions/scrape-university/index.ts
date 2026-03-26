@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
     const mapRes = await fetch('https://api.firecrawl.dev/v1/map', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${firecrawlKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: formattedUrl, search: 'courses programmes', limit: 200, includeSubdomains: false }),
+      body: JSON.stringify({ url: formattedUrl, search: 'courses programmes programs study', limit: 200, includeSubdomains: false }),
     });
     const mapData = await mapRes.json();
     if (!mapRes.ok) {
@@ -56,40 +56,61 @@ Deno.serve(async (req) => {
     const allLinks: string[] = mapData.links || [];
     console.log(`Found ${allLinks.length} total links`);
 
-    // Filter for course pages (individual course, not listing pages)
-    const coursePatterns = ['/courses/', '/programmes/', '/program/', '/course/'];
+    // Filter for course-related pages (broad patterns)
+    const coursePatterns = ['/courses/', '/programmes/', '/program/', '/course/', '/study/', '/undergraduate/', '/postgraduate/', '/degree/', '/hnd/', '/masters/', '/msc/', '/bsc/', '/ba-'];
+    const excludePatterns = ['/category', '/search', 'page=', 'sitemap', '/tag/', '/author/', '/wp-content/', '/wp-admin/', '/feed/', '.pdf', '.jpg', '.png', '/login', '/register', '/cart', '/checkout'];
+    
     const courseUrls = allLinks.filter((link: string) => {
       const lower = link.toLowerCase();
       const hasPattern = coursePatterns.some(p => lower.includes(p));
       if (!hasPattern) return false;
-      // Exclude listing/category/search pages
-      if (lower.endsWith('/courses/') || lower.endsWith('/courses') || lower.endsWith('/programmes/') || lower.endsWith('/programmes')) return false;
-      if (lower.includes('/category') || lower.includes('/search') || lower.includes('page=') || lower.includes('sitemap')) return false;
-      // Must have a slug after /courses/
-      const parts = lower.split('/courses/');
-      if (parts.length > 1 && parts[1].replace(/\/$/, '').length > 0) return true;
-      const parts2 = lower.split('/programmes/');
-      if (parts2.length > 1 && parts2[1].replace(/\/$/, '').length > 0) return true;
-      return false;
+      // Exclude utility pages
+      if (excludePatterns.some(p => lower.includes(p))) return false;
+      return true;
     });
 
-    const uniqueUrls = [...new Set(courseUrls)];
-    console.log(`Found ${uniqueUrls.length} course URLs`);
+    const uniqueCourseUrls = [...new Set(courseUrls)];
+    console.log(`Found ${uniqueCourseUrls.length} course-related URLs`);
 
-    if (uniqueUrls.length === 0) {
-      return new Response(
-        JSON.stringify({ success: true, courses: [], message: 'No course pages found. Try a different URL.' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Determine which URLs to scrape
+    let urlsToScrape: string[] = [];
+    
+    if (uniqueCourseUrls.length > 0) {
+      // Use found course URLs (up to 25)
+      urlsToScrape = uniqueCourseUrls.slice(0, 25);
+    } else {
+      // Fallback: scrape the provided URL directly + any relevant-looking pages
+      console.log('No course URLs found via patterns, falling back to direct scrape');
+      urlsToScrape = [formattedUrl];
+      
+      // Also add pages that might be course listings (top-level pages with relevant words)
+      const relevantPages = allLinks.filter((link: string) => {
+        const lower = link.toLowerCase();
+        if (excludePatterns.some(p => lower.includes(p))) return false;
+        return /course|program|study|degree|train|learn|diploma|certificate/i.test(lower);
+      });
+      
+      for (const p of relevantPages.slice(0, 10)) {
+        if (!urlsToScrape.includes(p)) urlsToScrape.push(p);
+      }
+      
+      // If still only the main URL, add a few top links from the sitemap
+      if (urlsToScrape.length <= 1 && allLinks.length > 0) {
+        for (const link of allLinks.slice(0, 10)) {
+          if (!urlsToScrape.includes(link) && !excludePatterns.some(p => link.toLowerCase().includes(p))) {
+            urlsToScrape.push(link);
+          }
+        }
+        urlsToScrape = urlsToScrape.slice(0, 15);
+      }
     }
 
-    // Step 2: Scrape the main courses listing page first (to get an overview)
-    // Then scrape individual course pages in batches using markdown
-    const urlsToScrape = uniqueUrls.slice(0, 25);
+    console.log(`Will scrape ${urlsToScrape.length} URLs`);
+
+    // Step 2: Scrape pages
     const scrapedPages: { url: string; markdown: string }[] = [];
     const errors: string[] = [];
 
-    // Scrape in batches of 5 for speed
     for (let i = 0; i < urlsToScrape.length; i += 5) {
       const batch = urlsToScrape.slice(i, i + 5);
       const results = await Promise.allSettled(
@@ -106,7 +127,7 @@ Deno.serve(async (req) => {
           }
           const md = scrapeData.data?.markdown || scrapeData.markdown || '';
           if (!md) throw new Error('No content returned');
-          return { url: courseUrl, markdown: md.slice(0, 3000) }; // Limit per page
+          return { url: courseUrl, markdown: md.slice(0, 3000) };
         })
       );
       for (const r of results) {
@@ -124,7 +145,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Step 3: Use AI to extract structured course data from all scraped markdown
+    // Step 3: Use AI to extract structured course data
     const combinedContent = scrapedPages.map((p, i) =>
       `=== PAGE ${i + 1}: ${p.url} ===\n${p.markdown}`
     ).join('\n\n');
@@ -142,7 +163,7 @@ Deno.serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You extract course information from university web pages. Return ONLY a JSON array of courses. Each course object must have:
+            content: `You extract course/programme information from web pages. Return ONLY a JSON array of courses found. Each course object must have:
 - "name": full course name (string)
 - "level": "undergraduate", "postgraduate", "foundation", or "hnd" (string)
 - "study_mode": "full-time", "part-time", "blended", or "online" (string)  
@@ -152,11 +173,12 @@ Deno.serve(async (req) => {
 - "description": 1-2 sentence description (string)
 - "source_url": the page URL this was extracted from (string)
 
+If no courses or programmes are found on the pages, return an empty array [].
 Return ONLY the JSON array, no markdown formatting, no explanation.`
           },
           {
             role: 'user',
-            content: `Extract all courses from these university web pages:\n\n${combinedContent}`
+            content: `Extract all courses/programmes from these web pages:\n\n${combinedContent}`
           }
         ],
         temperature: 0.1,
@@ -177,10 +199,8 @@ Return ONLY the JSON array, no markdown formatting, no explanation.`
     const aiContent = aiData.choices?.[0]?.message?.content || '';
     console.log('AI response length:', aiContent.length);
 
-    // Parse the JSON from AI response
     let courses: any[] = [];
     try {
-      // Remove possible markdown code fences
       const cleaned = aiContent.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       courses = JSON.parse(cleaned);
       if (!Array.isArray(courses)) courses = [courses];
@@ -198,7 +218,7 @@ Return ONLY the JSON array, no markdown formatting, no explanation.`
       JSON.stringify({
         success: true,
         courses,
-        totalUrlsFound: uniqueUrls.length,
+        totalUrlsFound: allLinks.length,
         scraped: scrapedPages.length,
         errors: errors.length > 0 ? errors.slice(0, 5) : undefined,
       }),
