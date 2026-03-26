@@ -15,6 +15,24 @@ import {
   Mail,
   MessageSquareHeart,
   CreditCard,
+  ContactRound,
+} from "lucide-react";
+  LayoutDashboard,
+  Users,
+  ClipboardList,
+  UserCog,
+  Settings,
+  LogOut,
+  GraduationCap,
+  PoundSterling,
+  UserCircle,
+  FolderOpen,
+  Brain,
+  MessageSquare,
+  Image as ImageIcon,
+  Mail,
+  MessageSquareHeart,
+  CreditCard,
 } from "lucide-react";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { NavLink } from "@/components/NavLink";
