@@ -755,11 +755,16 @@ export default function SettingsPage() {
             <TabsTrigger value="intakes">Intakes</TabsTrigger>
             <TabsTrigger value="commissions">Commission Tiers</TabsTrigger>
             <TabsTrigger value="promotions">Promotions</TabsTrigger>
+            <TabsTrigger value="timetable">Timetable</TabsTrigger>
             <TabsTrigger value="brand">Brand / AI</TabsTrigger>
           </TabsList>
 
           <TabsContent value="universities" className="mt-4">
             <UniversitiesSection universities={universities} addUni={addUni} deleteItem={deleteItem} />
+          </TabsContent>
+
+          <TabsContent value="timetable" className="mt-4">
+            <TimetableSection universities={universities} />
           </TabsContent>
 
           <TabsContent value="campuses" className="mt-4">
