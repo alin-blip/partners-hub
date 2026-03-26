@@ -21,6 +21,9 @@ import {
   Loader2,
   Sparkles,
   User,
+  MessageSquare,
+  Copy,
+  Check,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -31,6 +34,34 @@ const PRESETS = [
   { id: "banner", label: "Banner", desc: "1200×628 horizontal", icon: LayoutTemplate },
 ];
 
+function CaptionDisplay({ caption, onClose }: { caption: string; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(caption);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="mt-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs font-medium flex items-center gap-1">
+          <MessageSquare className="w-3 h-3" />
+          Generated Caption
+        </Label>
+        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={handleCopy}>
+          {copied ? <Check className="w-3 h-3 mr-1" /> : <Copy className="w-3 h-3 mr-1" />}
+          {copied ? "Copied!" : "Copy"}
+        </Button>
+      </div>
+      <div className="p-3 rounded-md bg-muted text-sm whitespace-pre-wrap border">
+        {caption}
+      </div>
+    </div>
+  );
+}
+
 export default function CreateImagePage() {
   const { user, profile } = useAuth();
   const { toast } = useToast();
@@ -40,6 +71,8 @@ export default function CreateImagePage() {
   const [includePhoto, setIncludePhoto] = useState(false);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
   const [remaining, setRemaining] = useState<number | null>(null);
+  const [captions, setCaptions] = useState<Record<string, string>>({});
+  const [captionLoading, setCaptionLoading] = useState<Record<string, boolean>>({});
 
   const hasAvatar = !!(profile as any)?.avatar_url;
 
@@ -88,6 +121,34 @@ export default function CreateImagePage() {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     },
   });
+
+  const generateCaption = async (key: string, imgPrompt: string, imgPreset: string) => {
+    setCaptionLoading((prev) => ({ ...prev, [key]: true }));
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-caption`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ prompt: imgPrompt, preset: imgPreset }),
+        }
+      );
+
+      const result = await resp.json();
+      if (!resp.ok) throw new Error(result.error || "Caption generation failed");
+      setCaptions((prev) => ({ ...prev, [key]: result.caption }));
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setCaptionLoading((prev) => ({ ...prev, [key]: false }));
+    }
+  };
 
   const getPublicUrl = (path: string) => {
     const { data } = supabase.storage.from("generated-images").getPublicUrl(path);
@@ -206,18 +267,42 @@ export default function CreateImagePage() {
                   alt="Generated"
                   className="w-full max-w-lg mx-auto rounded-lg shadow-md"
                 />
-                <a
-                  href={generatedUrl}
-                  download
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Button size="icon" variant="secondary">
-                    <Download className="w-4 h-4" />
-                  </Button>
-                </a>
+                <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        onClick={() => generateCaption("latest", prompt, selectedPreset)}
+                        disabled={captionLoading["latest"]}
+                      >
+                        {captionLoading["latest"] ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <MessageSquare className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Generate caption</TooltipContent>
+                  </Tooltip>
+                  <a
+                    href={generatedUrl}
+                    download
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button size="icon" variant="secondary">
+                      <Download className="w-4 h-4" />
+                    </Button>
+                  </a>
+                </div>
               </div>
+              {captions["latest"] && (
+                <CaptionDisplay
+                  caption={captions["latest"]}
+                  onClose={() => setCaptions((prev) => { const n = { ...prev }; delete n["latest"]; return n; })}
+                />
+              )}
             </CardContent>
           </Card>
         )}
@@ -241,36 +326,65 @@ export default function CreateImagePage() {
                 No images generated yet. Create your first one above!
               </p>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {gallery.map((img: any) => (
-                  <div key={img.id} className="relative group rounded-lg overflow-hidden border">
-                    <img
-                      src={getPublicUrl(img.image_path)}
-                      alt={img.prompt}
-                      className="w-full aspect-square object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2">
-                      <p className="text-white text-xs line-clamp-2">{img.prompt}</p>
-                      <div className="flex items-center justify-between mt-1">
-                        <Badge variant="secondary" className="text-[10px]">
-                          {img.preset}
-                        </Badge>
-                        <span className="text-[10px] text-white/70">
-                          {format(new Date(img.created_at), "dd MMM")}
-                        </span>
+                  <div key={img.id} className="rounded-lg overflow-hidden border">
+                    <div className="relative group">
+                      <img
+                        src={getPublicUrl(img.image_path)}
+                        alt={img.prompt}
+                        className="w-full aspect-square object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2">
+                        <p className="text-white text-xs line-clamp-2">{img.prompt}</p>
+                        <div className="flex items-center justify-between mt-1">
+                          <Badge variant="secondary" className="text-[10px]">
+                            {img.preset}
+                          </Badge>
+                          <span className="text-[10px] text-white/70">
+                            {format(new Date(img.created_at), "dd MMM")}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="secondary"
+                              className="h-7 w-7"
+                              onClick={() => generateCaption(img.id, img.prompt, img.preset)}
+                              disabled={captionLoading[img.id]}
+                            >
+                              {captionLoading[img.id] ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <MessageSquare className="w-3 h-3" />
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Generate caption</TooltipContent>
+                        </Tooltip>
+                        <a
+                          href={getPublicUrl(img.image_path)}
+                          download
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Button size="icon" variant="secondary" className="h-7 w-7">
+                            <Download className="w-3 h-3" />
+                          </Button>
+                        </a>
                       </div>
                     </div>
-                    <a
-                      href={getPublicUrl(img.image_path)}
-                      download
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Button size="icon" variant="secondary" className="h-7 w-7">
-                        <Download className="w-3 h-3" />
-                      </Button>
-                    </a>
+                    {captions[img.id] && (
+                      <div className="p-3">
+                        <CaptionDisplay
+                          caption={captions[img.id]}
+                          onClose={() => setCaptions((prev) => { const n = { ...prev }; delete n[img.id]; return n; })}
+                        />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
