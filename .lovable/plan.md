@@ -1,31 +1,40 @@
 
 
-## Plan: Simplify Sidebar Navigation
+## Plan: Personalized Promo Banner with Agent Progress
 
-### Current State
-Three separate sidebar items: Students, Enrollments, Documents — plus each student detail page already has tabs for Enrollments, Documents, Funding, Notes.
+### What changes
+The PromoBanner will show each agent's individual progress toward the promotion target — e.g., "2/5 students · Mai ai 3" — by counting their qualifying enrollments (status = `offer_received`, `accepted`, `enrolled`, `active`) created during the promo period.
 
-### Analysis
-- **Students page**: Essential — entry point to all student data
-- **Enrollments page**: Useful as a global pipeline view (all enrollments across students, filterable by status). Owner/admin use this to see the big picture without clicking into each student.
-- **Documents page**: Owner/admin-only global view of all uploaded documents across students.
+### Database
+**New table: `agent_promotions`** — tracks when each agent joins a promo (their personal 30-day timer starts then):
 
-### Options
+```sql
+CREATE TABLE public.agent_promotions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  promotion_id uuid NOT NULL,
+  agent_id uuid NOT NULL,
+  started_at timestamptz NOT NULL DEFAULT now(),
+  personal_deadline timestamptz NOT NULL,
+  UNIQUE(promotion_id, agent_id)
+);
+-- RLS: agents read own, owner/admin read all
+```
 
-**Option A — Keep all 3 (recommended)**
-Students = student list, Enrollments = global pipeline/status tracker, Documents = global doc overview. Each serves a different cross-cutting purpose. No changes needed.
+When an agent first sees the promo, auto-insert a row with `personal_deadline = now() + 30 days`. The countdown timer uses this personal deadline instead of the global one.
 
-**Option B — Merge Enrollments into Students, remove Documents**
-Remove Enrollments and Documents from sidebar. Add status filter columns directly to the Students table. Remove `/owner/documents` and `/[role]/enrollments` routes. Simpler navigation but loses the global pipeline view.
+### PromoBanner changes
 
-**Option C — Keep Students + Enrollments, remove Documents**
-Documents page is the least useful since docs are always tied to a student. Remove only the Documents sidebar item and route. Keep Enrollments as the global pipeline tracker.
+1. **Fetch agent's personal promo record** — if none exists, auto-create one (upsert on first view)
+2. **Count qualifying enrollments** — query enrollments for this agent's students created after `started_at` with status in (`offer_received`, `accepted`, `enrolled`, `active`)
+3. **Show progress**: Replace the generic target text with:
+   - Progress bar or fraction: `🎯 2/5 students · Mai ai 3`
+   - Countdown uses `personal_deadline` instead of global `deadline`
+4. **If target reached**, show a congratulations state instead
 
-### Recommendation
-**Option C** — Remove Documents from sidebar (it's accessible per-student in the detail tabs). Keep Enrollments as it serves as a valuable pipeline/status dashboard for owner/admin to track all applications at a glance.
+### Files to modify
+- `src/components/PromoBanner.tsx` — add auth context, fetch personal promo + enrollment count, show progress
+- New migration for `agent_promotions` table
 
-### Changes (if Option C approved)
-1. **AppSidebar.tsx** — Remove Documents nav item (lines 79-81)
-2. **App.tsx** — Optionally keep route but remove from navigation
-3. No database changes needed
+### No other files affected
+The banner is already used in `AgentDashboard.tsx`. Owner/admin dashboards don't show it (they don't have the agent role check).
 
