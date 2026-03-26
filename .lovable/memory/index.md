@@ -21,22 +21,34 @@ EduForYou UK Agent Management Platform - design system and architecture decision
 - Public: /card/:slug (agent digital card, no auth)
 
 ## Key Tables
-profiles (with avatar_url, slug), user_roles, universities, campuses, courses, intakes, students, enrollments, commission_tiers, brand_settings, generated_images, ai_conversations, ai_messages, agent_card_settings
+profiles (with avatar_url, slug), user_roles, universities, campuses, courses, intakes, students, enrollments (with funding_status/type/reference/notes), commission_tiers, brand_settings, generated_images, ai_conversations, ai_messages, agent_card_settings, student_documents, student_notes
 
 ## Storage Buckets
 student-documents (private), resource-files (public), brand-assets (public), generated-images (public), avatars (public)
+
+## Student Detail Page
+- Tabbed interface: Overview, Documents, Enrollments, Funding, Notes
+- Components split into src/components/student-detail/ folder
+- Role permissions: Agent=read-only status, Owner/Admin=can change status & funding
+
+## Enrollment Flow
+- 5-step wizard: Institution → Applicant → Next of Kin → Document Upload → Review & Submit
+- After submit navigates to student detail page
+- Both full-page (EnrollStudent.tsx) and dialog (EnrollStudentDialog.tsx) versions
+
+## Enrollment Statuses
+applied, documents_pending, documents_submitted, processing, offer_received, accepted, funding, enrolled, active, rejected, withdrawn
+
+## Funding Statuses
+not_started, application_submitted, approved, rejected, disbursed
 
 ## AI Features
 - AI Chat: edge function ai-chat, persisted in ai_conversations + ai_messages
 - AI Image Generator: edge function generate-image, uses google/gemini-3.1-flash-image-preview
   - 5 images/user/day limit
   - Brand settings (prompt + logo) auto-injected
-  - Agent photo can be included in generated images
-  - Presets: social_post, story, flyer, banner
 
 ## Agent Digital Card
 - Public page at /card/:slug (no auth required)
 - Settings managed in Profile page via CardSettingsSection component
 - agent_card_settings table: job_title, whatsapp, booking_url, apply_url, bio, company info, social links, is_public
-- profiles.slug used for URL
-- vCard download support
