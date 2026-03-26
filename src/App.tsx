@@ -39,6 +39,7 @@ const App = () => (
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<Login />} />
             <Route path="/card/:slug" element={<AgentCardPage />} />
+            <Route path="/unsubscribe" element={<UnsubscribePage />} />
             
             {/* Owner routes */}
             <Route path="/owner/dashboard" element={<OwnerDashboard />} />
