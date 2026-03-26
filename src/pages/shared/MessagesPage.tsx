@@ -230,26 +230,57 @@ export default function MessagesPage() {
                       className="pl-9"
                     />
                   </div>
-                  <ScrollArea className="h-60">
+                  <ScrollArea className="h-72">
                     <div className="space-y-1">
-                      {availableUsers.map((u: any) => (
-                        <button
-                          key={u.id}
-                          onClick={() => startConversation(u.id)}
-                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 text-left transition-colors"
-                        >
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="text-xs bg-accent/20 text-accent">{getInitials(u.full_name)}</AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{u.full_name}</p>
-                            <p className="text-xs text-muted-foreground truncate">{u.email}</p>
-                          </div>
-                        </button>
-                      ))}
-                      {availableUsers.length === 0 && (
-                        <p className="text-sm text-muted-foreground text-center py-4">No users found</p>
-                      )}
+                      {/* Group users by role */}
+                      {(() => {
+                        const groups: Record<string, any[]> = {};
+                        const order = ["agent", "admin", "owner"];
+                        for (const u of availableUsers) {
+                          const r = (u as any).role || "other";
+                          if (!groups[r]) groups[r] = [];
+                          groups[r].push(u);
+                        }
+                        const roleLabel: Record<string, string> = { agent: "Agents", admin: "Admins", owner: "Owner", other: "Other" };
+                        const roleIcon: Record<string, typeof Users> = { agent: Users, admin: Shield, owner: UserCheck };
+                        const sortedKeys = [...order.filter(k => groups[k]), ...Object.keys(groups).filter(k => !order.includes(k))];
+
+                        if (availableUsers.length === 0) {
+                          return <p className="text-sm text-muted-foreground text-center py-4">No users found</p>;
+                        }
+
+                        return sortedKeys.map((groupKey) => {
+                          const Icon = roleIcon[groupKey] || Users;
+                          return (
+                            <div key={groupKey}>
+                              <div className="flex items-center gap-1.5 px-2 py-1.5 mt-1">
+                                <Icon className="w-3 h-3 text-muted-foreground" />
+                                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                  {roleLabel[groupKey] || groupKey}
+                                </span>
+                                <Badge variant="secondary" className="text-[9px] px-1 py-0 h-4 ml-auto">
+                                  {groups[groupKey].length}
+                                </Badge>
+                              </div>
+                              {groups[groupKey].map((u: any) => (
+                                <button
+                                  key={u.id}
+                                  onClick={() => startConversation(u.id)}
+                                  className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 text-left transition-colors"
+                                >
+                                  <Avatar className="h-8 w-8">
+                                    <AvatarFallback className="text-xs bg-accent/20 text-accent">{getInitials(u.full_name)}</AvatarFallback>
+                                  </Avatar>
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium truncate">{u.full_name}</p>
+                                    <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          );
+                        });
+                      })()}
                     </div>
                   </ScrollArea>
                 </div>
