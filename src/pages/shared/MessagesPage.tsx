@@ -56,16 +56,44 @@ export default function MessagesPage() {
     enabled: !!activeConvo,
   });
 
-  // Fetch users for new conversation
+  // Fetch users for new conversation with roles
   const { data: availableUsers = [] } = useQuery({
-    queryKey: ["available-users-for-chat", searchUsers],
+    queryKey: ["available-users-for-chat", searchUsers, role],
     queryFn: async () => {
-      let query = supabase.from("profiles").select("id, full_name, email, avatar_url").neq("id", user!.id);
+      // Fetch profiles
+      let query = supabase.from("profiles").select("id, full_name, email, avatar_url, admin_id").neq("id", user!.id);
       if (searchUsers.trim()) {
         query = query.or(`full_name.ilike.%${searchUsers}%,email.ilike.%${searchUsers}%`);
       }
-      const { data } = await query.order("full_name").limit(20);
-      return data || [];
+      const { data: profiles } = await query.order("full_name").limit(50);
+      if (!profiles || profiles.length === 0) return [];
+
+      // Fetch roles for these users
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("user_id, role")
+        .in("user_id", profiles.map((p: any) => p.id));
+
+      const roleMap: Record<string, string> = {};
+      if (roles) {
+        for (const r of roles) roleMap[r.user_id] = r.role;
+      }
+
+      let enriched = profiles.map((p: any) => ({
+        ...p,
+        role: roleMap[p.id] || "unknown",
+      }));
+
+      // Filter based on current user's role
+      if (role === "admin") {
+        // Admin can message: their agents + owner
+        enriched = enriched.filter((u: any) =>
+          u.role === "owner" || u.admin_id === user!.id
+        );
+      }
+      // Owner and agent see all users (owner sees everyone, agent sees who they can)
+
+      return enriched;
     },
     enabled: newConvoOpen && !!user,
   });
