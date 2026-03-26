@@ -1,37 +1,54 @@
 
 
-## Plan: Add "Generate Caption" Button to Each Image
+## Plan: User Feedback System
 
-Add a button on every generated image (both the latest result and gallery items) that calls AI to generate a social media caption in the EduForYou brand voice, using the image's original prompt and the brand DNA from `brand_settings`.
+### Overview
+Add a feedback collection system accessible from the sidebar for all roles, with an owner-only page to review all submissions.
 
----
+### 1. Database: `feedback` table
 
-### 1. New Edge Function: `generate-caption`
+```sql
+CREATE TABLE public.feedback (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  category TEXT NOT NULL DEFAULT 'suggestion',
+  message TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'new'
+);
+```
 
-**File:** `supabase/functions/generate-caption/index.ts`
+RLS policies:
+- All authenticated users can INSERT (own feedback, `user_id = auth.uid()`)
+- All authenticated users can SELECT own feedback
+- Owner can SELECT/UPDATE all feedback
 
-- Accepts `{ prompt, preset }` (the original image prompt and preset type)
-- Authenticates user via JWT (same pattern as `generate-image`)
-- Fetches `brand_settings.brand_prompt` for the brand DNA/voice
-- Calls Lovable AI (`google/gemini-3-flash-preview`) with a system prompt like:
+### 2. New page: `FeedbackPage.tsx` (owner only)
 
-> "You are the social media manager for EduForYou UK, an education recruitment agency. Write an engaging social media post caption for the following image. Use the brand voice described below. Include relevant hashtags. Keep it concise and compelling."
+Path: `/owner/feedback`
 
-- Returns `{ caption: string }`
+- Table showing all feedback with columns: Date, User (join profiles), Category, Message, Status
+- Filter by status (New / Reviewed / Done)
+- Owner can mark feedback as "Reviewed" or "Done"
 
-### 2. Update `CreateImagePage.tsx`
+### 3. Feedback dialog component: `FeedbackDialog.tsx`
 
-- Add state: `captionLoading` (map of image id/url to boolean), `captions` (map of image id/url to string)
-- Add a `MessageSquare` (or `Type`) icon button next to the Download button on:
-  - The **Generated Result** card
-  - Each **Gallery** item
-- On click: call `generate-caption` edge function with the image's prompt and preset
-- Display the generated caption in a text area below the image, with a "Copy" button
-- Show loading spinner while generating
+- A dialog triggered from the sidebar menu item "Help us improve"
+- Fields: Category dropdown (Suggestion, Bug, Simplify, New Feature), Message textarea
+- Submits to `feedback` table
+- Toast confirmation on success
+
+### 4. Sidebar update: `AppSidebar.tsx`
+
+- Add "Feedback" item with `MessageSquareHeart` icon in the footer area (visible to all roles)
+- For owner: also add "Feedback" in Management section linking to `/owner/feedback`
+
+### 5. Routes: `App.tsx`
+
+- Add `/owner/feedback` route pointing to `FeedbackPage`
 
 ### Technical Details
-
-- No database changes needed — captions are generated on-demand, not stored
-- Edge function uses the same auth pattern as `generate-image` (adminClient + token)
-- Brand voice comes from `brand_settings.brand_prompt` — same table already used by image generator
+- The dialog opens inline from sidebar (no navigation needed for submitting)
+- Owner's management page is a separate route for reviewing all feedback
+- `feedback.status` allows owner to track which items have been addressed
 
