@@ -134,6 +134,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
           uk_entry_date: ukEntryDate || null, immigration_status: immigrationStatus || null,
           share_code: shareCode || null, ni_number: niNumber || null,
           previous_funding_years: previousFundingYears ? parseInt(previousFundingYears) : null,
+          crn: crn || null,
           study_pattern: studyPattern.length > 0 ? studyPattern.join(", ") : null,
           qualifications: qualifications || null, notes: notes || null,
           next_of_kin_name: nokName || null, next_of_kin_phone: nokPhone || null,
