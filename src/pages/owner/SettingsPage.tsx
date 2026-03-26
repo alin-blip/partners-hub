@@ -546,6 +546,7 @@ function PromotionsSection({ deleteItem }: { deleteItem: any }) {
           <TableHeader>
             <TableRow>
               <TableHead>Title</TableHead>
+              <TableHead>Role</TableHead>
               <TableHead>Target</TableHead>
               <TableHead>Bonus</TableHead>
               <TableHead>Deadline</TableHead>
@@ -557,6 +558,7 @@ function PromotionsSection({ deleteItem }: { deleteItem: any }) {
             {promotions.map((p: any) => (
               <TableRow key={p.id}>
                 <TableCell className="font-medium">{p.title}</TableCell>
+                <TableCell className="capitalize">{p.target_role || "agent"}</TableCell>
                 <TableCell>{p.target_students} students</TableCell>
                 <TableCell>£{p.bonus_amount}{p.bonus_percentage ? ` + ${p.bonus_percentage}%` : ""}</TableCell>
                 <TableCell className="text-sm">{format(new Date(p.deadline), "dd MMM yyyy HH:mm")}</TableCell>
