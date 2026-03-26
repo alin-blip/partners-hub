@@ -191,14 +191,44 @@ export default function CardSettingsSection() {
             </div>
 
             {cardUrl && isPublic && (
-              <div className="flex items-center gap-2 p-2 rounded-md bg-muted text-xs">
-                <span className="truncate flex-1">{cardUrl}</span>
-                <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={copyLink}>
-                  <Copy className="w-3 h-3" />
-                </Button>
-                <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => window.open(cardUrl, "_blank")}>
-                  <ExternalLink className="w-3 h-3" />
-                </Button>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 p-2 rounded-md bg-muted text-xs">
+                  <span className="truncate flex-1">{cardUrl}</span>
+                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyLink(cardUrl, "Card link")}>
+                    <Copy className="w-3 h-3" />
+                  </Button>
+                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => window.open(cardUrl, "_blank")}>
+                    <ExternalLink className="w-3 h-3" />
+                  </Button>
+                </div>
+
+                <div className="flex items-center gap-2 p-2 rounded-md bg-muted text-xs">
+                  <span className="truncate flex-1">{applyFormUrl}</span>
+                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyLink(applyFormUrl, "Application form link")}>
+                    <Copy className="w-3 h-3" />
+                  </Button>
+                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => window.open(applyFormUrl, "_blank")}>
+                    <ExternalLink className="w-3 h-3" />
+                  </Button>
+                </div>
+
+                {/* QR Codes */}
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  <div className="flex flex-col items-center gap-2">
+                    <p className="text-xs font-medium text-muted-foreground flex items-center gap-1"><QrCode className="w-3 h-3" /> Digital Card QR</p>
+                    <QRCodeCanvas ref={cardQrRef} value={cardUrl} size={120} className="rounded border p-1" />
+                    <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => downloadQr(cardQrRef, `card-qr-${slug}.png`)}>
+                      <Download className="w-3 h-3 mr-1" /> Download
+                    </Button>
+                  </div>
+                  <div className="flex flex-col items-center gap-2">
+                    <p className="text-xs font-medium text-muted-foreground flex items-center gap-1"><QrCode className="w-3 h-3" /> Apply Form QR</p>
+                    <QRCodeCanvas ref={applyQrRef} value={applyFormUrl} size={120} className="rounded border p-1" />
+                    <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => downloadQr(applyQrRef, `apply-qr-${slug}.png`)}>
+                      <Download className="w-3 h-3 mr-1" /> Download
+                    </Button>
+                  </div>
+                </div>
               </div>
             )}
 
