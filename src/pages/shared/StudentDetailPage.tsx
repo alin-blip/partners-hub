@@ -61,12 +61,13 @@ export default function StudentDetailPage() {
         </div>
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview" className="gap-1.5"><User className="w-3.5 h-3.5" /> Overview</TabsTrigger>
             <TabsTrigger value="documents" className="gap-1.5"><FileText className="w-3.5 h-3.5" /> Documents</TabsTrigger>
             <TabsTrigger value="enrollments" className="gap-1.5"><GraduationCap className="w-3.5 h-3.5" /> Enrollments</TabsTrigger>
             <TabsTrigger value="funding" className="gap-1.5"><DollarSign className="w-3.5 h-3.5" /> Funding</TabsTrigger>
             <TabsTrigger value="notes" className="gap-1.5"><MessageSquare className="w-3.5 h-3.5" /> Notes</TabsTrigger>
+            <TabsTrigger value="ai-docs" className="gap-1.5"><Sparkles className="w-3.5 h-3.5" /> AI Docs</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
