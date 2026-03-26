@@ -574,7 +574,86 @@ function UniversitiesSection({ universities, addUni, deleteItem }: { universitie
   );
 }
 
-export default function SettingsPage() {
+function TimetableSection({ universities }: { universities: any[] }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  const toggleTimetable = useMutation({
+    mutationFn: async ({ id, timetable_available }: { id: string; timetable_available: boolean }) => {
+      const { error } = await supabase.from("universities").update({ timetable_available } as any).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["universities"] }); },
+  });
+
+  const updateMessage = useMutation({
+    mutationFn: async ({ id, timetable_message }: { id: string; timetable_message: string }) => {
+      const { error } = await supabase.from("universities").update({ timetable_message: timetable_message || null } as any).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["universities"] }); toast({ title: "Message saved" }); },
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Calendar className="w-4 h-4" />
+          Timetable Settings
+        </CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Configure per-university whether students can select a study pattern during enrollment, or display a custom message instead.
+        </p>
+      </CardHeader>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>University</TableHead>
+              <TableHead>Timetable Selectable</TableHead>
+              <TableHead>Custom Message (when disabled)</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {universities.map((u: any) => (
+              <TableRow key={u.id}>
+                <TableCell className="font-medium">{u.name}</TableCell>
+                <TableCell>
+                  <Switch
+                    checked={u.timetable_available !== false}
+                    onCheckedChange={(checked) => toggleTimetable.mutate({ id: u.id, timetable_available: checked })}
+                  />
+                </TableCell>
+                <TableCell>
+                  {u.timetable_available === false ? (
+                    <Input
+                      defaultValue={u.timetable_message || ""}
+                      placeholder="e.g. Studentul își alege programul după testul de admitere"
+                      className="text-sm"
+                      onBlur={(e) => {
+                        if (e.target.value !== (u.timetable_message || "")) {
+                          updateMessage.mutate({ id: u.id, timetable_message: e.target.value });
+                        }
+                      }}
+                    />
+                  ) : (
+                    <span className="text-muted-foreground text-sm">—</span>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+            {universities.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={3} className="text-center text-muted-foreground py-6">No universities yet. Add universities first.</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
   const { toast } = useToast();
   const qc = useQueryClient();
 
