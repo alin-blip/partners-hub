@@ -175,7 +175,10 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
       resetForm();
       onOpenChange(false);
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => {
+      console.error("Enrollment error:", error);
+      toast.error(error.message);
+    },
   });
 
   const canProceedStep1 = universityId && courseId;
