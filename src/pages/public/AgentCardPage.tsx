@@ -8,7 +8,8 @@ import {
   Phone, Mail, MessageCircle, Calendar, UserPlus, CheckCircle, FileText,
   ExternalLink, MapPin, Clock
 } from "lucide-react";
-import { SiGoogle, SiInstagram, SiYoutube, SiFacebook, SiLinkedin, SiTiktok } from "react-icons/si";
+import { SiGoogle, SiInstagram, SiYoutube, SiFacebook, SiTiktok } from "react-icons/si";
+import { FaLinkedinIn } from "react-icons/fa";
 import { FaStar } from "react-icons/fa";
 
 interface AgentProfile {
