@@ -1,37 +1,47 @@
 
 
-## Plan: Enhanced Student Communication & Status Management
+## Plan: Email Notifications for Urgent Notes + Urgent Notes Indicator on Students List
 
-### What you get
-The existing **Notes** tab on the student detail page already supports notes, document requests, and funding updates. We'll enhance it into a proper communication hub where owner/admin can:
+### Two features
 
-1. **Send action requests to agents** — new note types: "status_update_request", "info_request", "action_required"
-2. **Quick-set enrollment status** directly from the Notes tab — a compact status changer at the top without switching to the Enrollments tab
-3. **Note visibility control** — mark notes as urgent/priority so they stand out
-4. **Agent sees requests highlighted** — urgent requests show with a red/orange indicator
+**1. Email notification to the agent** when an owner/admin adds an urgent or action_required note on their student. After inserting the note, call the `send-transactional-email` edge function with the agent's email and note details.
 
-### Changes
+**2. Urgent notes count badge** on the Students list table — a small orange badge next to each student's name showing the count of unresolved urgent/action_required notes.
+
+---
+
+### Prerequisites — Email Infrastructure
+
+The project has a verified email domain (`notify.agents-eduforyou.co.uk`) but no transactional email infrastructure yet. Before wiring up notifications:
+
+1. Call `setup_email_infra` to create pgmq queues, RPC wrappers, cron job
+2. Call `scaffold_transactional_email` to create the `send-transactional-email` edge function and template structure
+3. Create a `note-notification` email template
+4. Deploy edge functions
+
+### Implementation
+
+**Database**: No schema changes needed. We'll query `student_notes` for urgent counts.
+
+**New email template** (`supabase/functions/_shared/transactional-email-templates/note-notification.tsx`):
+- Shows student name, note type (Urgent / Action Required / etc.), note content, and a link to the student detail page
+- Styled with the existing brand (navy + orange accent)
 
 **`src/components/student-detail/StudentNotesTab.tsx`**:
-- Add new note types for owner/admin: `info_request` (request info from agent), `action_required` (ask agent to do something), `status_update` (log a status change with context)
-- Add a priority/urgent toggle for owner/admin notes — saves to a new column or uses styling based on note_type
-- Show a quick enrollment status selector at the top of the Notes tab (for owner/admin only) so they can change status and auto-log a "status_change" note in one action
-- Style action_required and info_request notes with stronger visual indicators (orange/red borders)
+- After successfully inserting an urgent or action_required note, look up the student's `agent_id`, fetch the agent's email from `profiles`, and invoke `send-transactional-email` with:
+  - `templateName: 'note-notification'`
+  - `recipientEmail: agentEmail`
+  - `templateData: { studentName, noteType, content }`
+  - `idempotencyKey: 'note-{noteId}'`
 
-**Database migration** — add `is_urgent` boolean column to `student_notes`:
-```sql
-ALTER TABLE public.student_notes ADD COLUMN is_urgent boolean NOT NULL DEFAULT false;
-```
+**`src/pages/shared/StudentsPage.tsx`**:
+- Add a second query to fetch urgent note counts grouped by student_id: `SELECT student_id, count(*) FROM student_notes WHERE (is_urgent = true OR note_type IN ('action_required', 'info_request')) GROUP BY student_id`
+- Display a small orange `Badge` with a flame icon + count next to the student name in the table when count > 0
 
-**`src/components/student-detail/StudentNotesTab.tsx`** detailed changes:
-- New note types in `NOTE_TYPE_CONFIG`: `info_request`, `action_required`, `status_update`
-- Quick status changer: dropdown with current enrollment status + "Update & Log" button that updates enrollment status AND creates a status_change note simultaneously
-- Urgent toggle (checkbox/switch) for owner/admin when creating notes
-- Urgent notes render with orange-left-border and a small "URGENT" badge
-
-### No new tables — reuses existing `student_notes` + `enrollments`
-
-### Files to modify
-- New migration — add `is_urgent` to `student_notes`
-- `src/components/student-detail/StudentNotesTab.tsx` — new note types, quick status changer, urgent toggle, enhanced styling
+### Files to modify/create
+- Email infrastructure setup (tools — no code files)
+- `supabase/functions/_shared/transactional-email-templates/note-notification.tsx` — new template
+- `supabase/functions/_shared/transactional-email-templates/registry.ts` — register template
+- `src/components/student-detail/StudentNotesTab.tsx` — send email after note insert
+- `src/pages/shared/StudentsPage.tsx` — fetch urgent counts, show badge
 
