@@ -626,18 +626,24 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          timetable_available: boolean
+          timetable_message: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           is_active?: boolean
           name: string
+          timetable_available?: boolean
+          timetable_message?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           is_active?: boolean
           name?: string
+          timetable_available?: boolean
+          timetable_message?: string | null
         }
         Relationships: []
       }
