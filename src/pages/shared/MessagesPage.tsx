@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { Send, Plus, MessageCircle, Search } from "lucide-react";
+import { MentionTextarea } from "@/components/MentionTextarea";
 import { format } from "date-fns";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
