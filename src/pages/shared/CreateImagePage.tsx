@@ -6,6 +6,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +27,15 @@ import {
   Check,
 } from "lucide-react";
 import { format } from "date-fns";
+
+const LANGUAGES = [
+  { value: "Romanian", label: "🇷🇴 Română" },
+  { value: "English", label: "🇬🇧 English" },
+  { value: "Arabic", label: "🇸🇦 العربية" },
+  { value: "French", label: "🇫🇷 Français" },
+  { value: "Spanish", label: "🇪🇸 Español" },
+  { value: "Hindi", label: "🇮🇳 हिन्दी" },
+];
 
 const PRESETS = [
   { id: "social_post", label: "Social Media Post", desc: "1080×1080 square", icon: Square },
@@ -73,6 +83,7 @@ export default function CreateImagePage() {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [captions, setCaptions] = useState<Record<string, string>>({});
   const [captionLoading, setCaptionLoading] = useState<Record<string, boolean>>({});
+  const [captionLanguage, setCaptionLanguage] = useState("Romanian");
 
   const hasAvatar = !!(profile as any)?.avatar_url;
 
@@ -136,7 +147,7 @@ export default function CreateImagePage() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ prompt: imgPrompt, preset: imgPreset }),
+          body: JSON.stringify({ prompt: imgPrompt, preset: imgPreset, language: captionLanguage }),
         }
       );
 
@@ -209,8 +220,8 @@ export default function CreateImagePage() {
               />
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-4">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className="flex items-center gap-2">
@@ -231,6 +242,20 @@ export default function CreateImagePage() {
                     </TooltipContent>
                   )}
                 </Tooltip>
+
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm whitespace-nowrap">Caption language:</Label>
+                  <Select value={captionLanguage} onValueChange={setCaptionLanguage}>
+                    <SelectTrigger className="w-[140px] h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LANGUAGES.map((l) => (
+                        <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <Button
