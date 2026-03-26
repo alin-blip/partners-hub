@@ -12,7 +12,7 @@ import {
   Brain,
   MessageSquare,
   Image as ImageIcon,
-  FileText,
+  
   MessageSquareHeart,
 } from "lucide-react";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
@@ -76,9 +76,6 @@ export function AppSidebar() {
     { title: "Enrollments", url: `${prefix}/enrollments`, icon: ClipboardList },
   ];
 
-  // Documents visible to owner & admin
-  if (role === "owner") mainItems.push({ title: "Documents", url: "/owner/documents", icon: FileText });
-  if (role === "admin") mainItems.push({ title: "Documents", url: "/admin/documents", icon: FileText });
 
   const actionItems: NavItem[] = [
     { title: "Create Image", url: `${prefix}/create-image`, icon: ImageIcon },

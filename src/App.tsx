@@ -21,7 +21,7 @@ import StudentDetailPage from "./pages/shared/StudentDetailPage";
 import ProfilePage from "./pages/shared/ProfilePage";
 import ResourcesPage from "./pages/shared/ResourcesPage";
 import CreateImagePage from "./pages/shared/CreateImagePage";
-import DocumentsPage from "./pages/owner/DocumentsPage";
+
 import FeedbackPage from "./pages/owner/FeedbackPage";
 import NotFound from "./pages/NotFound";
 
@@ -53,7 +53,7 @@ const App = () => (
             <Route path="/owner/profile" element={<ProfilePage />} />
             <Route path="/owner/resources" element={<ResourcesPage />} />
             <Route path="/owner/create-image" element={<CreateImagePage />} />
-            <Route path="/owner/documents" element={<DocumentsPage />} />
+            
             <Route path="/owner/feedback" element={<FeedbackPage />} />
             
             {/* Admin routes */}
@@ -66,7 +66,7 @@ const App = () => (
             <Route path="/admin/profile" element={<ProfilePage />} />
             <Route path="/admin/resources" element={<ResourcesPage />} />
             <Route path="/admin/create-image" element={<CreateImagePage />} />
-            <Route path="/admin/documents" element={<DocumentsPage />} />
+            
             
             {/* Agent routes */}
             <Route path="/agent/dashboard" element={<AgentDashboard />} />
