@@ -14,6 +14,7 @@ import {
   Image as ImageIcon,
   Mail,
   MessageSquareHeart,
+  CreditCard,
 } from "lucide-react";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { NavLink } from "@/components/NavLink";
@@ -111,6 +112,7 @@ export function AppSidebar() {
 
 
   const actionItems: NavItem[] = [
+    { title: "Digital Card", url: `${prefix}/digital-card`, icon: CreditCard },
     { title: "Create Image", url: `${prefix}/create-image`, icon: ImageIcon },
     { title: "Resources", url: `${prefix}/resources`, icon: FolderOpen },
   ];

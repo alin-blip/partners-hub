@@ -238,25 +238,21 @@ export default function AgentCardPage() {
 
           {/* CTA buttons */}
           <div className="grid grid-cols-2 gap-3 mt-5">
-            {settings.apply_url ? (
-              <>
-                <Button
-                  variant="outline"
-                  className="border-accent text-accent hover:bg-accent hover:text-accent-foreground"
-                  onClick={() => window.open(settings.apply_url, "_blank")}
-                >
-                  <CheckCircle className="w-4 h-4 mr-1" />
-                  Check Eligibility
-                </Button>
-                <Button
-                  className="bg-accent text-accent-foreground hover:bg-accent/90"
-                  onClick={() => window.open(settings.apply_url, "_blank")}
-                >
-                  <FileText className="w-4 h-4 mr-1" />
-                  Apply Now
-                </Button>
-              </>
-            ) : null}
+            <Button
+              variant="outline"
+              className="border-accent text-accent hover:bg-accent hover:text-accent-foreground"
+              onClick={() => window.open(`/apply/${slug}`, "_blank")}
+            >
+              <CheckCircle className="w-4 h-4 mr-1" />
+              Check Eligibility
+            </Button>
+            <Button
+              className="bg-accent text-accent-foreground hover:bg-accent/90"
+              onClick={() => window.open(`/apply/${slug}`, "_blank")}
+            >
+              <FileText className="w-4 h-4 mr-1" />
+              Apply Now
+            </Button>
           </div>
 
           {/* Social links */}

@@ -668,6 +668,45 @@ export type Database = {
           },
         ]
       }
+      leads: {
+        Row: {
+          agent_id: string
+          course_interest: string | null
+          created_at: string
+          email: string
+          first_name: string
+          id: string
+          last_name: string
+          nationality: string | null
+          phone: string | null
+          status: string
+        }
+        Insert: {
+          agent_id: string
+          course_interest?: string | null
+          created_at?: string
+          email: string
+          first_name: string
+          id?: string
+          last_name: string
+          nationality?: string | null
+          phone?: string | null
+          status?: string
+        }
+        Update: {
+          agent_id?: string
+          course_interest?: string | null
+          created_at?: string
+          email?: string
+          first_name?: string
+          id?: string
+          last_name?: string
+          nationality?: string | null
+          phone?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           admin_id: string | null

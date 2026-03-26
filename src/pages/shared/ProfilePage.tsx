@@ -10,7 +10,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Save, Lock, Upload, Camera, Loader2 } from "lucide-react";
-import CardSettingsSection from "@/components/CardSettingsSection";
 
 export default function ProfilePage() {
   const { user, profile } = useAuth();
@@ -209,8 +208,6 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        {/* Digital Card Settings */}
-        <CardSettingsSection />
       </div>
     </DashboardLayout>
   );

@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import AgentCardPage from "./pages/public/AgentCardPage";
+import PublicApplicationPage from "./pages/public/PublicApplicationPage";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -23,6 +24,7 @@ import ResourcesPage from "./pages/shared/ResourcesPage";
 import CreateImagePage from "./pages/shared/CreateImagePage";
 import UnsubscribePage from "./pages/shared/UnsubscribePage";
 import MessagesPage from "./pages/shared/MessagesPage";
+import DigitalCardPage from "./pages/shared/DigitalCardPage";
 
 import FeedbackPage from "./pages/owner/FeedbackPage";
 import NotFound from "./pages/NotFound";
@@ -40,6 +42,7 @@ const App = () => (
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<Login />} />
             <Route path="/card/:slug" element={<AgentCardPage />} />
+            <Route path="/apply/:slug" element={<PublicApplicationPage />} />
             <Route path="/unsubscribe" element={<UnsubscribePage />} />
             
             {/* Owner routes */}
@@ -57,6 +60,7 @@ const App = () => (
             <Route path="/owner/profile" element={<ProfilePage />} />
             <Route path="/owner/resources" element={<ResourcesPage />} />
             <Route path="/owner/create-image" element={<CreateImagePage />} />
+            <Route path="/owner/digital-card" element={<DigitalCardPage />} />
             
             <Route path="/owner/feedback" element={<FeedbackPage />} />
             
@@ -71,6 +75,7 @@ const App = () => (
             <Route path="/admin/profile" element={<ProfilePage />} />
             <Route path="/admin/resources" element={<ResourcesPage />} />
             <Route path="/admin/create-image" element={<CreateImagePage />} />
+            <Route path="/admin/digital-card" element={<DigitalCardPage />} />
             
             
             {/* Agent routes */}
@@ -83,6 +88,7 @@ const App = () => (
             <Route path="/agent/profile" element={<ProfilePage />} />
             <Route path="/agent/resources" element={<ResourcesPage />} />
             <Route path="/agent/create-image" element={<CreateImagePage />} />
+            <Route path="/agent/digital-card" element={<DigitalCardPage />} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
