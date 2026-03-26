@@ -78,7 +78,7 @@ const App = () => (
             <Route path="/admin/resources" element={<ResourcesPage />} />
             <Route path="/admin/create-image" element={<CreateImagePage />} />
             <Route path="/admin/digital-card" element={<DigitalCardPage />} />
-            
+            <Route path="/admin/leads" element={<LeadsPage />} />
             
             {/* Agent routes */}
             <Route path="/agent/dashboard" element={<AgentDashboard />} />
