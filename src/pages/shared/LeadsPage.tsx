@@ -376,3 +376,5 @@ export default function LeadsPage() {
         </DialogContent>
       </Dialog>
     </DashboardLayout>
+  );
+}
