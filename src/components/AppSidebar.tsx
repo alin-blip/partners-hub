@@ -72,16 +72,41 @@ function SidebarNavGroup({ label, items, collapsed }: { label: string; items: Na
 }
 
 export function AppSidebar() {
-  const { role, profile, signOut } = useAuth();
+  const { user, role, profile, signOut } = useAuth();
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const prefix = role === "owner" ? "/owner" : role === "admin" ? "/admin" : "/agent";
+
+  // Unread messages count
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: ["unread-messages-count", user?.id],
+    queryFn: async () => {
+      if (!user) return 0;
+      // Get conversations where user is participant
+      const { data: convos } = await supabase
+        .from("direct_conversations")
+        .select("id")
+        .or(`participant_1.eq.${user.id},participant_2.eq.${user.id}`);
+      if (!convos || convos.length === 0) return 0;
+      const convoIds = convos.map((c: any) => c.id);
+      const { count, error } = await supabase
+        .from("direct_messages")
+        .select("id", { count: "exact", head: true })
+        .in("conversation_id", convoIds)
+        .neq("sender_id", user.id)
+        .is("read_at", null);
+      if (error) return 0;
+      return count || 0;
+    },
+    enabled: !!user,
+    refetchInterval: 30000, // poll every 30s
+  });
 
   const mainItems: NavItem[] = [
     { title: "Dashboard", url: `${prefix}/dashboard`, icon: LayoutDashboard },
     { title: "Students", url: `${prefix}/students`, icon: Users },
     { title: "Enrollments", url: `${prefix}/enrollments`, icon: ClipboardList },
-    { title: "Messages", url: `${prefix}/messages`, icon: Mail },
+    { title: "Messages", url: `${prefix}/messages`, icon: Mail, badge: unreadCount },
   ];
 
 
