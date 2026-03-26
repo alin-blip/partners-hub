@@ -25,8 +25,9 @@ serve(async (req) => {
     const { data: { user }, error: authErr } = await adminClient.auth.getUser(token);
     if (authErr || !user) throw new Error("Unauthorized");
 
-    const { prompt, preset } = await req.json();
+    const { prompt, preset, language } = await req.json();
     if (!prompt) throw new Error("Missing prompt");
+    const lang = language || "English";
 
     // Fetch brand settings for voice/DNA
     const { data: brand } = await adminClient.from("brand_settings").select("brand_prompt").limit(1).single();
