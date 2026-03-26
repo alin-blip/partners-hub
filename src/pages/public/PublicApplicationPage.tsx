@@ -30,6 +30,7 @@ export default function PublicApplicationPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [nationality, setNationality] = useState("");
+  const [gdprConsent, setGdprConsent] = useState(false);
 
   // Cascading dropdowns
   const [universities, setUniversities] = useState<any[]>([]);
