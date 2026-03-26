@@ -64,6 +64,7 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
       uk_entry_date: editData.uk_entry_date || null, immigration_status: editData.immigration_status || null,
       share_code: editData.share_code || null, ni_number: editData.ni_number || null,
       previous_funding_years: editData.previous_funding_years ? parseInt(editData.previous_funding_years) : null,
+      crn: editData.crn || null,
       study_pattern: editData.study_pattern || null, qualifications: editData.qualifications || null,
       notes: editData.notes || null, next_of_kin_name: editData.next_of_kin_name || null,
       next_of_kin_phone: editData.next_of_kin_phone || null, next_of_kin_relationship: editData.next_of_kin_relationship || null,
