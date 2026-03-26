@@ -17,12 +17,16 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Upload, Loader2, Palette, Calendar, FileUp } from "lucide-react";
+import { Plus, Trash2, Upload, Loader2, Palette, Calendar, FileUp, Pencil } from "lucide-react";
 import { DocumentProcessorDialog } from "@/components/DocumentProcessorDialog";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
+
+/* ──────────────────────────────────────────────────────── */
+/*  Generic CRUD Section with Add + Edit + Delete          */
+/* ──────────────────────────────────────────────────────── */
 
 function CrudSection({
   title,
@@ -31,21 +35,32 @@ function CrudSection({
   renderRow,
   onAdd,
   addFields,
+  editFields,
+  onEdit,
 }: {
   title: string;
   items: any[];
   columns: string[];
-  renderRow: (item: any) => React.ReactNode;
+  renderRow: (item: any, onEditClick: (item: any) => void) => React.ReactNode;
   onAdd: (data: any) => void;
   addFields: React.ReactNode;
+  editFields?: (item: any) => React.ReactNode;
+  onEdit?: (data: any) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<any>(null);
+
+  const handleEditClick = (item: any) => {
+    setEditingItem(item);
+    setEditOpen(true);
+  };
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <CardTitle className="text-base">{title}</CardTitle>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogTrigger asChild>
             <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90">
               <Plus className="w-3 h-3 mr-1" /> Add
@@ -60,15 +75,12 @@ function CrudSection({
               onSubmit={(e) => {
                 e.preventDefault();
                 const formData = new FormData(e.currentTarget);
-                const data = Object.fromEntries(formData);
-                onAdd(data);
-                setOpen(false);
+                onAdd(Object.fromEntries(formData));
+                setAddOpen(false);
               }}
             >
               {addFields}
-              <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
-                Save
-              </Button>
+              <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">Save</Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -80,11 +92,11 @@ function CrudSection({
               {columns.map((c) => (
                 <TableHead key={c}>{c}</TableHead>
               ))}
-              <TableHead className="w-16" />
+              <TableHead className="w-24" />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {items.map((item) => renderRow(item))}
+            {items.map((item) => renderRow(item, handleEditClick))}
             {items.length === 0 && (
               <TableRow>
                 <TableCell colSpan={columns.length + 1} className="text-center text-muted-foreground py-6">
@@ -95,14 +107,45 @@ function CrudSection({
           </TableBody>
         </Table>
       </CardContent>
+
+      {/* Edit Dialog */}
+      {onEdit && editFields && (
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit {title.slice(0, -1)}</DialogTitle>
+            </DialogHeader>
+            {editingItem && (
+              <form
+                className="space-y-4 pt-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  onEdit({ id: editingItem.id, ...Object.fromEntries(formData) });
+                  setEditOpen(false);
+                }}
+              >
+                {editFields(editingItem)}
+                <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">Save Changes</Button>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
     </Card>
   );
 }
 
+/* ──────────────────────────────────────────────────────── */
+/*  Commission Tiers                                       */
+/* ──────────────────────────────────────────────────────── */
+
 function CommissionTiersSection({ deleteItem }: { deleteItem: any }) {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingTier, setEditingTier] = useState<any>(null);
 
   const { data: tiers = [] } = useQuery({
     queryKey: ["commission-tiers"],
@@ -122,56 +165,64 @@ function CommissionTiersSection({ deleteItem }: { deleteItem: any }) {
       });
       if (error) throw error;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["commission-tiers"] });
-      toast({ title: "Tier added" });
-    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["commission-tiers"] }); toast({ title: "Tier added" }); },
   });
+
+  const updateTier = useMutation({
+    mutationFn: async (d: any) => {
+      const { error } = await supabase.from("commission_tiers").update({
+        tier_name: d.tier_name,
+        min_students: Number(d.min_students),
+        max_students: d.max_students ? Number(d.max_students) : null,
+        commission_per_student: Number(d.commission_per_student),
+      }).eq("id", d.id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["commission-tiers"] }); toast({ title: "Tier updated" }); },
+  });
+
+  const tierFormFields = (defaults?: any) => (
+    <>
+      <div className="space-y-2">
+        <Label>Tier Name</Label>
+        <Input name="tier_name" required placeholder="e.g. Bronze" defaultValue={defaults?.tier_name || ""} />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-2">
+          <Label>Min Students</Label>
+          <Input name="min_students" type="number" required min={0} defaultValue={defaults?.min_students ?? 0} />
+        </div>
+        <div className="space-y-2">
+          <Label>Max Students</Label>
+          <Input name="max_students" type="number" placeholder="∞" defaultValue={defaults?.max_students ?? ""} />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label>Commission per Student (£)</Label>
+        <Input name="commission_per_student" type="number" required min={0} step="0.01" defaultValue={defaults?.commission_per_student ?? 500} />
+      </div>
+    </>
+  );
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <CardTitle className="text-base">Commission Tiers</CardTitle>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogTrigger asChild>
             <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90">
               <Plus className="w-3 h-3 mr-1" /> Add
             </Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Commission Tier</DialogTitle>
-            </DialogHeader>
-            <form
-              className="space-y-4 pt-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const formData = new FormData(e.currentTarget);
-                addTier.mutate(Object.fromEntries(formData));
-                setOpen(false);
-              }}
-            >
-              <div className="space-y-2">
-                <Label>Tier Name</Label>
-                <Input name="tier_name" required placeholder="e.g. Bronze" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label>Min Students</Label>
-                  <Input name="min_students" type="number" required min={0} defaultValue={0} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Max Students</Label>
-                  <Input name="max_students" type="number" placeholder="∞" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Commission per Student (£)</Label>
-                <Input name="commission_per_student" type="number" required min={0} step="0.01" defaultValue={500} />
-              </div>
-              <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
-                Save
-              </Button>
+            <DialogHeader><DialogTitle>Add Commission Tier</DialogTitle></DialogHeader>
+            <form className="space-y-4 pt-2" onSubmit={(e) => {
+              e.preventDefault();
+              addTier.mutate(Object.fromEntries(new FormData(e.currentTarget)));
+              setAddOpen(false);
+            }}>
+              {tierFormFields()}
+              <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">Save</Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -184,7 +235,7 @@ function CommissionTiersSection({ deleteItem }: { deleteItem: any }) {
               <TableHead>Min Students</TableHead>
               <TableHead>Max Students</TableHead>
               <TableHead>£ per Student</TableHead>
-              <TableHead className="w-16" />
+              <TableHead className="w-24" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -195,25 +246,48 @@ function CommissionTiersSection({ deleteItem }: { deleteItem: any }) {
                 <TableCell>{t.max_students ?? "∞"}</TableCell>
                 <TableCell>£{t.commission_per_student}</TableCell>
                 <TableCell>
-                  <Button variant="ghost" size="icon" onClick={() => deleteItem.mutate({ table: "commission_tiers", id: t.id })}>
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => { setEditingTier(t); setEditOpen(true); }}>
+                      <Pencil className="w-4 h-4 text-muted-foreground" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => deleteItem.mutate({ table: "commission_tiers", id: t.id })}>
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
             {tiers.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
-                  No tiers yet
-                </TableCell>
+                <TableCell colSpan={5} className="text-center text-muted-foreground py-6">No tiers yet</TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </CardContent>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Commission Tier</DialogTitle></DialogHeader>
+          {editingTier && (
+            <form className="space-y-4 pt-2" onSubmit={(e) => {
+              e.preventDefault();
+              updateTier.mutate({ id: editingTier.id, ...Object.fromEntries(new FormData(e.currentTarget)) });
+              setEditOpen(false);
+            }}>
+              {tierFormFields(editingTier)}
+              <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">Save Changes</Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
+
+/* ──────────────────────────────────────────────────────── */
+/*  Brand Settings (already editable, no changes needed)   */
+/* ──────────────────────────────────────────────────────── */
 
 function BrandSettingsSection() {
   const { toast } = useToast();
@@ -247,10 +321,7 @@ function BrandSettingsSection() {
         .eq("id", brand.id);
       if (error) throw error;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["brand-settings"] });
-      toast({ title: "Brand settings saved" });
-    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["brand-settings"] }); toast({ title: "Brand settings saved" }); },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
@@ -321,18 +392,12 @@ function BrandSettingsSection() {
                     </span>
                   </Button>
                 </label>
-                <p className="text-xs text-muted-foreground">
-                  PNG with transparent background recommended, min 200×200px
-                </p>
+                <p className="text-xs text-muted-foreground">PNG with transparent background recommended, min 200×200px</p>
               </div>
             </div>
           </div>
 
-          <Button
-            onClick={() => saveBrand.mutate()}
-            disabled={saveBrand.isPending}
-            className="bg-accent text-accent-foreground hover:bg-accent/90"
-          >
+          <Button onClick={() => saveBrand.mutate()} disabled={saveBrand.isPending} className="bg-accent text-accent-foreground hover:bg-accent/90">
             {saveBrand.isPending ? "Saving…" : "Save Brand Settings"}
           </Button>
         </CardContent>
@@ -341,10 +406,16 @@ function BrandSettingsSection() {
   );
 }
 
+/* ──────────────────────────────────────────────────────── */
+/*  Promotions                                             */
+/* ──────────────────────────────────────────────────────── */
+
 function PromotionsSection({ deleteItem }: { deleteItem: any }) {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingPromo, setEditingPromo] = useState<any>(null);
 
   const { data: promotions = [] } = useQuery({
     queryKey: ["promotions-settings"],
@@ -374,6 +445,25 @@ function PromotionsSection({ deleteItem }: { deleteItem: any }) {
     },
   });
 
+  const updatePromo = useMutation({
+    mutationFn: async (d: any) => {
+      const { error } = await (supabase.from("promotions" as any) as any).update({
+        title: d.title,
+        description: d.description || null,
+        deadline: d.deadline,
+        bonus_amount: Number(d.bonus_amount),
+        bonus_percentage: d.bonus_percentage ? Number(d.bonus_percentage) : null,
+        target_students: Number(d.target_students),
+      }).eq("id", d.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["promotions-settings"] });
+      qc.invalidateQueries({ queryKey: ["active-promotions"] });
+      toast({ title: "Promotion updated" });
+    },
+  });
+
   const toggleActive = useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
       const { error } = await (supabase.from("promotions" as any) as any).update({ is_active }).eq("id", id);
@@ -386,60 +476,58 @@ function PromotionsSection({ deleteItem }: { deleteItem: any }) {
     },
   });
 
+  const promoFormFields = (defaults?: any) => (
+    <>
+      <div className="space-y-2">
+        <Label>Title</Label>
+        <Input name="title" required placeholder="e.g. Spring Bonus Campaign" defaultValue={defaults?.title || ""} />
+      </div>
+      <div className="space-y-2">
+        <Label>Description</Label>
+        <Input name="description" placeholder="Recruteaza si obtine 5 studenti admisi..." defaultValue={defaults?.description || ""} />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-2">
+          <Label>Target Students</Label>
+          <Input name="target_students" type="number" required min={1} defaultValue={defaults?.target_students ?? 5} />
+        </div>
+        <div className="space-y-2">
+          <Label>Bonus Amount (£)</Label>
+          <Input name="bonus_amount" type="number" required min={0} step="0.01" defaultValue={defaults?.bonus_amount ?? 500} />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-2">
+          <Label>Bonus % Commission</Label>
+          <Input name="bonus_percentage" type="number" min={0} max={100} placeholder="e.g. 25" defaultValue={defaults?.bonus_percentage ?? 25} />
+        </div>
+        <div className="space-y-2">
+          <Label>Deadline</Label>
+          <Input name="deadline" type="datetime-local" required defaultValue={defaults?.deadline ? defaults.deadline.slice(0, 16) : ""} />
+        </div>
+      </div>
+    </>
+  );
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <CardTitle className="text-base">Promotions</CardTitle>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogTrigger asChild>
             <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90">
               <Plus className="w-3 h-3 mr-1" /> Add
             </Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Promotion</DialogTitle>
-            </DialogHeader>
-            <form
-              className="space-y-4 pt-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const formData = new FormData(e.currentTarget);
-                addPromo.mutate(Object.fromEntries(formData));
-                setOpen(false);
-              }}
-            >
-              <div className="space-y-2">
-                <Label>Title</Label>
-                <Input name="title" required placeholder="e.g. Spring Bonus Campaign" />
-              </div>
-              <div className="space-y-2">
-                <Label>Description</Label>
-                <Input name="description" placeholder="Recruteaza si obtine 5 studenti admisi..." />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label>Target Students</Label>
-                  <Input name="target_students" type="number" required min={1} defaultValue={5} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Bonus Amount (£)</Label>
-                  <Input name="bonus_amount" type="number" required min={0} step="0.01" defaultValue={500} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label>Bonus % Commission</Label>
-                  <Input name="bonus_percentage" type="number" min={0} max={100} placeholder="e.g. 25" defaultValue={25} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Deadline</Label>
-                  <Input name="deadline" type="datetime-local" required />
-                </div>
-              </div>
-              <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
-                Save
-              </Button>
+            <DialogHeader><DialogTitle>Add Promotion</DialogTitle></DialogHeader>
+            <form className="space-y-4 pt-2" onSubmit={(e) => {
+              e.preventDefault();
+              addPromo.mutate(Object.fromEntries(new FormData(e.currentTarget)));
+              setAddOpen(false);
+            }}>
+              {promoFormFields()}
+              <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">Save</Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -453,7 +541,7 @@ function PromotionsSection({ deleteItem }: { deleteItem: any }) {
               <TableHead>Bonus</TableHead>
               <TableHead>Deadline</TableHead>
               <TableHead>Active</TableHead>
-              <TableHead className="w-16" />
+              <TableHead className="w-24" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -474,28 +562,53 @@ function PromotionsSection({ deleteItem }: { deleteItem: any }) {
                   </Button>
                 </TableCell>
                 <TableCell>
-                  <Button variant="ghost" size="icon" onClick={() => deleteItem.mutate({ table: "promotions", id: p.id })}>
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => { setEditingPromo(p); setEditOpen(true); }}>
+                      <Pencil className="w-4 h-4 text-muted-foreground" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => deleteItem.mutate({ table: "promotions", id: p.id })}>
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
             {promotions.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
-                  No promotions yet
-                </TableCell>
+                <TableCell colSpan={6} className="text-center text-muted-foreground py-6">No promotions yet</TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </CardContent>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Promotion</DialogTitle></DialogHeader>
+          {editingPromo && (
+            <form className="space-y-4 pt-2" onSubmit={(e) => {
+              e.preventDefault();
+              updatePromo.mutate({ id: editingPromo.id, ...Object.fromEntries(new FormData(e.currentTarget)) });
+              setEditOpen(false);
+            }}>
+              {promoFormFields(editingPromo)}
+              <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">Save Changes</Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
 
-function UniversitiesSection({ universities, addUni, deleteItem }: { universities: any[]; addUni: any; deleteItem: any }) {
+/* ──────────────────────────────────────────────────────── */
+/*  Universities                                           */
+/* ──────────────────────────────────────────────────────── */
+
+function UniversitiesSection({ universities, addUni, deleteItem, updateUni }: { universities: any[]; addUni: any; deleteItem: any; updateUni: any }) {
   const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingUni, setEditingUni] = useState<any>(null);
 
   return (
     <Card>
@@ -511,8 +624,7 @@ function UniversitiesSection({ universities, addUni, deleteItem }: { universitie
             <DialogHeader><DialogTitle>Add University</DialogTitle></DialogHeader>
             <form className="space-y-4 pt-2" onSubmit={(e) => {
               e.preventDefault();
-              const formData = new FormData(e.currentTarget);
-              addUni.mutate(Object.fromEntries(formData));
+              addUni.mutate(Object.fromEntries(new FormData(e.currentTarget)));
               setAddOpen(false);
             }}>
               <div className="space-y-2">
@@ -530,18 +642,28 @@ function UniversitiesSection({ universities, addUni, deleteItem }: { universitie
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Active</TableHead>
-              <TableHead className="w-16" />
+              <TableHead className="w-24" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {universities.map((u: any) => (
               <TableRow key={u.id}>
                 <TableCell className="font-medium">{u.name}</TableCell>
-                <TableCell>{u.is_active ? "Yes" : "No"}</TableCell>
                 <TableCell>
-                  <Button variant="ghost" size="icon" onClick={() => deleteItem.mutate({ table: "universities", id: u.id })}>
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </Button>
+                  <Switch
+                    checked={u.is_active}
+                    onCheckedChange={(checked) => updateUni.mutate({ id: u.id, is_active: checked })}
+                  />
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => { setEditingUni(u); setEditOpen(true); }}>
+                      <Pencil className="w-4 h-4 text-muted-foreground" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => deleteItem.mutate({ table: "universities", id: u.id })}>
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -553,9 +675,33 @@ function UniversitiesSection({ universities, addUni, deleteItem }: { universitie
           </TableBody>
         </Table>
       </CardContent>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit University</DialogTitle></DialogHeader>
+          {editingUni && (
+            <form className="space-y-4 pt-2" onSubmit={(e) => {
+              e.preventDefault();
+              const fd = new FormData(e.currentTarget);
+              updateUni.mutate({ id: editingUni.id, name: fd.get("name") });
+              setEditOpen(false);
+            }}>
+              <div className="space-y-2">
+                <Label>Name</Label>
+                <Input name="name" required defaultValue={editingUni.name} />
+              </div>
+              <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">Save Changes</Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
+
+/* ──────────────────────────────────────────────────────── */
+/*  Timetable Section (unchanged)                          */
+/* ──────────────────────────────────────────────────────── */
 
 function TimetableSection({ universities }: { universities: any[] }) {
   const { toast } = useToast();
@@ -682,7 +828,6 @@ function TimetableSection({ universities }: { universities: any[] }) {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Add new option */}
           <div className="flex items-end gap-3">
             <div className="space-y-1 flex-1">
               <Label className="text-xs">University</Label>
@@ -715,7 +860,6 @@ function TimetableSection({ universities }: { universities: any[] }) {
             </Button>
           </div>
 
-          {/* List per university */}
           {universities.filter((u: any) => u.timetable_available !== false).map((u: any) => {
             const opts = timetableOptions.filter((o: any) => o.university_id === u.id);
             if (opts.length === 0) return null;
@@ -747,6 +891,10 @@ function TimetableSection({ universities }: { universities: any[] }) {
     </div>
   );
 }
+
+/* ──────────────────────────────────────────────────────── */
+/*  Main Page                                              */
+/* ──────────────────────────────────────────────────────── */
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -792,9 +940,19 @@ export default function SettingsPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["universities"] }); toast({ title: "University added" }); },
   });
 
+  const updateUni = useMutation({
+    mutationFn: async (d: any) => {
+      const updates: any = {};
+      if (d.name !== undefined) updates.name = d.name;
+      if (d.is_active !== undefined) updates.is_active = d.is_active;
+      const { error } = await supabase.from("universities").update(updates).eq("id", d.id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["universities"] }); toast({ title: "University updated" }); },
+  });
+
   const deleteItem = useMutation({
     mutationFn: async ({ table, id }: { table: string; id: string }) => {
-      // For universities, delete related data first
       if (table === "universities") {
         await supabase.from("intakes").delete().eq("university_id", id);
         await supabase.from("courses").delete().eq("university_id", id);
@@ -803,13 +961,8 @@ export default function SettingsPage() {
       const { error } = await supabase.from(table as any).delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
-      qc.invalidateQueries();
-      toast({ title: "Deleted" });
-    },
-    onError: (e: any) => {
-      toast({ title: "Error deleting", description: e.message, variant: "destructive" });
-    },
+    onSuccess: () => { qc.invalidateQueries(); toast({ title: "Deleted" }); },
+    onError: (e: any) => toast({ title: "Error deleting", description: e.message, variant: "destructive" }),
   });
 
   const addCampus = useMutation({
@@ -820,6 +973,14 @@ export default function SettingsPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["all-campuses"] }); toast({ title: "Campus added" }); },
   });
 
+  const updateCampus = useMutation({
+    mutationFn: async (d: any) => {
+      const { error } = await supabase.from("campuses").update({ name: d.name, city: d.city || null, university_id: d.university_id }).eq("id", d.id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["all-campuses"] }); toast({ title: "Campus updated" }); },
+  });
+
   const addCourse = useMutation({
     mutationFn: async (d: any) => {
       const { error } = await supabase.from("courses").insert({ name: d.name, study_mode: d.study_mode || "blended", level: d.level || "undergraduate", university_id: d.university_id });
@@ -828,12 +989,28 @@ export default function SettingsPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["all-courses"] }); toast({ title: "Course added" }); },
   });
 
+  const updateCourse = useMutation({
+    mutationFn: async (d: any) => {
+      const { error } = await supabase.from("courses").update({ name: d.name, study_mode: d.study_mode || "blended", level: d.level || "undergraduate", university_id: d.university_id }).eq("id", d.id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["all-courses"] }); toast({ title: "Course updated" }); },
+  });
+
   const addIntake = useMutation({
     mutationFn: async (d: any) => {
       const { error } = await supabase.from("intakes").insert({ label: d.label, start_date: d.start_date, application_deadline: d.application_deadline || null, university_id: d.university_id });
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["all-intakes"] }); toast({ title: "Intake added" }); },
+  });
+
+  const updateIntake = useMutation({
+    mutationFn: async (d: any) => {
+      const { error } = await supabase.from("intakes").update({ label: d.label, start_date: d.start_date, application_deadline: d.application_deadline || null, university_id: d.university_id }).eq("id", d.id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["all-intakes"] }); toast({ title: "Intake updated" }); },
   });
 
   const [importOpen, setImportOpen] = useState(false);
@@ -867,7 +1044,7 @@ export default function SettingsPage() {
           </TabsList>
 
           <TabsContent value="universities" className="mt-4">
-            <UniversitiesSection universities={universities} addUni={addUni} deleteItem={deleteItem} />
+            <UniversitiesSection universities={universities} addUni={addUni} deleteItem={deleteItem} updateUni={updateUni} />
           </TabsContent>
 
           <TabsContent value="timetable" className="mt-4">
@@ -879,15 +1056,20 @@ export default function SettingsPage() {
               title="Campuses"
               items={campuses}
               columns={["Name", "City", "University"]}
-              renderRow={(c) => (
+              renderRow={(c, onEditClick) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.name}</TableCell>
                   <TableCell>{c.city || "—"}</TableCell>
                   <TableCell>{(c as any).universities?.name}</TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" onClick={() => deleteItem.mutate({ table: "campuses", id: c.id })}>
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => onEditClick(c)}>
+                        <Pencil className="w-4 h-4 text-muted-foreground" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => deleteItem.mutate({ table: "campuses", id: c.id })}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               )}
@@ -911,6 +1093,26 @@ export default function SettingsPage() {
                   </div>
                 </>
               }
+              onEdit={(d) => updateCampus.mutate(d)}
+              editFields={(item) => (
+                <>
+                  <div className="space-y-2">
+                    <Label>University</Label>
+                    <select name="university_id" required className="w-full h-10 rounded-md border px-3 text-sm" defaultValue={item.university_id}>
+                      <option value="">Select…</option>
+                      {universities.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Name</Label>
+                    <Input name="name" required defaultValue={item.name} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>City</Label>
+                    <Input name="city" defaultValue={item.city || ""} />
+                  </div>
+                </>
+              )}
             />
           </TabsContent>
 
@@ -919,16 +1121,21 @@ export default function SettingsPage() {
               title="Courses"
               items={courses}
               columns={["Name", "Level", "Mode", "University"]}
-              renderRow={(c) => (
+              renderRow={(c, onEditClick) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.name}</TableCell>
                   <TableCell className="capitalize">{c.level}</TableCell>
                   <TableCell className="capitalize">{c.study_mode}</TableCell>
                   <TableCell>{(c as any).universities?.name}</TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" onClick={() => deleteItem.mutate({ table: "courses", id: c.id })}>
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => onEditClick(c)}>
+                        <Pencil className="w-4 h-4 text-muted-foreground" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => deleteItem.mutate({ table: "courses", id: c.id })}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               )}
@@ -956,6 +1163,30 @@ export default function SettingsPage() {
                   </div>
                 </>
               }
+              onEdit={(d) => updateCourse.mutate(d)}
+              editFields={(item) => (
+                <>
+                  <div className="space-y-2">
+                    <Label>University</Label>
+                    <select name="university_id" required className="w-full h-10 rounded-md border px-3 text-sm" defaultValue={item.university_id}>
+                      <option value="">Select…</option>
+                      {universities.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Course Name</Label>
+                    <Input name="name" required defaultValue={item.name} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Level</Label>
+                    <Input name="level" defaultValue={item.level} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Study Mode</Label>
+                    <Input name="study_mode" defaultValue={item.study_mode} />
+                  </div>
+                </>
+              )}
             />
           </TabsContent>
 
@@ -964,16 +1195,21 @@ export default function SettingsPage() {
               title="Intakes"
               items={intakes}
               columns={["Label", "Start Date", "Deadline", "University"]}
-              renderRow={(i) => (
+              renderRow={(i, onEditClick) => (
                 <TableRow key={i.id}>
                   <TableCell className="font-medium">{i.label}</TableCell>
                   <TableCell>{i.start_date}</TableCell>
                   <TableCell>{i.application_deadline || "—"}</TableCell>
                   <TableCell>{(i as any).universities?.name}</TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" onClick={() => deleteItem.mutate({ table: "intakes", id: i.id })}>
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => onEditClick(i)}>
+                        <Pencil className="w-4 h-4 text-muted-foreground" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => deleteItem.mutate({ table: "intakes", id: i.id })}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               )}
@@ -1001,6 +1237,30 @@ export default function SettingsPage() {
                   </div>
                 </>
               }
+              onEdit={(d) => updateIntake.mutate(d)}
+              editFields={(item) => (
+                <>
+                  <div className="space-y-2">
+                    <Label>University</Label>
+                    <select name="university_id" required className="w-full h-10 rounded-md border px-3 text-sm" defaultValue={item.university_id}>
+                      <option value="">Select…</option>
+                      {universities.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Label</Label>
+                    <Input name="label" required defaultValue={item.label} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Start Date</Label>
+                    <Input name="start_date" type="date" required defaultValue={item.start_date} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Application Deadline</Label>
+                    <Input name="application_deadline" type="date" defaultValue={item.application_deadline || ""} />
+                  </div>
+                </>
+              )}
             />
           </TabsContent>
 
