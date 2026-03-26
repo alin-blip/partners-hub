@@ -53,7 +53,7 @@ const App = () => (
             <Route path="/owner/profile" element={<ProfilePage />} />
             <Route path="/owner/resources" element={<ResourcesPage />} />
             <Route path="/owner/create-image" element={<CreateImagePage />} />
-            <Route path="/owner/documents" element={<DocumentsPage />} />
+            
             <Route path="/owner/feedback" element={<FeedbackPage />} />
             
             {/* Admin routes */}
