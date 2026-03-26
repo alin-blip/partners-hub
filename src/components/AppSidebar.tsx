@@ -107,6 +107,7 @@ export function AppSidebar() {
   const mainItems: NavItem[] = [
     { title: "Dashboard", url: `${prefix}/dashboard`, icon: LayoutDashboard },
     { title: "Students", url: `${prefix}/students`, icon: Users },
+    { title: "Leads", url: `${prefix}/leads`, icon: ContactRound },
     { title: "Enrollments", url: `${prefix}/enrollments`, icon: ClipboardList },
     { title: "Messages", url: `${prefix}/messages`, icon: Mail, badge: unreadCount },
   ];
