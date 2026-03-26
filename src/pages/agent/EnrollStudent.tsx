@@ -132,7 +132,8 @@ export default function EnrollStudent() {
           ni_number: niNumber || null,
           previous_funding_years: previousFundingYears ? parseInt(previousFundingYears) : null,
           study_pattern: studyPattern.length > 0 ? studyPattern.join(", ") : null,
-          qualifications: qualifications || null, notes: notes || null,
+           qualifications: qualifications || null, notes: notes || null,
+           crn: crn || null,
           next_of_kin_name: nokName || null, next_of_kin_phone: nokPhone || null,
           next_of_kin_relationship: nokRelationship || null,
         } as any)
