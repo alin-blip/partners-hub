@@ -654,6 +654,7 @@ function TimetableSection({ universities }: { universities: any[] }) {
   );
 }
 
+export default function SettingsPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
 
