@@ -687,6 +687,7 @@ export type Database = {
           enrollment_id: string | null
           id: string
           is_agent_visible: boolean
+          is_urgent: boolean
           note_type: string
           student_id: string
           user_id: string
@@ -697,6 +698,7 @@ export type Database = {
           enrollment_id?: string | null
           id?: string
           is_agent_visible?: boolean
+          is_urgent?: boolean
           note_type?: string
           student_id: string
           user_id: string
@@ -707,6 +709,7 @@ export type Database = {
           enrollment_id?: string | null
           id?: string
           is_agent_visible?: boolean
+          is_urgent?: boolean
           note_type?: string
           student_id?: string
           user_id?: string

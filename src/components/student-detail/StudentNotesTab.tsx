@@ -7,20 +7,31 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Send, AlertTriangle, MessageSquare, FileWarning, DollarSign } from "lucide-react";
+import { Send, AlertTriangle, MessageSquare, FileWarning, DollarSign, Info, AlertCircle, RefreshCw, Flame } from "lucide-react";
 import { format } from "date-fns";
+import { StatusBadge } from "@/components/StatusBadge";
 
 const NOTE_TYPE_CONFIG: Record<string, { label: string; icon: any; color: string }> = {
   note: { label: "Note", icon: MessageSquare, color: "bg-blue-500/10 text-blue-700" },
   status_change: { label: "Status Change", icon: AlertTriangle, color: "bg-yellow-500/10 text-yellow-700" },
   document_request: { label: "Document Request", icon: FileWarning, color: "bg-red-500/10 text-red-700" },
   funding_update: { label: "Funding Update", icon: DollarSign, color: "bg-green-500/10 text-green-700" },
+  info_request: { label: "Info Request", icon: Info, color: "bg-purple-500/10 text-purple-700" },
+  action_required: { label: "Action Required", icon: AlertCircle, color: "bg-orange-500/10 text-orange-700" },
+  status_update: { label: "Status Update", icon: RefreshCw, color: "bg-teal-500/10 text-teal-700" },
 };
+
+const ENROLLMENT_STATUSES = [
+  "applied", "conditional_offer", "unconditional_offer",
+  "enrolled", "deferred", "rejected", "withdrawn",
+];
 
 interface Props {
   studentId: string;
-  canSendRequests: boolean; // owner/admin only
+  canSendRequests: boolean;
 }
 
 export function StudentNotesTab({ studentId, canSendRequests }: Props) {
@@ -29,6 +40,11 @@ export function StudentNotesTab({ studentId, canSendRequests }: Props) {
   const qc = useQueryClient();
   const [content, setContent] = useState("");
   const [noteType, setNoteType] = useState("note");
+  const [isUrgent, setIsUrgent] = useState(false);
+
+  // Quick status changer state
+  const [newStatus, setNewStatus] = useState("");
+  const [statusNote, setStatusNote] = useState("");
 
   const { data: notes = [] } = useQuery({
     queryKey: ["student-notes", studentId],
@@ -42,6 +58,20 @@ export function StudentNotesTab({ studentId, canSendRequests }: Props) {
     },
   });
 
+  // Fetch enrollments for quick status changer
+  const { data: enrollments = [] } = useQuery({
+    queryKey: ["student-enrollments-for-notes", studentId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("enrollments")
+        .select("id, status, universities(name), courses(name)")
+        .eq("student_id", studentId)
+        .order("created_at", { ascending: false });
+      return data || [];
+    },
+    enabled: canSendRequests,
+  });
+
   const addNote = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from("student_notes").insert({
@@ -50,6 +80,7 @@ export function StudentNotesTab({ studentId, canSendRequests }: Props) {
         content,
         note_type: noteType,
         is_agent_visible: true,
+        is_urgent: isUrgent,
       } as any);
       if (error) throw error;
     },
@@ -57,74 +88,196 @@ export function StudentNotesTab({ studentId, canSendRequests }: Props) {
       qc.invalidateQueries({ queryKey: ["student-notes", studentId] });
       setContent("");
       setNoteType("note");
+      setIsUrgent(false);
       toast({ title: "Note added" });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const updateStatusAndLog = useMutation({
+    mutationFn: async ({ enrollmentId, status, note }: { enrollmentId: string; status: string; note: string }) => {
+      const { error: updateErr } = await supabase
+        .from("enrollments")
+        .update({ status })
+        .eq("id", enrollmentId);
+      if (updateErr) throw updateErr;
+
+      const { error: noteErr } = await supabase.from("student_notes").insert({
+        student_id: studentId,
+        user_id: user!.id,
+        content: note || `Status updated to ${status.replace(/_/g, " ")}`,
+        note_type: "status_update",
+        is_agent_visible: true,
+        is_urgent: false,
+      } as any);
+      if (noteErr) throw noteErr;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["student-notes", studentId] });
+      qc.invalidateQueries({ queryKey: ["student-enrollments", studentId] });
+      qc.invalidateQueries({ queryKey: ["student-enrollments-for-notes", studentId] });
+      setNewStatus("");
+      setStatusNote("");
+      toast({ title: "Status updated & logged" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   const availableTypes = canSendRequests
-    ? ["note", "document_request", "funding_update"]
+    ? ["note", "document_request", "funding_update", "info_request", "action_required"]
     : ["note"];
 
+  const [selectedEnrollment, setSelectedEnrollment] = useState("");
+
   return (
-    <Card>
-      <CardHeader><CardTitle className="text-base">Notes & Activity</CardTitle></CardHeader>
-      <CardContent className="space-y-4">
-        {/* Add note form */}
-        <div className="space-y-3 border rounded-lg p-4 bg-muted/20">
-          <div className="flex gap-2">
-            {canSendRequests && (
-              <Select value={noteType} onValueChange={setNoteType}>
-                <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
+    <div className="space-y-4">
+      {/* Quick Status Changer — owner/admin only */}
+      {canSendRequests && enrollments.length > 0 && (
+        <Card className="border-accent/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 text-accent" />
+              Quick Status Update
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex gap-2 flex-wrap">
+              <Select value={selectedEnrollment} onValueChange={(v) => { setSelectedEnrollment(v); setNewStatus(""); }}>
+                <SelectTrigger className="w-[260px] h-9"><SelectValue placeholder="Select enrollment…" /></SelectTrigger>
                 <SelectContent>
-                  {availableTypes.map((t) => {
-                    const cfg = NOTE_TYPE_CONFIG[t];
-                    return <SelectItem key={t} value={t}>{cfg.label}</SelectItem>;
-                  })}
+                  {enrollments.map((e: any) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {(e as any).universities?.name} — {(e as any).courses?.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-            )}
-          </div>
-          <Textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder={noteType === "document_request" ? "Describe which documents are needed..." : "Write a note..."}
-            rows={3}
-          />
-          <div className="flex justify-end">
-            <Button size="sm" onClick={() => addNote.mutate()} disabled={!content.trim() || addNote.isPending}>
-              <Send className="w-3 h-3 mr-1" /> {addNote.isPending ? "Sending…" : "Add Note"}
-            </Button>
-          </div>
-        </div>
-
-        {/* Notes list */}
-        {notes.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">No notes yet</p>
-        ) : (
-          <div className="space-y-3">
-            {notes.map((note: any) => {
-              const cfg = NOTE_TYPE_CONFIG[note.note_type] || NOTE_TYPE_CONFIG.note;
-              const Icon = cfg.icon;
-              return (
-                <div key={note.id} className="border rounded-lg p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className={`text-xs ${cfg.color}`}>
-                        <Icon className="w-3 h-3 mr-1" />
-                        {cfg.label}
-                      </Badge>
-                      <span className="text-xs font-medium">{(note as any).profiles?.full_name || "Unknown"}</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">{format(new Date(note.created_at), "dd MMM yyyy HH:mm")}</span>
-                  </div>
-                  <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+              {selectedEnrollment && (
+                <>
+                  <Select value={newStatus} onValueChange={setNewStatus}>
+                    <SelectTrigger className="w-[180px] h-9"><SelectValue placeholder="New status…" /></SelectTrigger>
+                    <SelectContent>
+                      {ENROLLMENT_STATUSES.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          <StatusBadge status={s} />
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
+            </div>
+            {selectedEnrollment && newStatus && (
+              <>
+                <Textarea
+                  value={statusNote}
+                  onChange={(e) => setStatusNote(e.target.value)}
+                  placeholder="Add context for this status change (optional)…"
+                  rows={2}
+                />
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    onClick={() => updateStatusAndLog.mutate({ enrollmentId: selectedEnrollment, status: newStatus, note: statusNote })}
+                    disabled={updateStatusAndLog.isPending}
+                  >
+                    <RefreshCw className="w-3 h-3 mr-1" />
+                    {updateStatusAndLog.isPending ? "Updating…" : "Update & Log"}
+                  </Button>
                 </div>
-              );
-            })}
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Notes & Activity */}
+      <Card>
+        <CardHeader><CardTitle className="text-base">Notes & Activity</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          {/* Add note form */}
+          <div className="space-y-3 border rounded-lg p-4 bg-muted/20">
+            <div className="flex items-center gap-2 flex-wrap">
+              {canSendRequests && (
+                <Select value={noteType} onValueChange={setNoteType}>
+                  <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {availableTypes.map((t) => {
+                      const cfg = NOTE_TYPE_CONFIG[t];
+                      return <SelectItem key={t} value={t}>{cfg.label}</SelectItem>;
+                    })}
+                  </SelectContent>
+                </Select>
+              )}
+              {canSendRequests && (
+                <div className="flex items-center gap-2 ml-auto">
+                  <Flame className={`w-4 h-4 ${isUrgent ? "text-orange-500" : "text-muted-foreground"}`} />
+                  <Label htmlFor="urgent-toggle" className="text-xs cursor-pointer">Urgent</Label>
+                  <Switch id="urgent-toggle" checked={isUrgent} onCheckedChange={setIsUrgent} />
+                </div>
+              )}
+            </div>
+            <Textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder={
+                noteType === "document_request" ? "Describe which documents are needed…"
+                : noteType === "info_request" ? "What information do you need from the agent?"
+                : noteType === "action_required" ? "Describe what the agent needs to do…"
+                : "Write a note…"
+              }
+              rows={3}
+            />
+            <div className="flex justify-end">
+              <Button size="sm" onClick={() => addNote.mutate()} disabled={!content.trim() || addNote.isPending}>
+                <Send className="w-3 h-3 mr-1" /> {addNote.isPending ? "Sending…" : "Add Note"}
+              </Button>
+            </div>
           </div>
-        )}
-      </CardContent>
-    </Card>
+
+          {/* Notes list */}
+          {notes.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">No notes yet</p>
+          ) : (
+            <div className="space-y-3">
+              {notes.map((note: any) => {
+                const cfg = NOTE_TYPE_CONFIG[note.note_type] || NOTE_TYPE_CONFIG.note;
+                const Icon = cfg.icon;
+                const urgent = note.is_urgent;
+                return (
+                  <div
+                    key={note.id}
+                    className={`border rounded-lg p-3 space-y-2 ${
+                      urgent ? "border-l-4 border-l-orange-500 bg-orange-500/5" : ""
+                    } ${
+                      note.note_type === "action_required" ? "border-l-4 border-l-orange-400" : ""
+                    } ${
+                      note.note_type === "info_request" ? "border-l-4 border-l-purple-400" : ""
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className={`text-xs ${cfg.color}`}>
+                          <Icon className="w-3 h-3 mr-1" />
+                          {cfg.label}
+                        </Badge>
+                        {urgent && (
+                          <Badge className="text-[10px] bg-orange-500 text-white px-1.5 py-0">
+                            <Flame className="w-2.5 h-2.5 mr-0.5" /> URGENT
+                          </Badge>
+                        )}
+                        <span className="text-xs font-medium">{(note as any).profiles?.full_name || "Unknown"}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">{format(new Date(note.created_at), "dd MMM yyyy HH:mm")}</span>
+                    </div>
+                    <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
