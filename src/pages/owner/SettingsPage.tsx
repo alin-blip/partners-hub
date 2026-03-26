@@ -836,10 +836,23 @@ export default function SettingsPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["all-intakes"] }); toast({ title: "Intake added" }); },
   });
 
+  const [importOpen, setImportOpen] = useState(false);
+
   return (
     <DashboardLayout allowedRoles={["owner"]}>
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold tracking-tight">Platform Settings</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold tracking-tight">Platform Settings</h1>
+          <Button onClick={() => setImportOpen(true)} variant="outline">
+            <FileUp className="h-4 w-4 mr-2" /> Import from Document
+          </Button>
+        </div>
+
+        <DocumentProcessorDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          universities={universities}
+        />
 
         <Tabs defaultValue="universities">
           <TabsList>
