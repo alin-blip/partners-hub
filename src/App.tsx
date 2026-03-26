@@ -21,6 +21,7 @@ import ProfilePage from "./pages/shared/ProfilePage";
 import ResourcesPage from "./pages/shared/ResourcesPage";
 import CreateImagePage from "./pages/shared/CreateImagePage";
 import DocumentsPage from "./pages/owner/DocumentsPage";
+import FeedbackPage from "./pages/owner/FeedbackPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
