@@ -89,6 +89,10 @@ export default function StudentDetailPage() {
           <TabsContent value="notes">
             <StudentNotesTab studentId={student.id} studentName={`${student.first_name} ${student.last_name}`} canSendRequests={canChangeStatus} />
           </TabsContent>
+
+          <TabsContent value="ai-docs">
+            <StudentAIDocumentsTab studentId={student.id} studentName={`${student.first_name} ${student.last_name}`} />
+          </TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>
