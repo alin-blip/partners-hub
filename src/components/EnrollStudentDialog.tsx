@@ -157,11 +157,13 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
         for (const { file, docType } of docFiles) {
           const ext = file.name.split(".").pop();
           const storagePath = `${agentName}_${user!.id}/${studentName}_${student.id}/${docType}_${Date.now()}.${ext}`;
-          await supabase.storage.from("student-documents").upload(storagePath, file);
-          await supabase.from("student_documents").insert({
+          const { error: uploadErr } = await supabase.storage.from("student-documents").upload(storagePath, file);
+          if (uploadErr) console.error("Doc upload error:", uploadErr);
+          const { error: docInsertErr } = await supabase.from("student_documents").insert({
             student_id: student.id, agent_id: user!.id, doc_type: docType,
             file_name: file.name, file_path: storagePath, file_size: file.size, uploaded_by: user!.id,
           });
+          if (docInsertErr) console.error("Doc record error:", docInsertErr);
         }
       }
     },
