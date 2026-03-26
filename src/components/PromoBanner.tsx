@@ -116,10 +116,10 @@ export function PromoBanner() {
         const ids = teamAgentIds || [];
         if (ids.length === 0) return 0;
 
-        const { count } = await supabase
+        const { count } = await (supabase
           .from("enrollments")
-          .select("id, students!inner(agent_id)", { count: "exact", head: true })
-          .in("students.agent_id" as any, ids)
+          .select("id, students!inner(agent_id)", { count: "exact", head: true }) as any)
+          .in("students.agent_id", ids)
           .in("status", QUALIFYING_STATUSES)
           .gte("created_at", agentPromo.started_at)
           .lte("created_at", agentPromo.personal_deadline);
