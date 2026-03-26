@@ -620,6 +620,35 @@ export type Database = {
           },
         ]
       }
+      timetable_options: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          university_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label: string
+          university_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          university_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timetable_options_university_id_fkey"
+            columns: ["university_id"]
+            isOneToOne: false
+            referencedRelation: "universities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       universities: {
         Row: {
           created_at: string
