@@ -86,6 +86,38 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_promotions: {
+        Row: {
+          agent_id: string
+          id: string
+          personal_deadline: string
+          promotion_id: string
+          started_at: string
+        }
+        Insert: {
+          agent_id: string
+          id?: string
+          personal_deadline: string
+          promotion_id: string
+          started_at?: string
+        }
+        Update: {
+          agent_id?: string
+          id?: string
+          personal_deadline?: string
+          promotion_id?: string
+          started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_promotions_promotion_id_fkey"
+            columns: ["promotion_id"]
+            isOneToOne: false
+            referencedRelation: "promotions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_conversations: {
         Row: {
           created_at: string
