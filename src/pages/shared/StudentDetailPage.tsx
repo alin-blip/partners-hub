@@ -5,12 +5,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, User, FileText, GraduationCap, DollarSign, MessageSquare } from "lucide-react";
+import { ArrowLeft, User, FileText, GraduationCap, DollarSign, MessageSquare, Sparkles } from "lucide-react";
 import { StudentOverviewTab } from "@/components/student-detail/StudentOverviewTab";
 import { StudentDocumentsTab } from "@/components/student-detail/StudentDocumentsTab";
 import { StudentEnrollmentsTab } from "@/components/student-detail/StudentEnrollmentsTab";
 import { StudentFundingTab } from "@/components/student-detail/StudentFundingTab";
 import { StudentNotesTab } from "@/components/student-detail/StudentNotesTab";
+import { StudentAIDocumentsTab } from "@/components/student-detail/StudentAIDocumentsTab";
 
 export default function StudentDetailPage() {
   const { id } = useParams<{ id: string }>();
