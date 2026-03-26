@@ -31,17 +31,24 @@ serve(async (req) => {
 
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { prompt, preset, includePhoto } = await req.json();
+    const { prompt, preset, includePhoto, timezone } = await req.json();
     if (!prompt || !preset) throw new Error("Missing prompt or preset");
 
-    // Daily limit check
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Daily limit check — use client timezone so reset aligns with user's midnight
+    const tz = timezone || "Europe/Bucharest";
+    const now = new Date();
+    const utcStr = now.toLocaleString("en-US", { timeZone: "UTC" });
+    const tzStr = now.toLocaleString("en-US", { timeZone: tz });
+    const offsetMs = new Date(tzStr).getTime() - new Date(utcStr).getTime();
+    const todayInTz = new Date(now.getTime() + offsetMs);
+    todayInTz.setHours(0, 0, 0, 0);
+    const todayUtc = new Date(todayInTz.getTime() - offsetMs);
+
     const { count } = await adminClient
       .from("generated_images")
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id)
-      .gte("created_at", today.toISOString());
+      .gte("created_at", todayUtc.toISOString());
 
     if ((count ?? 0) >= 5) {
       return new Response(
