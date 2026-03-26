@@ -141,8 +141,9 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
           next_of_kin_relationship: nokRelationship || null,
         } as any)
         .select("id")
-        .single();
+        .maybeSingle();
       if (studentError) throw studentError;
+      if (!student) throw new Error("Failed to create student record — please try again");
 
       const { error: enrollError } = await supabase.from("enrollments").insert({
         student_id: student.id, university_id: universityId,
