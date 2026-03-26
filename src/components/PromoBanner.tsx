@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Trophy, X, PartyPopper } from "lucide-react";
@@ -33,7 +33,6 @@ const QUALIFYING_STATUSES = ["offer_received", "accepted", "enrolled", "active"]
 
 export function PromoBanner() {
   const { user, role } = useAuth();
-  const queryClient = useQueryClient();
 
   const [dismissed, setDismissed] = useState<Set<string>>(() => {
     try {
@@ -42,40 +41,42 @@ export function PromoBanner() {
     } catch { return new Set(); }
   });
 
-  // Fetch active promotion
+  // Only agents and admins see banners
+  const isEligible = role === "agent" || role === "admin";
+
+  // Fetch active promotion matching user's role
   const { data: promo } = useQuery({
-    queryKey: ["active-promotion"],
+    queryKey: ["active-promotion", role],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("promotions")
+      const { data } = await (supabase.from("promotions") as any)
         .select("*")
         .eq("is_active", true)
+        .eq("target_role", role!)
         .order("created_at", { ascending: false })
         .limit(1);
       return data?.[0] || null;
     },
+    enabled: isEligible,
   });
 
-  // Fetch or auto-create agent's personal promo record
+  // Fetch or auto-create personal promo record
   const { data: agentPromo } = useQuery({
     queryKey: ["agent-promo", promo?.id, user?.id],
     queryFn: async () => {
       if (!promo || !user) return null;
-      
-      // Try to fetch existing
+
       const { data: existing } = await supabase
         .from("agent_promotions" as any)
         .select("*")
         .eq("promotion_id", promo.id)
         .eq("agent_id", user.id)
         .maybeSingle();
-      
+
       if (existing) return existing as any;
-      
-      // Auto-create with 30-day personal deadline
+
       const personalDeadline = new Date();
       personalDeadline.setDate(personalDeadline.getDate() + 30);
-      
+
       const { data: created } = await supabase
         .from("agent_promotions" as any)
         .insert({
@@ -85,17 +86,47 @@ export function PromoBanner() {
         } as any)
         .select()
         .single();
-      
+
       return created as any;
     },
-    enabled: !!promo && !!user && role === "agent",
+    enabled: !!promo && !!user && isEligible,
   });
 
-  // Count qualifying enrollments since agent started
+  // For admin: get team agent IDs
+  const { data: teamAgentIds } = useQuery({
+    queryKey: ["team-agent-ids", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("admin_id", user!.id);
+      return data?.map((a) => a.id) || [];
+    },
+    enabled: !!user && role === "admin",
+  });
+
+  // Count qualifying enrollments
   const { data: qualifyingCount = 0 } = useQuery({
-    queryKey: ["promo-qualifying-count", user?.id, agentPromo?.started_at],
+    queryKey: ["promo-qualifying-count", user?.id, agentPromo?.started_at, role, teamAgentIds],
     queryFn: async () => {
       if (!user || !agentPromo) return 0;
+
+      if (role === "admin") {
+        // Count enrollments from all team agents' students
+        const ids = teamAgentIds || [];
+        if (ids.length === 0) return 0;
+
+        const { count } = await (supabase
+          .from("enrollments")
+          .select("id, students!inner(agent_id)", { count: "exact", head: true }) as any)
+          .in("students.agent_id", ids)
+          .in("status", QUALIFYING_STATUSES)
+          .gte("created_at", agentPromo.started_at)
+          .lte("created_at", agentPromo.personal_deadline);
+        return count || 0;
+      }
+
+      // Agent: count own enrollments
       const { count } = await supabase
         .from("enrollments")
         .select("id", { count: "exact", head: true })
@@ -104,11 +135,10 @@ export function PromoBanner() {
         .lte("created_at", agentPromo.personal_deadline);
       return count || 0;
     },
-    enabled: !!user && !!agentPromo,
+    enabled: !!user && !!agentPromo && (role === "agent" || (role === "admin" && !!teamAgentIds)),
   });
 
-  if (!promo || dismissed.has(promo.id)) return null;
-  if (role !== "agent") return null;
+  if (!isEligible || !promo || dismissed.has(promo.id)) return null;
 
   const handleDismiss = () => {
     const next = new Set(dismissed);
@@ -123,6 +153,7 @@ export function PromoBanner() {
       agentPromo={agentPromo}
       qualifyingCount={qualifyingCount}
       onDismiss={handleDismiss}
+      isTeam={role === "admin"}
     />
   );
 }
@@ -132,11 +163,13 @@ function PromoBannerCard({
   agentPromo,
   qualifyingCount,
   onDismiss,
+  isTeam,
 }: {
   promo: any;
   agentPromo: any;
   qualifyingCount: number;
   onDismiss: () => void;
+  isTeam: boolean;
 }) {
   const deadline = agentPromo?.personal_deadline || promo.deadline;
   const { days, hours, mins, secs, expired } = useCountdown(deadline);
@@ -145,6 +178,7 @@ function PromoBannerCard({
   const remaining = Math.max(0, target - qualifyingCount);
   const reached = qualifyingCount >= target;
   const progressPct = Math.min(100, (qualifyingCount / target) * 100);
+  const label = isTeam ? "echipă" : "studenți";
 
   if (expired && !reached) return null;
 
@@ -162,7 +196,7 @@ function PromoBannerCard({
           <div>
             <h3 className="font-bold text-lg">🎉 Felicitări! Ai atins targetul!</h3>
             <p className="text-sm mt-1 opacity-90">
-              Ai adus {qualifyingCount}/{target} studenți. Bonusul tău: £{promo.bonus_amount}
+              {isTeam ? "Echipa ta a adus" : "Ai adus"} {qualifyingCount}/{target} studenți. Bonusul tău: £{promo.bonus_amount}
               {promo.bonus_percentage ? ` + ${promo.bonus_percentage}% comision` : ""}
             </p>
           </div>
@@ -190,10 +224,10 @@ function PromoBannerCard({
           {promo.description && (
             <p className="text-sm opacity-90">{promo.description}</p>
           )}
-          
+
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-sm font-medium">
-              <span>🎯 {qualifyingCount}/{target} studenți · Mai ai {remaining}</span>
+              <span>🎯 {qualifyingCount}/{target} {label} · Mai {remaining === 1 ? "e" : "sunt"} {remaining}</span>
               <span>💰 £{promo.bonus_amount}{promo.bonus_percentage ? ` + ${promo.bonus_percentage}%` : ""}</span>
             </div>
             <Progress value={progressPct} className="h-2 bg-white/20" />

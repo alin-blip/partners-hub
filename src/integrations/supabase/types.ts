@@ -557,6 +557,7 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean
+          target_role: string
           target_students: number
           title: string
         }
@@ -569,6 +570,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          target_role?: string
           target_students?: number
           title: string
         }
@@ -581,6 +583,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          target_role?: string
           target_students?: number
           title?: string
         }

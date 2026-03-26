@@ -434,6 +434,7 @@ function PromotionsSection({ deleteItem }: { deleteItem: any }) {
         bonus_amount: Number(d.bonus_amount),
         bonus_percentage: d.bonus_percentage ? Number(d.bonus_percentage) : null,
         target_students: Number(d.target_students),
+        target_role: d.target_role || "agent",
         is_active: true,
       });
       if (error) throw error;
@@ -454,6 +455,7 @@ function PromotionsSection({ deleteItem }: { deleteItem: any }) {
         bonus_amount: Number(d.bonus_amount),
         bonus_percentage: d.bonus_percentage ? Number(d.bonus_percentage) : null,
         target_students: Number(d.target_students),
+        target_role: d.target_role || "agent",
       }).eq("id", d.id);
       if (error) throw error;
     },
@@ -506,6 +508,13 @@ function PromotionsSection({ deleteItem }: { deleteItem: any }) {
           <Input name="deadline" type="datetime-local" required defaultValue={defaults?.deadline ? defaults.deadline.slice(0, 16) : ""} />
         </div>
       </div>
+      <div className="space-y-2">
+        <Label>Target Role</Label>
+        <select name="target_role" className="w-full h-10 rounded-md border px-3 text-sm" defaultValue={defaults?.target_role || "agent"}>
+          <option value="agent">Agent (individual)</option>
+          <option value="admin">Admin (echipă)</option>
+        </select>
+      </div>
     </>
   );
 
@@ -537,6 +546,7 @@ function PromotionsSection({ deleteItem }: { deleteItem: any }) {
           <TableHeader>
             <TableRow>
               <TableHead>Title</TableHead>
+              <TableHead>Role</TableHead>
               <TableHead>Target</TableHead>
               <TableHead>Bonus</TableHead>
               <TableHead>Deadline</TableHead>
@@ -548,6 +558,7 @@ function PromotionsSection({ deleteItem }: { deleteItem: any }) {
             {promotions.map((p: any) => (
               <TableRow key={p.id}>
                 <TableCell className="font-medium">{p.title}</TableCell>
+                <TableCell className="capitalize">{p.target_role || "agent"}</TableCell>
                 <TableCell>{p.target_students} students</TableCell>
                 <TableCell>£{p.bonus_amount}{p.bonus_percentage ? ` + ${p.bonus_percentage}%` : ""}</TableCell>
                 <TableCell className="text-sm">{format(new Date(p.deadline), "dd MMM yyyy HH:mm")}</TableCell>
@@ -575,7 +586,7 @@ function PromotionsSection({ deleteItem }: { deleteItem: any }) {
             ))}
             {promotions.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-6">No promotions yet</TableCell>
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-6">No promotions yet</TableCell>
               </TableRow>
             )}
           </TableBody>
