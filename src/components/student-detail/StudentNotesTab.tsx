@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Send, AlertTriangle, MessageSquare, FileWarning, DollarSign, Info, AlertCircle, RefreshCw, Flame } from "lucide-react";
+import { Send, AlertTriangle, MessageSquare, FileWarning, DollarSign, Info, AlertCircle, RefreshCw, Flame, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
 import { StatusBadge } from "@/components/StatusBadge";
 
@@ -37,25 +37,12 @@ interface Props {
 
 async function sendNoteEmailToAgent(studentId: string, studentName: string, noteType: string, content: string, authorName: string) {
   try {
-    // Fetch student's agent_id
-    const { data: student } = await supabase
-      .from("students")
-      .select("agent_id")
-      .eq("id", studentId)
-      .single();
+    const { data: student } = await supabase.from("students").select("agent_id").eq("id", studentId).single();
     if (!student?.agent_id) return;
-
-    // Fetch agent email
-    const { data: agent } = await supabase
-      .from("profiles")
-      .select("email")
-      .eq("id", student.agent_id)
-      .single();
+    const { data: agent } = await supabase.from("profiles").select("email").eq("id", student.agent_id).single();
     if (!agent?.email) return;
-
     const noteId = crypto.randomUUID();
     const studentUrl = `${window.location.origin}/agent/students/${studentId}`;
-
     await supabase.functions.invoke("send-transactional-email", {
       body: {
         templateName: "note-notification",
@@ -95,11 +82,7 @@ export function StudentNotesTab({ studentId, studentName, canSendRequests }: Pro
   const { data: profile } = useQuery({
     queryKey: ["my-profile"],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("id", user!.id)
-        .single();
+      const { data } = await supabase.from("profiles").select("full_name").eq("id", user!.id).single();
       return data;
     },
     enabled: !!user,
@@ -131,17 +114,11 @@ export function StudentNotesTab({ studentId, studentName, canSendRequests }: Pro
       if (error) throw error;
     },
     onSuccess: () => {
-      // Send email for urgent or action_required notes
       if (isUrgent || noteType === "action_required" || noteType === "info_request") {
-        sendNoteEmailToAgent(
-          studentId,
-          studentName || "Student",
-          noteType,
-          content,
-          profile?.full_name || "Admin",
-        );
+        sendNoteEmailToAgent(studentId, studentName || "Student", noteType, content, profile?.full_name || "Admin");
       }
       qc.invalidateQueries({ queryKey: ["student-notes", studentId] });
+      qc.invalidateQueries({ queryKey: ["urgent-note-counts"] });
       setContent("");
       setNoteType("note");
       setIsUrgent(false);
@@ -150,21 +127,30 @@ export function StudentNotesTab({ studentId, studentName, canSendRequests }: Pro
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const resolveNote = useMutation({
+    mutationFn: async (noteId: string) => {
+      const { error } = await supabase
+        .from("student_notes")
+        .update({ resolved_at: new Date().toISOString() } as any)
+        .eq("id", noteId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["student-notes", studentId] });
+      qc.invalidateQueries({ queryKey: ["urgent-note-counts"] });
+      toast({ title: "Note marked as resolved" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   const updateStatusAndLog = useMutation({
     mutationFn: async ({ enrollmentId, status, note }: { enrollmentId: string; status: string; note: string }) => {
-      const { error: updateErr } = await supabase
-        .from("enrollments")
-        .update({ status })
-        .eq("id", enrollmentId);
+      const { error: updateErr } = await supabase.from("enrollments").update({ status }).eq("id", enrollmentId);
       if (updateErr) throw updateErr;
-
       const { error: noteErr } = await supabase.from("student_notes").insert({
-        student_id: studentId,
-        user_id: user!.id,
+        student_id: studentId, user_id: user!.id,
         content: note || `Status updated to ${status.replace(/_/g, " ")}`,
-        note_type: "status_update",
-        is_agent_visible: true,
-        is_urgent: false,
+        note_type: "status_update", is_agent_visible: true, is_urgent: false,
       } as any);
       if (noteErr) throw noteErr;
     },
@@ -172,8 +158,7 @@ export function StudentNotesTab({ studentId, studentName, canSendRequests }: Pro
       qc.invalidateQueries({ queryKey: ["student-notes", studentId] });
       qc.invalidateQueries({ queryKey: ["student-enrollments", studentId] });
       qc.invalidateQueries({ queryKey: ["student-enrollments-for-notes", studentId] });
-      setNewStatus("");
-      setStatusNote("");
+      setNewStatus(""); setStatusNote("");
       toast({ title: "Status updated & logged" });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -185,13 +170,12 @@ export function StudentNotesTab({ studentId, studentName, canSendRequests }: Pro
 
   return (
     <div className="space-y-4">
-      {/* Quick Status Changer — owner/admin only */}
+      {/* Quick Status Changer */}
       {canSendRequests && enrollments.length > 0 && (
         <Card className="border-accent/30">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
-              <RefreshCw className="w-4 h-4 text-accent" />
-              Quick Status Update
+              <RefreshCw className="w-4 h-4 text-accent" /> Quick Status Update
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -211,9 +195,7 @@ export function StudentNotesTab({ studentId, studentName, canSendRequests }: Pro
                   <SelectTrigger className="w-[180px] h-9"><SelectValue placeholder="New status…" /></SelectTrigger>
                   <SelectContent>
                     {ENROLLMENT_STATUSES.map((s) => (
-                      <SelectItem key={s} value={s}>
-                        <StatusBadge status={s} />
-                      </SelectItem>
+                      <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -221,20 +203,10 @@ export function StudentNotesTab({ studentId, studentName, canSendRequests }: Pro
             </div>
             {selectedEnrollment && newStatus && (
               <>
-                <Textarea
-                  value={statusNote}
-                  onChange={(e) => setStatusNote(e.target.value)}
-                  placeholder="Add context for this status change (optional)…"
-                  rows={2}
-                />
+                <Textarea value={statusNote} onChange={(e) => setStatusNote(e.target.value)} placeholder="Add context (optional)…" rows={2} />
                 <div className="flex justify-end">
-                  <Button
-                    size="sm"
-                    onClick={() => updateStatusAndLog.mutate({ enrollmentId: selectedEnrollment, status: newStatus, note: statusNote })}
-                    disabled={updateStatusAndLog.isPending}
-                  >
-                    <RefreshCw className="w-3 h-3 mr-1" />
-                    {updateStatusAndLog.isPending ? "Updating…" : "Update & Log"}
+                  <Button size="sm" onClick={() => updateStatusAndLog.mutate({ enrollmentId: selectedEnrollment, status: newStatus, note: statusNote })} disabled={updateStatusAndLog.isPending}>
+                    <RefreshCw className="w-3 h-3 mr-1" /> {updateStatusAndLog.isPending ? "Updating…" : "Update & Log"}
                   </Button>
                 </div>
               </>
@@ -269,8 +241,7 @@ export function StudentNotesTab({ studentId, studentName, canSendRequests }: Pro
               )}
             </div>
             <Textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
+              value={content} onChange={(e) => setContent(e.target.value)}
               placeholder={
                 noteType === "document_request" ? "Describe which documents are needed…"
                 : noteType === "info_request" ? "What information do you need from the agent?"
@@ -294,31 +265,52 @@ export function StudentNotesTab({ studentId, studentName, canSendRequests }: Pro
                 const cfg = NOTE_TYPE_CONFIG[note.note_type] || NOTE_TYPE_CONFIG.note;
                 const Icon = cfg.icon;
                 const urgent = note.is_urgent;
+                const isResolvable = (urgent || ["action_required", "info_request"].includes(note.note_type)) && !note.resolved_at;
+                const isResolved = !!note.resolved_at;
                 return (
                   <div
                     key={note.id}
                     className={`border rounded-lg p-3 space-y-2 ${
-                      urgent ? "border-l-4 border-l-orange-500 bg-orange-500/5" : ""
+                      isResolved ? "opacity-60" : ""
                     } ${
-                      note.note_type === "action_required" ? "border-l-4 border-l-orange-400" : ""
+                      urgent && !isResolved ? "border-l-4 border-l-orange-500 bg-orange-500/5" : ""
                     } ${
-                      note.note_type === "info_request" ? "border-l-4 border-l-purple-400" : ""
+                      note.note_type === "action_required" && !isResolved ? "border-l-4 border-l-orange-400" : ""
+                    } ${
+                      note.note_type === "info_request" && !isResolved ? "border-l-4 border-l-purple-400" : ""
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className={`text-xs ${cfg.color}`}>
-                          <Icon className="w-3 h-3 mr-1" />
-                          {cfg.label}
+                          <Icon className="w-3 h-3 mr-1" /> {cfg.label}
                         </Badge>
-                        {urgent && (
+                        {urgent && !isResolved && (
                           <Badge className="text-[10px] bg-orange-500 text-white px-1.5 py-0">
                             <Flame className="w-2.5 h-2.5 mr-0.5" /> URGENT
                           </Badge>
                         )}
+                        {isResolved && (
+                          <Badge variant="outline" className="text-[10px] text-green-700 border-green-300 px-1.5 py-0">
+                            <CheckCircle className="w-2.5 h-2.5 mr-0.5" /> Resolved
+                          </Badge>
+                        )}
                         <span className="text-xs font-medium">{(note as any).profiles?.full_name || "Unknown"}</span>
                       </div>
-                      <span className="text-xs text-muted-foreground">{format(new Date(note.created_at), "dd MMM yyyy HH:mm")}</span>
+                      <div className="flex items-center gap-2">
+                        {isResolvable && canSendRequests && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 text-xs text-green-700 hover:text-green-800 hover:bg-green-50 px-2"
+                            onClick={() => resolveNote.mutate(note.id)}
+                            disabled={resolveNote.isPending}
+                          >
+                            <CheckCircle className="w-3 h-3 mr-1" /> Resolve
+                          </Button>
+                        )}
+                        <span className="text-xs text-muted-foreground">{format(new Date(note.created_at), "dd MMM yyyy HH:mm")}</span>
+                      </div>
                     </div>
                     <p className="text-sm whitespace-pre-wrap">{note.content}</p>
                   </div>
