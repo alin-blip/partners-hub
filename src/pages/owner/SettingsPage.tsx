@@ -494,8 +494,6 @@ function PromotionsSection({ deleteItem }: { deleteItem: any }) {
 }
 
 function UniversitiesSection({ universities, addUni, deleteItem }: { universities: any[]; addUni: any; deleteItem: any }) {
-  const { toast } = useToast();
-  const qc = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
 
   const toggleTimetable = useMutation({
