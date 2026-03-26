@@ -38,6 +38,8 @@ export default function LeadsPage() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [convertLead, setConvertLead] = useState<any | null>(null);
+  const [notesLead, setNotesLead] = useState<any | null>(null);
+  const [notesText, setNotesText] = useState("");
 
   const { data: leads = [], isLoading } = useQuery({
     queryKey: ["leads"],
