@@ -14,6 +14,78 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_card_settings: {
+        Row: {
+          accreditation: string | null
+          apply_url: string | null
+          bio: string | null
+          booking_url: string | null
+          company_description: string | null
+          company_name: string | null
+          created_at: string
+          id: string
+          is_public: boolean
+          job_title: string | null
+          social_facebook: string | null
+          social_google: string | null
+          social_instagram: string | null
+          social_linkedin: string | null
+          social_tiktok: string | null
+          social_trustpilot: string | null
+          social_youtube: string | null
+          updated_at: string
+          user_id: string
+          whatsapp: string | null
+          working_hours: string | null
+        }
+        Insert: {
+          accreditation?: string | null
+          apply_url?: string | null
+          bio?: string | null
+          booking_url?: string | null
+          company_description?: string | null
+          company_name?: string | null
+          created_at?: string
+          id?: string
+          is_public?: boolean
+          job_title?: string | null
+          social_facebook?: string | null
+          social_google?: string | null
+          social_instagram?: string | null
+          social_linkedin?: string | null
+          social_tiktok?: string | null
+          social_trustpilot?: string | null
+          social_youtube?: string | null
+          updated_at?: string
+          user_id: string
+          whatsapp?: string | null
+          working_hours?: string | null
+        }
+        Update: {
+          accreditation?: string | null
+          apply_url?: string | null
+          bio?: string | null
+          booking_url?: string | null
+          company_description?: string | null
+          company_name?: string | null
+          created_at?: string
+          id?: string
+          is_public?: boolean
+          job_title?: string | null
+          social_facebook?: string | null
+          social_google?: string | null
+          social_instagram?: string | null
+          social_linkedin?: string | null
+          social_tiktok?: string | null
+          social_trustpilot?: string | null
+          social_youtube?: string | null
+          updated_at?: string
+          user_id?: string
+          whatsapp?: string | null
+          working_hours?: string | null
+        }
+        Relationships: []
+      }
       ai_conversations: {
         Row: {
           created_at: string
@@ -394,6 +466,7 @@ export type Database = {
           id: string
           is_active: boolean
           phone: string | null
+          slug: string | null
           updated_at: string
         }
         Insert: {
@@ -405,6 +478,7 @@ export type Database = {
           id: string
           is_active?: boolean
           phone?: string | null
+          slug?: string | null
           updated_at?: string
         }
         Update: {
@@ -416,6 +490,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           phone?: string | null
+          slug?: string | null
           updated_at?: string
         }
         Relationships: [
