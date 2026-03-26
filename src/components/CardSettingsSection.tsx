@@ -135,11 +135,25 @@ export default function CardSettingsSection() {
   });
 
   const cardUrl = slug ? `${window.location.origin}/card/${slug}` : "";
+  const applyFormUrl = slug ? `${window.location.origin}/apply/${slug}` : "";
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(cardUrl);
-    toast({ title: "Link copied!" });
+  const copyLink = (url: string, label = "Link") => {
+    navigator.clipboard.writeText(url);
+    toast({ title: `${label} copied!` });
   };
+
+  const cardQrRef = useRef<HTMLCanvasElement>(null);
+  const applyQrRef = useRef<HTMLCanvasElement>(null);
+
+  const downloadQr = useCallback((ref: React.RefObject<HTMLCanvasElement>, filename: string) => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const url = canvas.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+  }, []);
 
   if (isLoading) return null;
 
