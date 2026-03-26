@@ -147,7 +147,7 @@ export default function CreateImagePage() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ prompt: imgPrompt, preset: imgPreset }),
+          body: JSON.stringify({ prompt: imgPrompt, preset: imgPreset, language: captionLanguage }),
         }
       );
 
