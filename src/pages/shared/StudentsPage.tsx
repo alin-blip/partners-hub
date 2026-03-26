@@ -7,6 +7,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { EnrollStudentDialog } from "@/components/EnrollStudentDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -14,7 +15,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { format } from "date-fns";
-import { Download, Search, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { Download, Search, ChevronLeft, ChevronRight, Plus, Flame } from "lucide-react";
 
 const PAGE_SIZE = 20;
 const IMMIGRATION_OPTIONS = ["All", "Pre-settled", "Settled", "British Citizen", "Visa Holder", "Refugee", "Other"];
@@ -48,6 +49,23 @@ export default function StudentsPage() {
 
       if (error) throw error;
       return { students: data || [], total: count || 0 };
+    },
+  });
+
+  // Fetch urgent note counts
+  const { data: urgentCounts = {} } = useQuery({
+    queryKey: ["urgent-note-counts"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("student_notes")
+        .select("student_id")
+        .or("is_urgent.eq.true,note_type.in.(action_required,info_request)");
+      if (error) throw error;
+      const counts: Record<string, number> = {};
+      (data || []).forEach((n: any) => {
+        counts[n.student_id] = (counts[n.student_id] || 0) + 1;
+      });
+      return counts;
     },
   });
 
@@ -121,21 +139,34 @@ export default function StudentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {students.map((s: any) => (
-                <TableRow
-                  key={s.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => navigate(`${prefix}/students/${s.id}`)}
-                >
-                  <TableCell className="font-medium">{s.first_name} {s.last_name}</TableCell>
-                  <TableCell className="text-muted-foreground">{s.email || "—"}</TableCell>
-                  <TableCell className="text-muted-foreground">{s.phone || "—"}</TableCell>
-                  <TableCell>{s.immigration_status || "—"}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {s.created_at ? format(new Date(s.created_at), "dd MMM yyyy") : "—"}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {students.map((s: any) => {
+                const urgentCount = urgentCounts[s.id] || 0;
+                return (
+                  <TableRow
+                    key={s.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => navigate(`${prefix}/students/${s.id}`)}
+                  >
+                    <TableCell className="font-medium">
+                      <span className="flex items-center gap-2">
+                        {s.first_name} {s.last_name}
+                        {urgentCount > 0 && (
+                          <Badge className="text-[10px] bg-orange-500 text-white px-1.5 py-0 gap-0.5">
+                            <Flame className="w-2.5 h-2.5" />
+                            {urgentCount}
+                          </Badge>
+                        )}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{s.email || "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{s.phone || "—"}</TableCell>
+                    <TableCell>{s.immigration_status || "—"}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {s.created_at ? format(new Date(s.created_at), "dd MMM yyyy") : "—"}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
               {students.length === 0 && !isLoading && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
