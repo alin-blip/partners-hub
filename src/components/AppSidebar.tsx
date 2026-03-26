@@ -12,7 +12,7 @@ import {
   Brain,
   MessageSquare,
   Image as ImageIcon,
-  FileText,
+  
   MessageSquareHeart,
 } from "lucide-react";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
