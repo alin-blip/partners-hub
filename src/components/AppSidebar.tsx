@@ -18,6 +18,8 @@ import {
 import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Sidebar,
   SidebarContent,
@@ -32,7 +34,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 
-type NavItem = { title: string; url: string; icon: React.ElementType };
+type NavItem = { title: string; url: string; icon: React.ElementType; badge?: number };
 
 function SidebarNavGroup({ label, items, collapsed }: { label: string; items: NavItem[]; collapsed: boolean }) {
   if (items.length === 0) return null;
@@ -53,7 +55,12 @@ function SidebarNavGroup({ label, items, collapsed }: { label: string; items: Na
                   activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
                 >
                   <item.icon className="mr-2 h-4 w-4 shrink-0" />
-                  {!collapsed && <span>{item.title}</span>}
+                  {!collapsed && <span className="flex-1">{item.title}</span>}
+                  {item.badge && item.badge > 0 && (
+                    <span className="ml-auto inline-flex items-center justify-center rounded-full bg-accent text-accent-foreground text-[10px] font-bold min-w-[18px] h-[18px] px-1">
+                      {item.badge > 99 ? "99+" : item.badge}
+                    </span>
+                  )}
                 </NavLink>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -65,16 +72,41 @@ function SidebarNavGroup({ label, items, collapsed }: { label: string; items: Na
 }
 
 export function AppSidebar() {
-  const { role, profile, signOut } = useAuth();
+  const { user, role, profile, signOut } = useAuth();
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const prefix = role === "owner" ? "/owner" : role === "admin" ? "/admin" : "/agent";
+
+  // Unread messages count
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: ["unread-messages-count", user?.id],
+    queryFn: async () => {
+      if (!user) return 0;
+      // Get conversations where user is participant
+      const { data: convos } = await supabase
+        .from("direct_conversations")
+        .select("id")
+        .or(`participant_1.eq.${user.id},participant_2.eq.${user.id}`);
+      if (!convos || convos.length === 0) return 0;
+      const convoIds = convos.map((c: any) => c.id);
+      const { count, error } = await supabase
+        .from("direct_messages")
+        .select("id", { count: "exact", head: true })
+        .in("conversation_id", convoIds)
+        .neq("sender_id", user.id)
+        .is("read_at", null);
+      if (error) return 0;
+      return count || 0;
+    },
+    enabled: !!user,
+    refetchInterval: 30000, // poll every 30s
+  });
 
   const mainItems: NavItem[] = [
     { title: "Dashboard", url: `${prefix}/dashboard`, icon: LayoutDashboard },
     { title: "Students", url: `${prefix}/students`, icon: Users },
     { title: "Enrollments", url: `${prefix}/enrollments`, icon: ClipboardList },
-    { title: "Messages", url: `${prefix}/messages`, icon: Mail },
+    { title: "Messages", url: `${prefix}/messages`, icon: Mail, badge: unreadCount },
   ];
 
 
