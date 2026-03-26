@@ -1,54 +1,74 @@
 
 
-## Plan: User Feedback System
+## Plan: AI Document Processor for Settings
 
 ### Overview
-Add a feedback collection system accessible from the sidebar for all roles, with an owner-only page to review all submissions.
+Add a document upload + AI processing feature to Platform Settings. The owner uploads a document (PDF, Excel, image) received from a university, selects the data type (Courses, Timetable Options, Campuses, Intakes), and the AI extracts structured data. The owner then reviews, edits, and confirms before saving to the database.
 
-### 1. Database: `feedback` table
+### Architecture
 
-```sql
-CREATE TABLE public.feedback (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  category TEXT NOT NULL DEFAULT 'suggestion',
-  message TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'new'
-);
+```text
+Upload Doc → Edge Function (parse + AI extract) → Preview Table → Owner confirms → Save to DB
 ```
 
-RLS policies:
-- All authenticated users can INSERT (own feedback, `user_id = auth.uid()`)
-- All authenticated users can SELECT own feedback
-- Owner can SELECT/UPDATE all feedback
+### 1. New Edge Function: `process-settings-document`
 
-### 2. New page: `FeedbackPage.tsx` (owner only)
+- Accepts: file (base64 or form-data), `document_type` (courses/timetable/campuses/intakes), `university_id`
+- Uses Lovable AI (gemini-2.5-flash) to extract structured data based on document type
+- For PDFs: extract text content, send to AI for structured parsing
+- Returns JSON array of extracted items with fields matching the target table schema
 
-Path: `/owner/feedback`
+**AI prompt per type:**
+- **Courses**: extract `name`, `level`, `study_mode`
+- **Timetable Options**: extract `label` (group/pattern names with times)
+- **Campuses**: extract `name`, `city`
+- **Intakes**: extract `label`, `start_date`, `application_deadline`
 
-- Table showing all feedback with columns: Date, User (join profiles), Category, Message, Status
-- Filter by status (New / Reviewed / Done)
-- Owner can mark feedback as "Reviewed" or "Done"
+### 2. New Component: `DocumentProcessorDialog.tsx`
 
-### 3. Feedback dialog component: `FeedbackDialog.tsx`
+A dialog with a multi-step flow:
 
-- A dialog triggered from the sidebar menu item "Help us improve"
-- Fields: Category dropdown (Suggestion, Bug, Simplify, New Feature), Message textarea
-- Submits to `feedback` table
-- Toast confirmation on success
+**Step 1 - Upload**
+- File input (PDF, XLSX, images, DOCX)
+- Select document type (Courses, Timetable, Campuses, Intakes)
+- Select university
+- "Process" button
 
-### 4. Sidebar update: `AppSidebar.tsx`
+**Step 2 - Review**
+- Table showing extracted items with editable fields
+- Checkboxes to select/deselect individual items
+- Highlight duplicates (items that already exist in DB)
+- Edit inline before confirming
 
-- Add "Feedback" item with `MessageSquareHeart` icon in the footer area (visible to all roles)
-- For owner: also add "Feedback" in Management section linking to `/owner/feedback`
+**Step 3 - Confirm**
+- "Add Selected" button inserts checked items into the appropriate table
+- Toast with count of items added
+- Invalidate relevant queries
 
-### 5. Routes: `App.tsx`
+### 3. Integration in SettingsPage
 
-- Add `/owner/feedback` route pointing to `FeedbackPage`
+- Add an "Import from Document" button (with Upload icon) at the top of the Settings page, next to the page title
+- Opens `DocumentProcessorDialog` with the current active tab pre-selected as document type
+
+### 4. File Handling
+
+- Read file client-side, convert to base64
+- Send to edge function for AI processing
+- No permanent file storage needed (temporary processing only)
+- Support: PDF, XLSX, DOCX, JPG/PNG (for scanned timetables)
 
 ### Technical Details
-- The dialog opens inline from sidebar (no navigation needed for submitting)
-- Owner's management page is a separate route for reviewing all feedback
-- `feedback.status` allows owner to track which items have been addressed
+
+**Edge function** (`supabase/functions/process-settings-document/index.ts`):
+- Uses `pdf-parse` approach: receive base64 content + file type
+- For images/PDFs: send as content to Gemini with vision capabilities
+- System prompt tailored per document_type to extract the right schema
+- Returns `{ success: true, items: [...] }` with extracted data
+
+**Files to create:**
+- `supabase/functions/process-settings-document/index.ts`
+- `src/components/DocumentProcessorDialog.tsx`
+
+**Files to modify:**
+- `src/pages/owner/SettingsPage.tsx` (add import button)
 
