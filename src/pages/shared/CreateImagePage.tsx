@@ -28,6 +28,15 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 
+const LANGUAGES = [
+  { value: "Romanian", label: "🇷🇴 Română" },
+  { value: "English", label: "🇬🇧 English" },
+  { value: "Arabic", label: "🇸🇦 العربية" },
+  { value: "French", label: "🇫🇷 Français" },
+  { value: "Spanish", label: "🇪🇸 Español" },
+  { value: "Hindi", label: "🇮🇳 हिन्दी" },
+];
+
 const PRESETS = [
   { id: "social_post", label: "Social Media Post", desc: "1080×1080 square", icon: Square },
   { id: "story", label: "Story", desc: "1080×1920 vertical", icon: Smartphone },
