@@ -1,31 +1,37 @@
 
 
-## Fix: AI Image Generator "Unauthorized" Error
+## Plan: Add "Generate Caption" Button to Each Image
 
-### Problem
-The `generate-image` edge function throws "Unauthorized" because `userClient.auth.getUser()` fails. The function creates a user-scoped Supabase client but the `getUser()` call doesn't work correctly in the edge function context.
+Add a button on every generated image (both the latest result and gallery items) that calls AI to generate a social media caption in the EduForYou brand voice, using the image's original prompt and the brand DNA from `brand_settings`.
 
-### Solution
-Change the auth validation to use the `adminClient` (service role) to verify the JWT token instead of creating a separate user client. This is more reliable in edge functions.
+---
 
-### Changes
+### 1. New Edge Function: `generate-caption`
 
-**1. Fix `supabase/functions/generate-image/index.ts`**
-- Replace the user client auth pattern with admin client JWT verification
-- Use `adminClient.auth.getUser(token)` which passes the JWT directly and works reliably
-- Remove the unnecessary `userClient` creation
+**File:** `supabase/functions/generate-caption/index.ts`
 
-Before:
-```ts
-const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { ... });
-const { data: { user }, error } = await userClient.auth.getUser();
-```
+- Accepts `{ prompt, preset }` (the original image prompt and preset type)
+- Authenticates user via JWT (same pattern as `generate-image`)
+- Fetches `brand_settings.brand_prompt` for the brand DNA/voice
+- Calls Lovable AI (`google/gemini-3-flash-preview`) with a system prompt like:
 
-After:
-```ts
-const token = authHeader.replace("Bearer ", "");
-const { data: { user }, error } = await adminClient.auth.getUser(token);
-```
+> "You are the social media manager for EduForYou UK, an education recruitment agency. Write an engaging social media post caption for the following image. Use the brand voice described below. Include relevant hashtags. Keep it concise and compelling."
 
-This is a single-file fix. No database or frontend changes needed — the page already has routes for all roles (owner, admin, agent).
+- Returns `{ caption: string }`
+
+### 2. Update `CreateImagePage.tsx`
+
+- Add state: `captionLoading` (map of image id/url to boolean), `captions` (map of image id/url to string)
+- Add a `MessageSquare` (or `Type`) icon button next to the Download button on:
+  - The **Generated Result** card
+  - Each **Gallery** item
+- On click: call `generate-caption` edge function with the image's prompt and preset
+- Display the generated caption in a text area below the image, with a "Copy" button
+- Show loading spinner while generating
+
+### Technical Details
+
+- No database changes needed — captions are generated on-demand, not stored
+- Edge function uses the same auth pattern as `generate-image` (adminClient + token)
+- Brand voice comes from `brand_settings.brand_prompt` — same table already used by image generator
 
