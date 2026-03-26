@@ -508,6 +508,13 @@ function PromotionsSection({ deleteItem }: { deleteItem: any }) {
           <Input name="deadline" type="datetime-local" required defaultValue={defaults?.deadline ? defaults.deadline.slice(0, 16) : ""} />
         </div>
       </div>
+      <div className="space-y-2">
+        <Label>Target Role</Label>
+        <select name="target_role" className="w-full h-10 rounded-md border px-3 text-sm" defaultValue={defaults?.target_role || "agent"}>
+          <option value="agent">Agent (individual)</option>
+          <option value="admin">Admin (echipă)</option>
+        </select>
+      </div>
     </>
   );
 
