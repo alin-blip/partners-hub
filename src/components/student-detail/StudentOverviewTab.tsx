@@ -48,6 +48,7 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
       uk_entry_date: student.uk_entry_date || "", immigration_status: student.immigration_status || "",
       share_code: student.share_code || "", ni_number: student.ni_number || "",
       previous_funding_years: student.previous_funding_years?.toString() || "",
+      crn: (student as any).crn || "",
       study_pattern: student.study_pattern || "", qualifications: student.qualifications || "",
       notes: student.notes || "", next_of_kin_name: student.next_of_kin_name || "",
       next_of_kin_phone: student.next_of_kin_phone || "", next_of_kin_relationship: student.next_of_kin_relationship || "",
