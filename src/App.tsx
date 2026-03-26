@@ -27,6 +27,7 @@ import MessagesPage from "./pages/shared/MessagesPage";
 import DigitalCardPage from "./pages/shared/DigitalCardPage";
 
 import FeedbackPage from "./pages/owner/FeedbackPage";
+import LeadsPage from "./pages/owner/LeadsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -56,6 +57,7 @@ const App = () => (
             <Route path="/owner/commissions" element={<CommissionsPage />} />
             <Route path="/owner/knowledge-base" element={<KnowledgeBasePage />} />
             <Route path="/owner/ai-monitoring" element={<AIMonitoringPage />} />
+            <Route path="/owner/leads" element={<LeadsPage />} />
             
             <Route path="/owner/profile" element={<ProfilePage />} />
             <Route path="/owner/resources" element={<ResourcesPage />} />
