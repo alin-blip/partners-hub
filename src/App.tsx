@@ -78,6 +78,7 @@ const App = () => (
             <Route path="/agent/students" element={<StudentsPage />} />
             <Route path="/agent/students/:id" element={<StudentDetailPage />} />
             <Route path="/agent/enrollments" element={<EnrollmentsPage />} />
+            <Route path="/agent/messages" element={<MessagesPage />} />
             
             <Route path="/agent/profile" element={<ProfilePage />} />
             <Route path="/agent/resources" element={<ResourcesPage />} />
