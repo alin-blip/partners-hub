@@ -597,29 +597,7 @@ export default function SettingsPage() {
           </TabsList>
 
           <TabsContent value="universities" className="mt-4">
-            <CrudSection
-              title="Universities"
-              items={universities}
-              columns={["Name", "Active"]}
-              renderRow={(u) => (
-                <TableRow key={u.id}>
-                  <TableCell className="font-medium">{u.name}</TableCell>
-                  <TableCell>{u.is_active ? "Yes" : "No"}</TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="icon" onClick={() => deleteItem.mutate({ table: "universities", id: u.id })}>
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              )}
-              onAdd={(d) => addUni.mutate(d)}
-              addFields={
-                <div className="space-y-2">
-                  <Label>Name</Label>
-                  <Input name="name" required placeholder="University name" />
-                </div>
-              }
-            />
+            <UniversitiesSection universities={universities} addUni={addUni} deleteItem={deleteItem} />
           </TabsContent>
 
           <TabsContent value="campuses" className="mt-4">
