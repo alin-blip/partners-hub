@@ -85,9 +85,24 @@ export default function LeadsPage() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const saveNotes = useMutation({
+    mutationFn: async ({ id, notes }: { id: string; notes: string }) => {
+      const { error } = await supabase
+        .from("leads")
+        .update({ notes } as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["leads"] });
+      toast({ title: "Notes saved" });
+      setNotesLead(null);
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   const convertToStudent = useMutation({
     mutationFn: async (lead: any) => {
-      // Create student record
       const { data: student, error: studentErr } = await supabase.from("students").insert({
         agent_id: lead.agent_id,
         first_name: lead.first_name,
@@ -99,7 +114,6 @@ export default function LeadsPage() {
       }).select("id").single();
       if (studentErr) throw studentErr;
 
-      // If lead has university + course, also create enrollment
       if (lead.university_id && lead.course_id && student) {
         const { error: enrollErr } = await supabase.from("enrollments").insert({
           student_id: student.id,
@@ -112,7 +126,6 @@ export default function LeadsPage() {
         if (enrollErr) console.error("Enrollment creation failed:", enrollErr);
       }
 
-      // Update lead status to converted
       const { error: updateErr } = await supabase
         .from("leads")
         .update({ status: "converted" } as any)
