@@ -493,6 +493,111 @@ function PromotionsSection({ deleteItem }: { deleteItem: any }) {
   );
 }
 
+function UniversitiesSection({ universities, addUni, deleteItem }: { universities: any[]; addUni: any; deleteItem: any }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [addOpen, setAddOpen] = useState(false);
+
+  const toggleTimetable = useMutation({
+    mutationFn: async ({ id, timetable_available }: { id: string; timetable_available: boolean }) => {
+      const { error } = await supabase.from("universities").update({ timetable_available } as any).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["universities"] }); },
+  });
+
+  const updateMessage = useMutation({
+    mutationFn: async ({ id, timetable_message }: { id: string; timetable_message: string }) => {
+      const { error } = await supabase.from("universities").update({ timetable_message: timetable_message || null } as any).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["universities"] }); toast({ title: "Message saved" }); },
+  });
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-3">
+        <CardTitle className="text-base">Universities</CardTitle>
+        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90">
+              <Plus className="w-3 h-3 mr-1" /> Add
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Add University</DialogTitle></DialogHeader>
+            <form className="space-y-4 pt-2" onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              addUni.mutate(Object.fromEntries(formData));
+              setAddOpen(false);
+            }}>
+              <div className="space-y-2">
+                <Label>Name</Label>
+                <Input name="name" required placeholder="University name" />
+              </div>
+              <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">Save</Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </CardHeader>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Active</TableHead>
+              <TableHead>Timetable Available</TableHead>
+              <TableHead>Timetable Message</TableHead>
+              <TableHead className="w-16" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {universities.map((u: any) => (
+              <TableRow key={u.id}>
+                <TableCell className="font-medium">{u.name}</TableCell>
+                <TableCell>{u.is_active ? "Yes" : "No"}</TableCell>
+                <TableCell>
+                  <Switch
+                    checked={u.timetable_available !== false}
+                    onCheckedChange={(checked) => toggleTimetable.mutate({ id: u.id, timetable_available: checked })}
+                  />
+                </TableCell>
+                <TableCell>
+                  {u.timetable_available === false && (
+                    <div className="flex gap-2">
+                      <Input
+                        defaultValue={u.timetable_message || ""}
+                        placeholder="e.g. Studentul își alege programul după test"
+                        className="text-xs h-8"
+                        onBlur={(e) => {
+                          if (e.target.value !== (u.timetable_message || "")) {
+                            updateMessage.mutate({ id: u.id, timetable_message: e.target.value });
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Button variant="ghost" size="icon" onClick={() => deleteItem.mutate({ table: "universities", id: u.id })}>
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+            {universities.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center text-muted-foreground py-6">No universities yet</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
