@@ -220,8 +220,8 @@ export default function CreateImagePage() {
               />
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-4">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className="flex items-center gap-2">
@@ -242,6 +242,20 @@ export default function CreateImagePage() {
                     </TooltipContent>
                   )}
                 </Tooltip>
+
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm whitespace-nowrap">Caption language:</Label>
+                  <Select value={captionLanguage} onValueChange={setCaptionLanguage}>
+                    <SelectTrigger className="w-[140px] h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LANGUAGES.map((l) => (
+                        <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <Button
