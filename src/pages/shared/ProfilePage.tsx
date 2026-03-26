@@ -208,7 +208,12 @@ export default function ProfilePage() {
             </form>
           </CardContent>
         </Card>
+
+        {/* Digital Card Settings */}
+        <CardSettingsSection />
       </div>
     </DashboardLayout>
+  );
+}
   );
 }
