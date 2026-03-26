@@ -13,7 +13,9 @@ import {
   MessageSquare,
   Image as ImageIcon,
   FileText,
+  MessageSquareHeart,
 } from "lucide-react";
+import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
 import {
