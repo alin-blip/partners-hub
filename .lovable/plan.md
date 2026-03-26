@@ -1,40 +1,58 @@
 
 
-## Plan: Personalized Promo Banner with Agent Progress
+## Plan: Admin Team Promo Banner
 
 ### What changes
-The PromoBanner will show each agent's individual progress toward the promotion target — e.g., "2/5 students · Mai ai 3" — by counting their qualifying enrollments (status = `offer_received`, `accepted`, `enrolled`, `active`) created during the promo period.
+Add support for **admin-level promotions** — team-based targets (e.g., "20 enrollments from your team = £1000 bonus"). The `PromoBanner` will work for both agents (personal target) and admins (team target).
 
 ### Database
-**New table: `agent_promotions`** — tracks when each agent joins a promo (their personal 30-day timer starts then):
 
+**Add columns to `promotions` table:**
+- `target_role` (text, default `'agent'`) — determines if promo is for agents or admins
+- When `target_role = 'admin'`, the target counts team enrollments instead of personal ones
+
+**Extend `agent_promotions` table** to also work for admins (the table name stays, but admins can also have records — the `agent_id` column works for any user ID).
+
+No new tables needed — reuse existing `promotions` + `agent_promotions`.
+
+### Migration SQL
 ```sql
-CREATE TABLE public.agent_promotions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  promotion_id uuid NOT NULL,
-  agent_id uuid NOT NULL,
-  started_at timestamptz NOT NULL DEFAULT now(),
-  personal_deadline timestamptz NOT NULL,
-  UNIQUE(promotion_id, agent_id)
-);
--- RLS: agents read own, owner/admin read all
+ALTER TABLE public.promotions 
+  ADD COLUMN target_role text NOT NULL DEFAULT 'agent';
 ```
 
-When an agent first sees the promo, auto-insert a row with `personal_deadline = now() + 30 days`. The countdown timer uses this personal deadline instead of the global one.
+### PromoBanner.tsx changes
 
-### PromoBanner changes
+1. **Remove `if (role !== "agent") return null`** — allow both agent and admin
+2. **Fetch TWO promos** — one where `target_role = role` (agent gets agent promos, admin gets admin promos)
+3. **For admin qualifying count**: count enrollments from the admin's team agents (students where `agent_id` is in the admin's team), not just their own
+4. **Auto-create `agent_promotions` record** for admins too (same 30-day personal deadline logic)
+5. Keep the same visual design — progress bar, countdown, congratulations state
 
-1. **Fetch agent's personal promo record** — if none exists, auto-create one (upsert on first view)
-2. **Count qualifying enrollments** — query enrollments for this agent's students created after `started_at` with status in (`offer_received`, `accepted`, `enrolled`, `active`)
-3. **Show progress**: Replace the generic target text with:
-   - Progress bar or fraction: `🎯 2/5 students · Mai ai 3`
-   - Countdown uses `personal_deadline` instead of global `deadline`
-4. **If target reached**, show a congratulations state instead
+### Admin enrollment counting logic
+```typescript
+// For admin: get team agent IDs first, then count enrollments for their students
+const { data: teamAgents } = await supabase
+  .from("profiles")
+  .select("id")
+  .eq("admin_id", user.id);
+
+const agentIds = teamAgents?.map(a => a.id) || [];
+
+const { count } = await supabase
+  .from("enrollments")
+  .select("id, students!inner(agent_id)", { count: "exact", head: true })
+  .in("students.agent_id", agentIds)
+  .in("status", QUALIFYING_STATUSES)
+  .gte("created_at", agentPromo.started_at)
+  .lte("created_at", agentPromo.personal_deadline);
+```
+
+### Owner Settings page
+The existing `PromotionsSection` in `SettingsPage.tsx` needs a new field to select `target_role` (agent or admin) when creating/editing a promotion.
 
 ### Files to modify
-- `src/components/PromoBanner.tsx` — add auth context, fetch personal promo + enrollment count, show progress
-- New migration for `agent_promotions` table
-
-### No other files affected
-The banner is already used in `AgentDashboard.tsx`. Owner/admin dashboards don't show it (they don't have the agent role check).
+- New migration — add `target_role` column to `promotions`
+- `src/components/PromoBanner.tsx` — support both roles, team counting for admin
+- `src/pages/owner/SettingsPage.tsx` — add `target_role` dropdown in promotions CRUD
 
