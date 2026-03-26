@@ -55,6 +55,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
   const [shareCode, setShareCode] = useState("");
   const [niNumber, setNiNumber] = useState("");
   const [previousFundingYears, setPreviousFundingYears] = useState("");
+  const [crn, setCrn] = useState("");
   const [qualifications, setQualifications] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -74,7 +75,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
     setTitle(""); setFirstName(""); setLastName(""); setNationality(""); setGender("");
     setDob(""); setEmail(""); setPhone(""); setFullAddress("");
     setUkEntryDate(""); setImmigrationStatus(""); setShareCode(""); setNiNumber("");
-    setPreviousFundingYears(""); setQualifications(""); setNotes("");
+    setPreviousFundingYears(""); setCrn(""); setQualifications(""); setNotes("");
     setNokName(""); setNokPhone(""); setNokRelationship("");
     setDocFiles([]); setSelectedDocType("Passport");
   };
@@ -133,6 +134,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
           uk_entry_date: ukEntryDate || null, immigration_status: immigrationStatus || null,
           share_code: shareCode || null, ni_number: niNumber || null,
           previous_funding_years: previousFundingYears ? parseInt(previousFundingYears) : null,
+          crn: crn || null,
           study_pattern: studyPattern.length > 0 ? studyPattern.join(", ") : null,
           qualifications: qualifications || null, notes: notes || null,
           next_of_kin_name: nokName || null, next_of_kin_phone: nokPhone || null,
@@ -280,6 +282,13 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
               <div className="space-y-2"><Label>NI Number</Label><Input value={niNumber} onChange={(e) => setNiNumber(e.target.value)} placeholder="e.g. QQ 12 34 56 C" /></div>
               <div className="space-y-2"><Label>Previous Funding (years)</Label><Input type="number" min="0" value={previousFundingYears} onChange={(e) => setPreviousFundingYears(e.target.value)} placeholder="0" /></div>
             </div>
+            {previousFundingYears && parseInt(previousFundingYears) > 0 && (
+              <div className="space-y-2">
+                <Label>CRN (Customer Reference Number)</Label>
+                <Input value={crn} onChange={(e) => setCrn(e.target.value)} placeholder="e.g. 1234567890" />
+                <p className="text-xs text-muted-foreground">Numărul de referință SFE al studentului</p>
+              </div>
+            )}
             <div className="space-y-2"><Label>Qualifications</Label><Textarea value={qualifications} onChange={(e) => setQualifications(e.target.value)} placeholder="Previous qualifications…" /></div>
             <div className="space-y-2"><Label>Notes</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Additional notes…" /></div>
             <div className="flex justify-between pt-2">

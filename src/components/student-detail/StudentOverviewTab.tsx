@@ -48,6 +48,7 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
       uk_entry_date: student.uk_entry_date || "", immigration_status: student.immigration_status || "",
       share_code: student.share_code || "", ni_number: student.ni_number || "",
       previous_funding_years: student.previous_funding_years?.toString() || "",
+      crn: (student as any).crn || "",
       study_pattern: student.study_pattern || "", qualifications: student.qualifications || "",
       notes: student.notes || "", next_of_kin_name: student.next_of_kin_name || "",
       next_of_kin_phone: student.next_of_kin_phone || "", next_of_kin_relationship: student.next_of_kin_relationship || "",
@@ -63,6 +64,7 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
       uk_entry_date: editData.uk_entry_date || null, immigration_status: editData.immigration_status || null,
       share_code: editData.share_code || null, ni_number: editData.ni_number || null,
       previous_funding_years: editData.previous_funding_years ? parseInt(editData.previous_funding_years) : null,
+      crn: editData.crn || null,
       study_pattern: editData.study_pattern || null, qualifications: editData.qualifications || null,
       notes: editData.notes || null, next_of_kin_name: editData.next_of_kin_name || null,
       next_of_kin_phone: editData.next_of_kin_phone || null, next_of_kin_relationship: editData.next_of_kin_relationship || null,
@@ -121,6 +123,13 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
             <div className="space-y-2"><Label>Share Code</Label><Input value={editData.share_code} onChange={(e) => setEditData({ ...editData, share_code: e.target.value })} /></div>
             <div className="space-y-2"><Label>NI Number</Label><Input value={editData.ni_number} onChange={(e) => setEditData({ ...editData, ni_number: e.target.value })} /></div>
             <div className="space-y-2"><Label>Previous Funding (years)</Label><Input type="number" min="0" value={editData.previous_funding_years} onChange={(e) => setEditData({ ...editData, previous_funding_years: e.target.value })} /></div>
+            {editData.previous_funding_years && parseInt(editData.previous_funding_years) > 0 && (
+              <div className="space-y-2">
+                <Label>CRN (Customer Reference Number)</Label>
+                <Input value={editData.crn} onChange={(e) => setEditData({ ...editData, crn: e.target.value })} placeholder="e.g. 1234567890" />
+                <p className="text-xs text-muted-foreground">Numărul de referință SFE al studentului</p>
+              </div>
+            )}
             <div className="space-y-2"><Label>Study Pattern</Label><Input value={editData.study_pattern} onChange={(e) => setEditData({ ...editData, study_pattern: e.target.value })} /></div>
             <div className="space-y-2 sm:col-span-2"><Label>Qualifications</Label><Textarea value={editData.qualifications} onChange={(e) => setEditData({ ...editData, qualifications: e.target.value })} /></div>
             <div className="space-y-2 sm:col-span-2"><Label>Notes</Label><Textarea value={editData.notes} onChange={(e) => setEditData({ ...editData, notes: e.target.value })} /></div>
@@ -148,6 +157,7 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
               {student.share_code && <div><p className="text-muted-foreground text-xs mb-0.5">Share Code</p><p className="font-medium">{student.share_code}</p></div>}
               {student.ni_number && <div><p className="text-muted-foreground text-xs mb-0.5">NI Number</p><p className="font-medium">{student.ni_number}</p></div>}
               {student.previous_funding_years != null && <div><p className="text-muted-foreground text-xs mb-0.5">Previous Funding</p><p className="font-medium">{student.previous_funding_years} year(s)</p></div>}
+              {(student as any).crn && <div><p className="text-muted-foreground text-xs mb-0.5">CRN</p><p className="font-medium">{(student as any).crn}</p></div>}
               {student.study_pattern && <div><p className="text-muted-foreground text-xs mb-0.5">Study Pattern</p><p className="font-medium">{student.study_pattern}</p></div>}
               <div><p className="text-muted-foreground text-xs mb-0.5">Qualifications</p><p className="font-medium">{student.qualifications || "—"}</p></div>
               <div><p className="text-muted-foreground text-xs mb-0.5">Agent</p><p className="font-medium">{agentName || "—"}</p></div>
