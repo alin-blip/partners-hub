@@ -21,6 +21,7 @@ import StudentDetailPage from "./pages/shared/StudentDetailPage";
 import ProfilePage from "./pages/shared/ProfilePage";
 import ResourcesPage from "./pages/shared/ResourcesPage";
 import CreateImagePage from "./pages/shared/CreateImagePage";
+import UnsubscribePage from "./pages/shared/UnsubscribePage";
 
 import FeedbackPage from "./pages/owner/FeedbackPage";
 import NotFound from "./pages/NotFound";
@@ -38,6 +39,7 @@ const App = () => (
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<Login />} />
             <Route path="/card/:slug" element={<AgentCardPage />} />
+            <Route path="/unsubscribe" element={<UnsubscribePage />} />
             
             {/* Owner routes */}
             <Route path="/owner/dashboard" element={<OwnerDashboard />} />

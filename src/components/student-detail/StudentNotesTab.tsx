@@ -31,20 +31,54 @@ const ENROLLMENT_STATUSES = [
 
 interface Props {
   studentId: string;
+  studentName?: string;
   canSendRequests: boolean;
 }
 
-export function StudentNotesTab({ studentId, canSendRequests }: Props) {
+async function sendNoteEmailToAgent(studentId: string, studentName: string, noteType: string, content: string, authorName: string) {
+  try {
+    // Fetch student's agent_id
+    const { data: student } = await supabase
+      .from("students")
+      .select("agent_id")
+      .eq("id", studentId)
+      .single();
+    if (!student?.agent_id) return;
+
+    // Fetch agent email
+    const { data: agent } = await supabase
+      .from("profiles")
+      .select("email")
+      .eq("id", student.agent_id)
+      .single();
+    if (!agent?.email) return;
+
+    const noteId = crypto.randomUUID();
+    const studentUrl = `${window.location.origin}/agent/students/${studentId}`;
+
+    await supabase.functions.invoke("send-transactional-email", {
+      body: {
+        templateName: "note-notification",
+        recipientEmail: agent.email,
+        idempotencyKey: `note-${noteId}`,
+        templateData: { studentName, noteType, content, authorName, studentUrl },
+      },
+    });
+  } catch (err) {
+    console.error("Failed to send note email:", err);
+  }
+}
+
+export function StudentNotesTab({ studentId, studentName, canSendRequests }: Props) {
   const { user, role } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
   const [content, setContent] = useState("");
   const [noteType, setNoteType] = useState("note");
   const [isUrgent, setIsUrgent] = useState(false);
-
-  // Quick status changer state
   const [newStatus, setNewStatus] = useState("");
   const [statusNote, setStatusNote] = useState("");
+  const [selectedEnrollment, setSelectedEnrollment] = useState("");
 
   const { data: notes = [] } = useQuery({
     queryKey: ["student-notes", studentId],
@@ -58,7 +92,19 @@ export function StudentNotesTab({ studentId, canSendRequests }: Props) {
     },
   });
 
-  // Fetch enrollments for quick status changer
+  const { data: profile } = useQuery({
+    queryKey: ["my-profile"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user!.id)
+        .single();
+      return data;
+    },
+    enabled: !!user,
+  });
+
   const { data: enrollments = [] } = useQuery({
     queryKey: ["student-enrollments-for-notes", studentId],
     queryFn: async () => {
@@ -85,6 +131,16 @@ export function StudentNotesTab({ studentId, canSendRequests }: Props) {
       if (error) throw error;
     },
     onSuccess: () => {
+      // Send email for urgent or action_required notes
+      if (isUrgent || noteType === "action_required" || noteType === "info_request") {
+        sendNoteEmailToAgent(
+          studentId,
+          studentName || "Student",
+          noteType,
+          content,
+          profile?.full_name || "Admin",
+        );
+      }
       qc.invalidateQueries({ queryKey: ["student-notes", studentId] });
       setContent("");
       setNoteType("note");
@@ -127,8 +183,6 @@ export function StudentNotesTab({ studentId, canSendRequests }: Props) {
     ? ["note", "document_request", "funding_update", "info_request", "action_required"]
     : ["note"];
 
-  const [selectedEnrollment, setSelectedEnrollment] = useState("");
-
   return (
     <div className="space-y-4">
       {/* Quick Status Changer — owner/admin only */}
@@ -153,18 +207,16 @@ export function StudentNotesTab({ studentId, canSendRequests }: Props) {
                 </SelectContent>
               </Select>
               {selectedEnrollment && (
-                <>
-                  <Select value={newStatus} onValueChange={setNewStatus}>
-                    <SelectTrigger className="w-[180px] h-9"><SelectValue placeholder="New status…" /></SelectTrigger>
-                    <SelectContent>
-                      {ENROLLMENT_STATUSES.map((s) => (
-                        <SelectItem key={s} value={s}>
-                          <StatusBadge status={s} />
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </>
+                <Select value={newStatus} onValueChange={setNewStatus}>
+                  <SelectTrigger className="w-[180px] h-9"><SelectValue placeholder="New status…" /></SelectTrigger>
+                  <SelectContent>
+                    {ENROLLMENT_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        <StatusBadge status={s} />
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
             </div>
             {selectedEnrollment && newStatus && (
@@ -195,7 +247,6 @@ export function StudentNotesTab({ studentId, canSendRequests }: Props) {
       <Card>
         <CardHeader><CardTitle className="text-base">Notes & Activity</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          {/* Add note form */}
           <div className="space-y-3 border rounded-lg p-4 bg-muted/20">
             <div className="flex items-center gap-2 flex-wrap">
               {canSendRequests && (
@@ -235,7 +286,6 @@ export function StudentNotesTab({ studentId, canSendRequests }: Props) {
             </div>
           </div>
 
-          {/* Notes list */}
           {notes.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">No notes yet</p>
           ) : (

@@ -85,7 +85,7 @@ export default function StudentDetailPage() {
           </TabsContent>
 
           <TabsContent value="notes">
-            <StudentNotesTab studentId={student.id} canSendRequests={canChangeStatus} />
+            <StudentNotesTab studentId={student.id} studentName={`${student.first_name} ${student.last_name}`} canSendRequests={canChangeStatus} />
           </TabsContent>
         </Tabs>
       </div>
