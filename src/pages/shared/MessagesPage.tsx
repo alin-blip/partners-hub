@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { Send, Plus, MessageCircle, Search } from "lucide-react";
+import { MentionTextarea } from "@/components/MentionTextarea";
 import { format } from "date-fns";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
@@ -153,6 +154,21 @@ export default function MessagesPage() {
     return 0;
   };
 
+  // Render @mentions as highlighted spans
+  const renderMessageContent = (content: string, isMine: boolean) => {
+    const parts = content.split(/(@[\p{L}\p{N}]+(?: [\p{L}\p{N}]+)*)/u);
+    return parts.map((part, i) => {
+      if (part.startsWith("@") && part.length > 1) {
+        return (
+          <span key={i} className={`font-semibold ${isMine ? "text-accent-foreground" : "text-accent"}`}>
+            {part}
+          </span>
+        );
+      }
+      return part;
+    });
+  };
+
   const getInitials = (name?: string) => {
     if (!name) return "?";
     return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
@@ -283,7 +299,9 @@ export default function MessagesPage() {
                         <div className={`max-w-[70%] rounded-lg px-3 py-2 ${
                           isMine ? "bg-accent text-accent-foreground" : "bg-muted"
                         }`}>
-                          <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                          <p className="text-sm whitespace-pre-wrap">
+                            {renderMessageContent(msg.content, isMine)}
+                          </p>
                           <p className={`text-[10px] mt-1 ${isMine ? "text-accent-foreground/60" : "text-muted-foreground"}`}>
                             {format(new Date(msg.created_at), "HH:mm")}
                           </p>
@@ -301,10 +319,10 @@ export default function MessagesPage() {
                   onSubmit={(e) => { e.preventDefault(); sendMessage.mutate(); }}
                   className="flex gap-2"
                 >
-                  <Textarea
+                  <MentionTextarea
                     value={messageText}
-                    onChange={(e) => setMessageText(e.target.value)}
-                    placeholder="Type a message…"
+                    onChange={setMessageText}
+                    placeholder="Type a message… Use @ to mention a student"
                     rows={1}
                     className="resize-none min-h-[40px]"
                     onKeyDown={(e) => {
