@@ -135,7 +135,7 @@ export default function AgentCardPage() {
     { url: settings.social_instagram, icon: SiInstagram, label: "Instagram" },
     { url: settings.social_youtube, icon: SiYoutube, label: "YouTube" },
     { url: settings.social_facebook, icon: SiFacebook, label: "Facebook" },
-    { url: settings.social_linkedin, icon: SiLinkedin, label: "LinkedIn" },
+    { url: settings.social_linkedin, icon: FaLinkedinIn, label: "LinkedIn" },
     { url: settings.social_tiktok, icon: SiTiktok, label: "TikTok" },
   ].filter(s => s.url);
 
