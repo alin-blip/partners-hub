@@ -58,6 +58,7 @@ export default function EnrollStudent() {
   const [previousFundingYears, setPreviousFundingYears] = useState("");
   const [qualifications, setQualifications] = useState("");
   const [notes, setNotes] = useState("");
+  const [crn, setCrn] = useState("");
 
   // Step 3
   const [nokName, setNokName] = useState("");
