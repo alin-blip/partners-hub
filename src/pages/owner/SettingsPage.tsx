@@ -586,7 +586,7 @@ function PromotionsSection({ deleteItem }: { deleteItem: any }) {
             ))}
             {promotions.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-6">No promotions yet</TableCell>
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-6">No promotions yet</TableCell>
               </TableRow>
             )}
           </TableBody>
