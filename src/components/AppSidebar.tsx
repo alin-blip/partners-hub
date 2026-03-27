@@ -111,6 +111,7 @@ export function AppSidebar() {
     { title: "Leads", url: `${prefix}/leads`, icon: ContactRound },
     { title: "Enrollments", url: `${prefix}/enrollments`, icon: ClipboardList },
     { title: "Messages", url: `${prefix}/messages`, icon: Mail, badge: unreadCount },
+    { title: "Tasks", url: `${prefix}/tasks`, icon: ListTodo },
   ];
 
 
