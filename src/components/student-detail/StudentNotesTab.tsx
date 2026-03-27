@@ -168,6 +168,9 @@ export function StudentNotesTab({ studentId, studentName, canSendRequests }: Pro
 
   const updateStatusAndLog = useMutation({
     mutationFn: async ({ enrollmentId, status, note }: { enrollmentId: string; status: string; note: string }) => {
+      // Capture old status before updating
+      const { data: current } = await supabase.from("enrollments").select("status").eq("id", enrollmentId).single();
+      const oldStatus = current?.status || "unknown";
       const { error: updateErr } = await supabase.from("enrollments").update({ status }).eq("id", enrollmentId);
       if (updateErr) throw updateErr;
       const { error: noteErr } = await supabase.from("student_notes").insert({
@@ -176,13 +179,15 @@ export function StudentNotesTab({ studentId, studentName, canSendRequests }: Pro
         note_type: "status_update", is_agent_visible: true, is_urgent: false,
       } as any);
       if (noteErr) throw noteErr;
+      return { enrollmentId, status, oldStatus };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ["student-notes", studentId] });
       qc.invalidateQueries({ queryKey: ["student-enrollments", studentId] });
       qc.invalidateQueries({ queryKey: ["student-enrollments-for-notes", studentId] });
       setNewStatus(""); setStatusNote("");
       toast({ title: "Status updated & logged" });
+      notifyAgentOfStatusChange(result.enrollmentId, result.status, result.oldStatus, profile?.full_name);
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });

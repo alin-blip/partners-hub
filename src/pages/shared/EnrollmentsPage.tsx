@@ -163,7 +163,7 @@ export default function EnrollmentsPage() {
                     {canEdit ? (
                       <Select
                         value={e.status}
-                        onValueChange={(v) => updateStatus.mutate({ id: e.id, status: v })}
+                        onValueChange={(v) => updateStatus.mutate({ id: e.id, status: v, oldStatus: e.status })}
                       >
                         <SelectTrigger className="w-[180px] h-8">
                           <StatusBadge status={e.status} />
