@@ -16,8 +16,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format, isPast, isToday } from "date-fns";
-import { Plus, CalendarIcon, GripVertical, Clock } from "lucide-react";
+import { Plus, CalendarIcon, GripVertical, Clock, GraduationCap, User, UserCheck } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 type Task = {
   id: string;
@@ -30,6 +31,8 @@ type Task = {
   deadline: string | null;
   created_at: string;
   updated_at: string;
+  source: string;
+  student_id: string | null;
 };
 
 type Profile = { id: string; full_name: string };
@@ -49,7 +52,9 @@ const priorityConfig: Record<string, { label: string; variant: "default" | "seco
 export default function TasksPage() {
   const { user, role } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const canManage = role === "owner" || role === "admin";
+  const prefix = role === "owner" ? "/owner" : role === "admin" ? "/admin" : "/agent";
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editTask, setEditTask] = useState<Task | null>(null);
@@ -83,7 +88,7 @@ export default function TasksPage() {
     },
   });
 
-  // Fetch agents/profiles for assignment dropdown
+  // Fetch profiles for all roles (to show names on cards)
   const { data: profiles = [] } = useQuery({
     queryKey: ["task-assignable-profiles"],
     queryFn: async () => {
@@ -95,8 +100,33 @@ export default function TasksPage() {
       if (error) throw error;
       return data as Profile[];
     },
-    enabled: canManage,
   });
+
+  // Fetch student names for student_note tasks
+  const studentIds = useMemo(() => {
+    const ids = tasks.filter(t => t.student_id).map(t => t.student_id!);
+    return [...new Set(ids)];
+  }, [tasks]);
+
+  const { data: students = [] } = useQuery({
+    queryKey: ["task-students", studentIds],
+    queryFn: async () => {
+      if (studentIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("students")
+        .select("id, first_name, last_name")
+        .in("id", studentIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: studentIds.length > 0,
+  });
+
+  const studentMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    students.forEach((s: any) => (map[s.id] = `${s.first_name} ${s.last_name}`));
+    return map;
+  }, [students]);
 
   // Create task
   const createMutation = useMutation({
@@ -105,10 +135,11 @@ export default function TasksPage() {
         title,
         description: description || null,
         priority,
-        assigned_to: assignedTo || null,
+        assigned_to: canManage ? (assignedTo || null) : user!.id,
         created_by: user!.id,
         deadline: deadline ? deadline.toISOString() : null,
-      });
+        source: "manual",
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -203,23 +234,6 @@ export default function TasksPage() {
     setDeadline(task.deadline ? new Date(task.deadline) : undefined);
   };
 
-  const handleSaveEdit = () => {
-    if (!editTask) return;
-    if (canManage) {
-      updateTaskMutation.mutate({
-        id: editTask.id,
-        title,
-        description: description || null,
-        priority,
-        assigned_to: assignedTo || null,
-        deadline: deadline ? deadline.toISOString() : null,
-      });
-    } else {
-      // Agent can only update status
-      updateTaskMutation.mutate({ id: editTask.id, status: editTask.status });
-    }
-  };
-
   const getInitials = (name: string) =>
     name
       .split(" ")
@@ -228,6 +242,34 @@ export default function TasksPage() {
       .toUpperCase()
       .slice(0, 2);
 
+  const canDeleteTask = (task: Task) => {
+    if (canManage) return true;
+    // Agent can delete own personal tasks
+    return task.created_by === user?.id && task.source === "manual";
+  };
+
+  const getSourceBadge = (task: Task) => {
+    if (task.source === "student_note") {
+      return (
+        <Badge variant="outline" className="text-[10px] gap-0.5 bg-accent/10 text-accent border-accent/30">
+          <GraduationCap className="h-2.5 w-2.5" />
+          {task.student_id && studentMap[task.student_id]
+            ? studentMap[task.student_id]
+            : "Student"}
+        </Badge>
+      );
+    }
+    if (!canManage) return null; // Agent doesn't need personal/assigned badge — all their tasks are "theirs"
+    if (task.created_by === user?.id && task.assigned_to === user?.id) {
+      return (
+        <Badge variant="outline" className="text-[10px] gap-0.5">
+          <User className="h-2.5 w-2.5" /> Personal
+        </Badge>
+      );
+    }
+    return null;
+  };
+
   return (
     <DashboardLayout>
       <div className="p-4 md:p-6 space-y-4">
@@ -235,13 +277,13 @@ export default function TasksPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Tasks</h1>
-            <p className="text-sm text-muted-foreground">Manage and track team tasks</p>
+            <p className="text-sm text-muted-foreground">
+              {canManage ? "Manage and track team tasks" : "Your tasks and to-dos"}
+            </p>
           </div>
-          {canManage && (
-            <Button onClick={() => { resetForm(); setCreateOpen(true); }}>
-              <Plus className="h-4 w-4 mr-2" /> New Task
-            </Button>
-          )}
+          <Button onClick={() => { resetForm(); setCreateOpen(true); }}>
+            <Plus className="h-4 w-4 mr-2" /> New Task
+          </Button>
         </div>
 
         {/* Kanban Board */}
@@ -273,6 +315,7 @@ export default function TasksPage() {
 
                 {tasksByStatus[col.key]?.map((task) => {
                   const isOverdue = task.deadline && isPast(new Date(task.deadline)) && !isToday(new Date(task.deadline)) && task.status !== "done";
+                  const sourceBadge = getSourceBadge(task);
                   return (
                     <Card
                       key={task.id}
@@ -294,6 +337,21 @@ export default function TasksPage() {
                               {priorityConfig[task.priority]?.label || task.priority}
                             </Badge>
                           </div>
+
+                          {sourceBadge && <div>{sourceBadge}</div>}
+
+                          {task.source === "student_note" && task.student_id && studentMap[task.student_id] && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`${prefix}/students/${task.student_id}`);
+                              }}
+                              className="text-[11px] text-accent hover:underline flex items-center gap-1"
+                            >
+                              <GraduationCap className="h-3 w-3" />
+                              View Student
+                            </button>
+                          )}
 
                           <div className="flex items-center justify-between gap-2">
                             {task.assigned_to && profileMap[task.assigned_to] ? (
@@ -318,6 +376,14 @@ export default function TasksPage() {
                               </div>
                             )}
                           </div>
+
+                          {/* Show who assigned it (for agents seeing assigned tasks) */}
+                          {!canManage && task.source !== "manual" && task.created_by !== user?.id && profileMap[task.created_by] && (
+                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                              <UserCheck className="h-2.5 w-2.5" />
+                              Assigned by {profileMap[task.created_by]}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </Card>
@@ -339,7 +405,7 @@ export default function TasksPage() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create Task</DialogTitle>
+            <DialogTitle>{canManage ? "Create Task" : "Add Personal To-Do"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -362,17 +428,19 @@ export default function TasksPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label>Assigned To</Label>
-                <Select value={assignedTo} onValueChange={setAssignedTo}>
-                  <SelectTrigger><SelectValue placeholder="Select agent" /></SelectTrigger>
-                  <SelectContent>
-                    {profiles.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {canManage && (
+                <div>
+                  <Label>Assigned To</Label>
+                  <Select value={assignedTo} onValueChange={setAssignedTo}>
+                    <SelectTrigger><SelectValue placeholder="Select agent" /></SelectTrigger>
+                    <SelectContent>
+                      {profiles.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
             <div>
               <Label>Deadline</Label>
@@ -474,6 +542,30 @@ export default function TasksPage() {
                     <p className="text-sm font-medium">{editTask.title}</p>
                     {editTask.description && <p className="text-sm text-muted-foreground mt-1">{editTask.description}</p>}
                   </div>
+                  {editTask.source === "student_note" && editTask.student_id && studentMap[editTask.student_id] && (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="gap-1 bg-accent/10 text-accent border-accent/30">
+                        <GraduationCap className="h-3 w-3" />
+                        {studentMap[editTask.student_id]}
+                      </Badge>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 text-xs text-accent"
+                        onClick={() => {
+                          setEditTask(null);
+                          navigate(`${prefix}/students/${editTask.student_id}`);
+                        }}
+                      >
+                        View Student →
+                      </Button>
+                    </div>
+                  )}
+                  {editTask.created_by !== user?.id && profileMap[editTask.created_by] && (
+                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                      <UserCheck className="h-3 w-3" /> Assigned by {profileMap[editTask.created_by]}
+                    </div>
+                  )}
                   <div>
                     <Label>Status</Label>
                     <Select value={editTask.status} onValueChange={(v) => setEditTask({ ...editTask, status: v })}>
@@ -490,7 +582,7 @@ export default function TasksPage() {
             </div>
           )}
           <DialogFooter className="flex justify-between">
-            {canManage && editTask && (
+            {editTask && canDeleteTask(editTask) && (
               <Button variant="destructive" size="sm" onClick={() => deleteMutation.mutate(editTask.id)} className="mr-auto">
                 Delete
               </Button>
