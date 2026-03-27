@@ -28,6 +28,7 @@ import DigitalCardPage from "./pages/shared/DigitalCardPage";
 
 import FeedbackPage from "./pages/owner/FeedbackPage";
 import LeadsPage from "./pages/shared/LeadsPage";
+import TasksPage from "./pages/shared/TasksPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -58,6 +59,7 @@ const App = () => (
             <Route path="/owner/knowledge-base" element={<KnowledgeBasePage />} />
             <Route path="/owner/ai-monitoring" element={<AIMonitoringPage />} />
             <Route path="/owner/leads" element={<LeadsPage />} />
+            <Route path="/owner/tasks" element={<TasksPage />} />
             
             <Route path="/owner/profile" element={<ProfilePage />} />
             <Route path="/owner/resources" element={<ResourcesPage />} />
@@ -79,6 +81,7 @@ const App = () => (
             <Route path="/admin/create-image" element={<CreateImagePage />} />
             <Route path="/admin/digital-card" element={<DigitalCardPage />} />
             <Route path="/admin/leads" element={<LeadsPage />} />
+            <Route path="/admin/tasks" element={<TasksPage />} />
             
             {/* Agent routes */}
             <Route path="/agent/dashboard" element={<AgentDashboard />} />
@@ -92,6 +95,7 @@ const App = () => (
             <Route path="/agent/create-image" element={<CreateImagePage />} />
             <Route path="/agent/digital-card" element={<DigitalCardPage />} />
             <Route path="/agent/leads" element={<LeadsPage />} />
+            <Route path="/agent/tasks" element={<TasksPage />} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
