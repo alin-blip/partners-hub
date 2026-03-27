@@ -404,8 +404,11 @@ export default function OwnerDashboard() {
                 )}
               </TableBody>
             </Table>
-          </div>
         </div>
+
+        {/* Email Log */}
+        <EmailLogSection />
+      </div>
       </div>
     </DashboardLayout>
   );
