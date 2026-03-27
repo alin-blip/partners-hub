@@ -15,6 +15,7 @@ import {
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Search, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { notifyAgentOfStatusChange } from "@/lib/enrollment-emails";
 
 const STATUSES = [
   "applied", "documents_submitted", "processing", "accepted", "enrolled", "active", "rejected",
@@ -22,13 +23,23 @@ const STATUSES = [
 const PAGE_SIZE = 20;
 
 export default function EnrollmentsPage() {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const canEdit = role === "owner" || role === "admin";
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [page, setPage] = useState(0);
+
+  const { data: profile } = useQuery({
+    queryKey: ["my-profile-name"],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data } = await supabase.from("profiles").select("full_name").eq("id", user.id).single();
+      return data;
+    },
+    enabled: !!user,
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ["enrollments-list", search, statusFilter, page],
@@ -63,13 +74,15 @@ export default function EnrollmentsPage() {
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   const updateStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+    mutationFn: async ({ id, status, oldStatus }: { id: string; status: string; oldStatus: string }) => {
       const { error } = await supabase.from("enrollments").update({ status }).eq("id", id);
       if (error) throw error;
+      return { id, status, oldStatus };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["enrollments-list"] });
       toast({ title: "Status updated" });
+      notifyAgentOfStatusChange(result.id, result.status, result.oldStatus, profile?.full_name);
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -150,7 +163,7 @@ export default function EnrollmentsPage() {
                     {canEdit ? (
                       <Select
                         value={e.status}
-                        onValueChange={(v) => updateStatus.mutate({ id: e.id, status: v })}
+                        onValueChange={(v) => updateStatus.mutate({ id: e.id, status: v, oldStatus: e.status })}
                       >
                         <SelectTrigger className="w-[180px] h-8">
                           <StatusBadge status={e.status} />
