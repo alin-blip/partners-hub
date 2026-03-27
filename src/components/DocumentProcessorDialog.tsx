@@ -77,6 +77,8 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
   const [saving, setSaving] = useState(false);
   const [savedSummary, setSavedSummary] = useState<Record<DocType, number>>({ courses: 0, timetable: 0, campuses: 0, intakes: 0 });
   const [savingToKB, setSavingToKB] = useState(false);
+  const [saveToTables, setSaveToTables] = useState(true);
+  const [saveToKBOption, setSaveToKBOption] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -91,6 +93,8 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
     setProcessProgress({ done: 0, total: 0 });
     setSavedSummary({ courses: 0, timetable: 0, campuses: 0, intakes: 0 });
     setSavingToKB(false);
+    setSaveToTables(true);
+    setSaveToKBOption(false);
   };
 
   const toggleType = (type: DocType) => {
@@ -235,59 +239,80 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
     try {
       const types = Array.from(selectedTypes);
 
+      // Collect selected items per type
+      const selectedItemsByType: Record<DocType, any[]> = { courses: [], timetable: [], campuses: [], intakes: [] };
       for (const docType of types) {
         const items = itemsByType[docType];
         const sel = selectedByType[docType];
         const toInsert = items.filter((_, i) => sel.has(i));
         if (toInsert.length === 0) continue;
-
-        const clean = toInsert.map(({ _source, ...rest }) => rest);
-
-        if (docType === "courses") {
-          const rows = clean.map((item) => ({
-            university_id: universityId,
-            name: item.name,
-            level: item.level || "undergraduate",
-            study_mode: item.study_mode || "blended",
-          }));
-          const { error } = await supabase.from("courses").insert(rows);
-          if (error) throw error;
-          qc.invalidateQueries({ queryKey: ["all-courses"] });
-        } else if (docType === "timetable") {
-          const rows = clean.map((item) => ({
-            university_id: universityId,
-            label: item.label,
-          }));
-          const { error } = await supabase.from("timetable_options").insert(rows);
-          if (error) throw error;
-          qc.invalidateQueries({ queryKey: ["timetable-options"] });
-        } else if (docType === "campuses") {
-          const rows = clean.map((item) => ({
-            university_id: universityId,
-            name: item.name,
-            city: item.city || null,
-          }));
-          const { error } = await supabase.from("campuses").insert(rows);
-          if (error) throw error;
-          qc.invalidateQueries({ queryKey: ["all-campuses"] });
-        } else if (docType === "intakes") {
-          const rows = clean.map((item) => ({
-            university_id: universityId,
-            label: item.label,
-            start_date: item.start_date,
-            application_deadline: item.application_deadline || null,
-          }));
-          const { error } = await supabase.from("intakes").insert(rows);
-          if (error) throw error;
-          qc.invalidateQueries({ queryKey: ["all-intakes"] });
-        }
-
+        selectedItemsByType[docType] = toInsert;
         summary[docType] = toInsert.length;
         totalSaved += toInsert.length;
       }
 
+      // Save to database tables
+      if (saveToTables) {
+        for (const docType of types) {
+          const toInsert = selectedItemsByType[docType];
+          if (!toInsert || toInsert.length === 0) continue;
+          const clean = toInsert.map(({ _source, ...rest }) => rest);
+
+          if (docType === "courses") {
+            const rows = clean.map((item) => ({ university_id: universityId, name: item.name, level: item.level || "undergraduate", study_mode: item.study_mode || "blended" }));
+            const { error } = await supabase.from("courses").insert(rows);
+            if (error) throw error;
+            qc.invalidateQueries({ queryKey: ["all-courses"] });
+          } else if (docType === "timetable") {
+            const rows = clean.map((item) => ({ university_id: universityId, label: item.label }));
+            const { error } = await supabase.from("timetable_options").insert(rows);
+            if (error) throw error;
+            qc.invalidateQueries({ queryKey: ["timetable-options"] });
+          } else if (docType === "campuses") {
+            const rows = clean.map((item) => ({ university_id: universityId, name: item.name, city: item.city || null }));
+            const { error } = await supabase.from("campuses").insert(rows);
+            if (error) throw error;
+            qc.invalidateQueries({ queryKey: ["all-campuses"] });
+          } else if (docType === "intakes") {
+            const rows = clean.map((item) => ({ university_id: universityId, label: item.label, start_date: item.start_date, application_deadline: item.application_deadline || null }));
+            const { error } = await supabase.from("intakes").insert(rows);
+            if (error) throw error;
+            qc.invalidateQueries({ queryKey: ["all-intakes"] });
+          }
+        }
+      }
+
+      // Save to Knowledge Base
+      if (saveToKBOption) {
+        const kbEntries = types
+          .filter((t) => selectedItemsByType[t]?.length > 0)
+          .map((docType) => {
+            const saved = selectedItemsByType[docType];
+            let content = "";
+            if (docType === "courses") {
+              content = saved.map((c) => `- ${c.name} (${c.level}, ${c.study_mode})`).join("\n");
+            } else if (docType === "campuses") {
+              content = saved.map((c) => `- ${c.name}${c.city ? ` — ${c.city}` : ""}`).join("\n");
+            } else if (docType === "intakes") {
+              content = saved.map((c) => `- ${c.label} (starts ${c.start_date}${c.application_deadline ? `, deadline ${c.application_deadline}` : ""})`).join("\n");
+            } else if (docType === "timetable") {
+              content = saved.map((c) => `- ${c.label}`).join("\n");
+            }
+            return { title: `${universityName} — ${DOC_TYPE_LABELS[docType]}`, content, category: docType };
+          });
+
+        if (kbEntries.length > 0) {
+          const { error } = await supabase.from("ai_knowledge_base").insert(kbEntries);
+          if (error) throw error;
+          qc.invalidateQueries({ queryKey: ["knowledge-base"] });
+        }
+      }
+
       setSavedSummary(summary);
-      toast({ title: `${totalSaved} items added successfully` });
+      const parts: string[] = [];
+      if (saveToTables) parts.push("database");
+      if (saveToKBOption) parts.push("Knowledge Base");
+      toast({ title: `${totalSaved} items saved to ${parts.join(" & ")}` });
       setStep(3);
     } catch (err: any) {
       toast({ title: "Error saving", description: err.message, variant: "destructive" });
@@ -298,48 +323,6 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
 
   const universityName = universities.find((u) => u.id === universityId)?.name || "University";
 
-  const handleSaveToKB = async () => {
-    setSavingToKB(true);
-    try {
-      const types = Array.from(selectedTypes).filter((t) => savedSummary[t] > 0);
-      const kbEntries = types.map((docType) => {
-        const items = itemsByType[docType];
-        const sel = selectedByType[docType];
-        const saved = items.filter((_, i) => sel.has(i));
-
-        let content = "";
-        if (docType === "courses") {
-          content = saved.map((c) => `- ${c.name} (${c.level}, ${c.study_mode})`).join("\n");
-        } else if (docType === "campuses") {
-          content = saved.map((c) => `- ${c.name}${c.city ? ` — ${c.city}` : ""}`).join("\n");
-        } else if (docType === "intakes") {
-          content = saved.map((c) => `- ${c.label} (starts ${c.start_date}${c.application_deadline ? `, deadline ${c.application_deadline}` : ""})`).join("\n");
-        } else if (docType === "timetable") {
-          content = saved.map((c) => `- ${c.label}`).join("\n");
-        }
-
-        return {
-          title: `${universityName} — ${DOC_TYPE_LABELS[docType]}`,
-          content,
-          category: docType,
-        };
-      });
-
-      if (kbEntries.length > 0) {
-        const { error } = await supabase.from("ai_knowledge_base").insert(kbEntries);
-        if (error) throw error;
-        qc.invalidateQueries({ queryKey: ["knowledge-base"] });
-      }
-
-      toast({ title: "Saved to Knowledge Base" });
-      reset();
-      onOpenChange(false);
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    } finally {
-      setSavingToKB(false);
-    }
-  };
 
   const typesWithItems = Array.from(selectedTypes).filter((t) => itemsByType[t].length > 0);
   const totalSelected = Array.from(selectedTypes).reduce((sum, t) => sum + selectedByType[t].size, 0);
@@ -519,11 +502,32 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
               <p className="text-center py-8 text-muted-foreground">No data extracted from the uploaded documents.</p>
             )}
 
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
-              <Button onClick={handleSave} disabled={totalSelected === 0 || saving}>
-                {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</> : <>Add {totalSelected} Selected</>}
-              </Button>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-4 border rounded-lg p-3 bg-muted/30">
+                <Label className="text-sm font-medium shrink-0">Save to:</Label>
+                <div className="flex flex-wrap gap-3">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox
+                      checked={saveToTables}
+                      onCheckedChange={(v) => setSaveToTables(!!v)}
+                    />
+                    Database (Courses, Campuses, etc.)
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox
+                      checked={saveToKBOption}
+                      onCheckedChange={(v) => setSaveToKBOption(!!v)}
+                    />
+                    Knowledge Base (AI)
+                  </label>
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
+                <Button onClick={handleSave} disabled={totalSelected === 0 || saving || (!saveToTables && !saveToKBOption)}>
+                  {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</> : <>Save {totalSelected} Selected</>}
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -548,16 +552,13 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
                     <span>{savedSummary[t]} {DOC_TYPE_LABELS[t]}</span>
                   </div>
                 ))}
+              <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t">
+                {saveToTables && <Badge variant="secondary">Database</Badge>}
+                {saveToKBOption && <Badge variant="secondary">Knowledge Base</Badge>}
+              </div>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <Button onClick={handleSaveToKB} disabled={savingToKB} variant="outline" className="w-full">
-                {savingToKB ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving to Knowledge Base...</> : <>
-                  <FileText className="h-4 w-4" /> Save to Knowledge Base
-                </>}
-              </Button>
-              <Button onClick={() => { reset(); onOpenChange(false); }} className="w-full">Done</Button>
-            </div>
+            <Button onClick={() => { reset(); onOpenChange(false); }} className="w-full">Done</Button>
           </div>
         )}
       </DialogContent>
