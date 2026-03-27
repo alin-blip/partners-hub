@@ -77,6 +77,8 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
   const [saving, setSaving] = useState(false);
   const [savedSummary, setSavedSummary] = useState<Record<DocType, number>>({ courses: 0, timetable: 0, campuses: 0, intakes: 0 });
   const [savingToKB, setSavingToKB] = useState(false);
+  const [saveToTables, setSaveToTables] = useState(true);
+  const [saveToKBOption, setSaveToKBOption] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
