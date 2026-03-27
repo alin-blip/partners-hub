@@ -16,6 +16,7 @@ import {
   MessageSquareHeart,
   CreditCard,
   ContactRound,
+  ListTodo,
 } from "lucide-react";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { NavLink } from "@/components/NavLink";
