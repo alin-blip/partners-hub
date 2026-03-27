@@ -519,11 +519,32 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
               <p className="text-center py-8 text-muted-foreground">No data extracted from the uploaded documents.</p>
             )}
 
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
-              <Button onClick={handleSave} disabled={totalSelected === 0 || saving}>
-                {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</> : <>Add {totalSelected} Selected</>}
-              </Button>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-4 border rounded-lg p-3 bg-muted/30">
+                <Label className="text-sm font-medium shrink-0">Save to:</Label>
+                <div className="flex flex-wrap gap-3">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox
+                      checked={saveToTables}
+                      onCheckedChange={(v) => setSaveToTables(!!v)}
+                    />
+                    Database (Courses, Campuses, etc.)
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox
+                      checked={saveToKB}
+                      onCheckedChange={(v) => setSaveToKB(!!v)}
+                    />
+                    Knowledge Base (AI)
+                  </label>
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
+                <Button onClick={handleSave} disabled={totalSelected === 0 || saving || (!saveToTables && !saveToKB)}>
+                  {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</> : <>Save {totalSelected} Selected</>}
+                </Button>
+              </div>
             </div>
           </div>
         )}
