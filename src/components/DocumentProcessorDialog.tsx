@@ -239,59 +239,80 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
     try {
       const types = Array.from(selectedTypes);
 
+      // Collect selected items per type
+      const selectedItemsByType: Record<DocType, any[]> = { courses: [], timetable: [], campuses: [], intakes: [] };
       for (const docType of types) {
         const items = itemsByType[docType];
         const sel = selectedByType[docType];
         const toInsert = items.filter((_, i) => sel.has(i));
         if (toInsert.length === 0) continue;
-
-        const clean = toInsert.map(({ _source, ...rest }) => rest);
-
-        if (docType === "courses") {
-          const rows = clean.map((item) => ({
-            university_id: universityId,
-            name: item.name,
-            level: item.level || "undergraduate",
-            study_mode: item.study_mode || "blended",
-          }));
-          const { error } = await supabase.from("courses").insert(rows);
-          if (error) throw error;
-          qc.invalidateQueries({ queryKey: ["all-courses"] });
-        } else if (docType === "timetable") {
-          const rows = clean.map((item) => ({
-            university_id: universityId,
-            label: item.label,
-          }));
-          const { error } = await supabase.from("timetable_options").insert(rows);
-          if (error) throw error;
-          qc.invalidateQueries({ queryKey: ["timetable-options"] });
-        } else if (docType === "campuses") {
-          const rows = clean.map((item) => ({
-            university_id: universityId,
-            name: item.name,
-            city: item.city || null,
-          }));
-          const { error } = await supabase.from("campuses").insert(rows);
-          if (error) throw error;
-          qc.invalidateQueries({ queryKey: ["all-campuses"] });
-        } else if (docType === "intakes") {
-          const rows = clean.map((item) => ({
-            university_id: universityId,
-            label: item.label,
-            start_date: item.start_date,
-            application_deadline: item.application_deadline || null,
-          }));
-          const { error } = await supabase.from("intakes").insert(rows);
-          if (error) throw error;
-          qc.invalidateQueries({ queryKey: ["all-intakes"] });
-        }
-
+        selectedItemsByType[docType] = toInsert;
         summary[docType] = toInsert.length;
         totalSaved += toInsert.length;
       }
 
+      // Save to database tables
+      if (saveToTables) {
+        for (const docType of types) {
+          const toInsert = selectedItemsByType[docType];
+          if (!toInsert || toInsert.length === 0) continue;
+          const clean = toInsert.map(({ _source, ...rest }) => rest);
+
+          if (docType === "courses") {
+            const rows = clean.map((item) => ({ university_id: universityId, name: item.name, level: item.level || "undergraduate", study_mode: item.study_mode || "blended" }));
+            const { error } = await supabase.from("courses").insert(rows);
+            if (error) throw error;
+            qc.invalidateQueries({ queryKey: ["all-courses"] });
+          } else if (docType === "timetable") {
+            const rows = clean.map((item) => ({ university_id: universityId, label: item.label }));
+            const { error } = await supabase.from("timetable_options").insert(rows);
+            if (error) throw error;
+            qc.invalidateQueries({ queryKey: ["timetable-options"] });
+          } else if (docType === "campuses") {
+            const rows = clean.map((item) => ({ university_id: universityId, name: item.name, city: item.city || null }));
+            const { error } = await supabase.from("campuses").insert(rows);
+            if (error) throw error;
+            qc.invalidateQueries({ queryKey: ["all-campuses"] });
+          } else if (docType === "intakes") {
+            const rows = clean.map((item) => ({ university_id: universityId, label: item.label, start_date: item.start_date, application_deadline: item.application_deadline || null }));
+            const { error } = await supabase.from("intakes").insert(rows);
+            if (error) throw error;
+            qc.invalidateQueries({ queryKey: ["all-intakes"] });
+          }
+        }
+      }
+
+      // Save to Knowledge Base
+      if (saveToKBOption) {
+        const kbEntries = types
+          .filter((t) => selectedItemsByType[t]?.length > 0)
+          .map((docType) => {
+            const saved = selectedItemsByType[docType];
+            let content = "";
+            if (docType === "courses") {
+              content = saved.map((c) => `- ${c.name} (${c.level}, ${c.study_mode})`).join("\n");
+            } else if (docType === "campuses") {
+              content = saved.map((c) => `- ${c.name}${c.city ? ` — ${c.city}` : ""}`).join("\n");
+            } else if (docType === "intakes") {
+              content = saved.map((c) => `- ${c.label} (starts ${c.start_date}${c.application_deadline ? `, deadline ${c.application_deadline}` : ""})`).join("\n");
+            } else if (docType === "timetable") {
+              content = saved.map((c) => `- ${c.label}`).join("\n");
+            }
+            return { title: `${universityName} — ${DOC_TYPE_LABELS[docType]}`, content, category: docType };
+          });
+
+        if (kbEntries.length > 0) {
+          const { error } = await supabase.from("ai_knowledge_base").insert(kbEntries);
+          if (error) throw error;
+          qc.invalidateQueries({ queryKey: ["knowledge-base"] });
+        }
+      }
+
       setSavedSummary(summary);
-      toast({ title: `${totalSaved} items added successfully` });
+      const parts: string[] = [];
+      if (saveToTables) parts.push("database");
+      if (saveToKBOption) parts.push("Knowledge Base");
+      toast({ title: `${totalSaved} items saved to ${parts.join(" & ")}` });
       setStep(3);
     } catch (err: any) {
       toast({ title: "Error saving", description: err.message, variant: "destructive" });
