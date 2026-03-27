@@ -230,6 +230,7 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
   const handleSave = async () => {
     setSaving(true);
     let totalSaved = 0;
+    const summary: Record<DocType, number> = { courses: 0, timetable: 0, campuses: 0, intakes: 0 };
 
     try {
       const types = Array.from(selectedTypes);
@@ -281,15 +282,62 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
           qc.invalidateQueries({ queryKey: ["all-intakes"] });
         }
 
+        summary[docType] = toInsert.length;
         totalSaved += toInsert.length;
       }
 
+      setSavedSummary(summary);
       toast({ title: `${totalSaved} items added successfully` });
       setStep(3);
     } catch (err: any) {
       toast({ title: "Error saving", description: err.message, variant: "destructive" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const universityName = universities.find((u) => u.id === universityId)?.name || "University";
+
+  const handleSaveToKB = async () => {
+    setSavingToKB(true);
+    try {
+      const types = Array.from(selectedTypes).filter((t) => savedSummary[t] > 0);
+      const kbEntries = types.map((docType) => {
+        const items = itemsByType[docType];
+        const sel = selectedByType[docType];
+        const saved = items.filter((_, i) => sel.has(i));
+
+        let content = "";
+        if (docType === "courses") {
+          content = saved.map((c) => `- ${c.name} (${c.level}, ${c.study_mode})`).join("\n");
+        } else if (docType === "campuses") {
+          content = saved.map((c) => `- ${c.name}${c.city ? ` — ${c.city}` : ""}`).join("\n");
+        } else if (docType === "intakes") {
+          content = saved.map((c) => `- ${c.label} (starts ${c.start_date}${c.application_deadline ? `, deadline ${c.application_deadline}` : ""})`).join("\n");
+        } else if (docType === "timetable") {
+          content = saved.map((c) => `- ${c.label}`).join("\n");
+        }
+
+        return {
+          title: `${universityName} — ${DOC_TYPE_LABELS[docType]}`,
+          content,
+          category: docType,
+        };
+      });
+
+      if (kbEntries.length > 0) {
+        const { error } = await supabase.from("ai_knowledge_base").insert(kbEntries);
+        if (error) throw error;
+        qc.invalidateQueries({ queryKey: ["knowledge-base"] });
+      }
+
+      toast({ title: "Saved to Knowledge Base" });
+      reset();
+      onOpenChange(false);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingToKB(false);
     }
   };
 
