@@ -74,13 +74,15 @@ export default function EnrollmentsPage() {
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   const updateStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+    mutationFn: async ({ id, status, oldStatus }: { id: string; status: string; oldStatus: string }) => {
       const { error } = await supabase.from("enrollments").update({ status }).eq("id", id);
       if (error) throw error;
+      return { id, status, oldStatus };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["enrollments-list"] });
       toast({ title: "Status updated" });
+      notifyAgentOfStatusChange(result.id, result.status, result.oldStatus, profile?.full_name);
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
