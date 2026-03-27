@@ -59,6 +59,7 @@ const App = () => (
             <Route path="/owner/knowledge-base" element={<KnowledgeBasePage />} />
             <Route path="/owner/ai-monitoring" element={<AIMonitoringPage />} />
             <Route path="/owner/leads" element={<LeadsPage />} />
+            <Route path="/owner/tasks" element={<TasksPage />} />
             
             <Route path="/owner/profile" element={<ProfilePage />} />
             <Route path="/owner/resources" element={<ResourcesPage />} />
