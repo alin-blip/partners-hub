@@ -529,13 +529,35 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
         )}
 
         {step === 3 && (
-          <div className="text-center space-y-4 py-6">
+          <div className="space-y-5 py-4">
             <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
               <Check className="h-6 w-6 text-primary" />
             </div>
-            <p className="text-lg font-medium">Import Complete!</p>
-            <p className="text-sm text-muted-foreground">Data has been added to your platform settings.</p>
-            <Button onClick={() => { reset(); onOpenChange(false); }}>Done</Button>
+            <div className="text-center">
+              <p className="text-lg font-medium">Import Complete!</p>
+              <p className="text-sm text-muted-foreground mt-1">{universityName}</p>
+            </div>
+
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+              <p className="text-sm font-medium mb-2">Summary</p>
+              {Array.from(selectedTypes)
+                .filter((t) => savedSummary[t] > 0)
+                .map((t) => (
+                  <div key={t} className="flex items-center gap-2 text-sm">
+                    <Check className="h-4 w-4 text-primary shrink-0" />
+                    <span>{savedSummary[t]} {DOC_TYPE_LABELS[t]}</span>
+                  </div>
+                ))}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Button onClick={handleSaveToKB} disabled={savingToKB} variant="outline" className="w-full">
+                {savingToKB ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving to Knowledge Base...</> : <>
+                  <FileText className="h-4 w-4" /> Save to Knowledge Base
+                </>}
+              </Button>
+              <Button onClick={() => { reset(); onOpenChange(false); }} className="w-full">Done</Button>
+            </div>
           </div>
         )}
       </DialogContent>
