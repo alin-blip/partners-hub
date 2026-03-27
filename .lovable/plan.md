@@ -1,75 +1,59 @@
 
 
-## Task Management Improvements
+## Email Automations — Enrollment Status Change Triggers
 
-### Problems to solve
-1. Agent sees "Manage and track team tasks" — wrong wording for agents
-2. Agents cannot create their own tasks (personal to-dos)
-3. Notes like "document_request", "action_required", "info_request" from StudentNotesTab don't appear as tasks — easy to miss
-4. Need clear visual distinction between assigned tasks (from owner/admin) and self-created tasks
+### What this does
+When an admin/owner changes an enrollment status, the system automatically sends an email notification to the student's agent informing them of the change. This ensures agents are always aware of status updates on their students' enrollments.
+
+### Status change locations (all 3 must be wired)
+1. **StudentEnrollmentsTab** — status dropdown on student detail page
+2. **EnrollmentsPage** — status dropdown on the enrollments list page
+3. **StudentNotesTab** — "Quick Status Update" section
 
 ### Changes
 
-#### 1. Database: Add `source` column + allow agent INSERT
+#### 1. New email template: `enrollment-status-change`
 
-**Migration:**
-- Add `source` column to `tasks` table: `text NOT NULL DEFAULT 'manual'` (values: `manual`, `student_note`)
-- Add `student_id` column: `uuid REFERENCES profiles(id) ON DELETE SET NULL` — links task to a student when auto-created from notes
-- Add RLS policy: **Agent inserts own tasks** — `WITH CHECK (created_by = auth.uid() AND assigned_to = auth.uid())` — agents can only create tasks assigned to themselves
-- Add RLS policy: **Agent deletes own created tasks** — agents can delete tasks they created themselves (not ones assigned by admin/owner)
+Create `supabase/functions/_shared/transactional-email-templates/enrollment-status-change.tsx`:
+- Props: `studentName`, `universityName`, `courseName`, `oldStatus`, `newStatus`, `changedBy`
+- Subject: dynamic — "Status Update: [Student Name] → [New Status]"
+- Styled consistently with existing `note-notification` template (same colors, layout, branding)
+- Register in `registry.ts`
 
-#### 2. Auto-create tasks from Student Notes
+#### 2. Helper function for sending the email
 
-In `StudentNotesTab.tsx`, when an admin/owner adds a note of type `document_request`, `info_request`, or `action_required`:
-- After inserting the note, also insert a task into the `tasks` table:
-  - `title`: auto-generated from note type + student name (e.g. "Document Request: John Smith")
-  - `description`: the note content
-  - `assigned_to`: the student's `agent_id`
-  - `created_by`: the admin/owner user id
-  - `source`: `"student_note"`
-  - `student_id`: the student's id
-  - `priority`: `"high"` if urgent, `"medium"` otherwise
+Create a shared helper (e.g. in a new `src/lib/enrollment-emails.ts`) that:
+- Takes `enrollmentId`, `newStatus`, `oldStatus`
+- Fetches the enrollment's student info (name, agent_id) and agent's email
+- Calls `supabase.functions.invoke('send-transactional-email', ...)` with the template data
+- Uses idempotency key: `enrollment-status-${enrollmentId}-${newStatus}-${timestamp}`
 
-This guarantees every actionable request appears in the agent's Tasks board.
+#### 3. Wire up all 3 status change locations
 
-#### 3. TasksPage UI changes
+**StudentEnrollmentsTab.tsx** — in `updateStatus` mutation `onSuccess`:
+- Call the helper with enrollment id, new status, and old status (capture old status before mutation)
 
-**Header text:**
-- Owner/Admin: "Manage and track team tasks"
-- Agent: "Your tasks and to-dos"
+**EnrollmentsPage.tsx** — in `updateStatus` mutation `onSuccess`:
+- Same pattern: call the helper after successful status change
 
-**Agent can create tasks:**
-- Show "New Task" button for agents too
-- Agent create form: simpler — no "Assigned To" dropdown (auto-assigns to self)
-- Agent-created tasks get `source: 'manual'`
+**StudentNotesTab.tsx** — in `updateStatusAndLog` mutation `onSuccess`:
+- Same pattern: call the helper (already has enrollment context)
 
-**Visual distinction on task cards:**
-- Tasks with `source === 'student_note'` show a small badge/icon (e.g. `GraduationCap` icon + student name link)
-- Tasks created by the agent themselves show a "Personal" badge
-- Tasks assigned by admin/owner show "Assigned" badge with creator name
+#### 4. Deploy edge functions
 
-**Task card enhancement:**
-- If `student_id` is set, show student name and make it clickable (navigates to student detail)
+Redeploy `send-transactional-email` after adding the new template to the registry.
 
-#### 4. Places where admin/owner can trigger tasks for agents
-
-| Location | Trigger | How it creates a task |
-|----------|---------|----------------------|
-| **Student Notes Tab** | Adding `document_request`, `info_request`, `action_required` note | Auto-inserts task assigned to student's agent |
-| **Tasks Page** | Manual "New Task" creation | Owner/admin picks agent from dropdown |
-
-These are the two entry points. The StudentNotesTab auto-creation ensures nothing is missed.
+### Files to create/modify
+- **Create**: `supabase/functions/_shared/transactional-email-templates/enrollment-status-change.tsx`
+- **Edit**: `supabase/functions/_shared/transactional-email-templates/registry.ts` — add new template
+- **Create**: `src/lib/enrollment-emails.ts` — shared helper
+- **Edit**: `src/components/student-detail/StudentEnrollmentsTab.tsx` — wire email on status change
+- **Edit**: `src/pages/shared/EnrollmentsPage.tsx` — wire email on status change
+- **Edit**: `src/components/student-detail/StudentNotesTab.tsx` — wire email on status change
 
 ### Technical details
-
-- New migration: `ALTER TABLE tasks ADD COLUMN source text NOT NULL DEFAULT 'manual'`, `ADD COLUMN student_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL`
-- New RLS: agent INSERT policy with `created_by = auth.uid() AND assigned_to = auth.uid()`
-- New RLS: agent DELETE policy with `created_by = auth.uid()`
-- `StudentNotesTab.tsx`: after `addNote` mutation succeeds for actionable types, call `supabase.from("tasks").insert(...)` to create the linked task
-- `TasksPage.tsx`: fetch `profiles` for all roles (not just canManage) to show names; adjust header/subtitle; add source badges; allow agent to create tasks
-
-### Files to modify
-- **Migration**: new SQL migration
-- `src/pages/shared/TasksPage.tsx` — UI changes, agent create, source badges
-- `src/components/student-detail/StudentNotesTab.tsx` — auto-create task on actionable notes
+- No database changes needed — uses existing `send-transactional-email` edge function and email infrastructure
+- Emails go to the student's agent (looked up via `students.agent_id` → `profiles.email`)
+- Old status is captured before the mutation fires so the email can show "changed from X to Y"
+- Idempotency keys prevent duplicate emails on retries
 
