@@ -79,7 +79,7 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
                 <TableCell>{e.courses?.name}</TableCell>
                 <TableCell>
                   {canChangeStatus ? (
-                    <Select value={e.status} onValueChange={(v) => updateStatus.mutate({ id: e.id, status: v })}>
+                    <Select value={e.status} onValueChange={(v) => updateStatus.mutate({ id: e.id, status: v, oldStatus: e.status })}>
                       <SelectTrigger className="w-[180px] h-8">
                         <StatusBadge status={e.status} />
                       </SelectTrigger>

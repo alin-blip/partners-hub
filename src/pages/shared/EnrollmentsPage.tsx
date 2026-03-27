@@ -31,6 +31,18 @@ export default function EnrollmentsPage() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [page, setPage] = useState(0);
 
+  const { data: profile } = useQuery({
+    queryKey: ["my-profile-name"],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data } = await supabase.from("profiles").select("full_name").eq("id", user.id).single();
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const user = useAuth().user;
+
   const { data, isLoading } = useQuery({
     queryKey: ["enrollments-list", search, statusFilter, page],
     queryFn: async () => {
