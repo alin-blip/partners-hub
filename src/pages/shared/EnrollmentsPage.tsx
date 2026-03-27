@@ -23,7 +23,7 @@ const STATUSES = [
 const PAGE_SIZE = 20;
 
 export default function EnrollmentsPage() {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const canEdit = role === "owner" || role === "admin";
@@ -40,8 +40,6 @@ export default function EnrollmentsPage() {
     },
     enabled: !!user,
   });
-
-  const user = useAuth().user;
 
   const { data, isLoading } = useQuery({
     queryKey: ["enrollments-list", search, statusFilter, page],
