@@ -85,7 +85,6 @@ export function AppSidebar() {
     queryKey: ["unread-messages-count", user?.id],
     queryFn: async () => {
       if (!user) return 0;
-      // Get conversations where user is participant
       const { data: convos } = await supabase
         .from("direct_conversations")
         .select("id")
@@ -102,7 +101,23 @@ export function AppSidebar() {
       return count || 0;
     },
     enabled: !!user,
-    refetchInterval: 30000, // poll every 30s
+    refetchInterval: 30000,
+  });
+
+  // Pending tasks count (not done)
+  const { data: pendingTasksCount = 0 } = useQuery({
+    queryKey: ["pending-tasks-count", user?.id],
+    queryFn: async () => {
+      if (!user) return 0;
+      const { count, error } = await supabase
+        .from("tasks")
+        .select("id", { count: "exact", head: true })
+        .neq("status", "done");
+      if (error) return 0;
+      return count || 0;
+    },
+    enabled: !!user,
+    refetchInterval: 60000,
   });
 
   const mainItems: NavItem[] = [
@@ -111,7 +126,7 @@ export function AppSidebar() {
     { title: "Leads", url: `${prefix}/leads`, icon: ContactRound },
     { title: "Enrollments", url: `${prefix}/enrollments`, icon: ClipboardList },
     { title: "Messages", url: `${prefix}/messages`, icon: Mail, badge: unreadCount },
-    { title: "Tasks", url: `${prefix}/tasks`, icon: ListTodo },
+    { title: "Tasks", url: `${prefix}/tasks`, icon: ListTodo, badge: pendingTasksCount },
   ];
 
 
