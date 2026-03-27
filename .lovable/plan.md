@@ -1,64 +1,75 @@
 
 
-## Task Management — Kanban Board
+## Task Management Improvements
 
-### Overview
-Build a task management system with a Kanban board where owners and admins can create tasks, assign them to agents, set deadlines, and track status (To Do, In Progress, Done). Agents can view and update their own tasks.
+### Problems to solve
+1. Agent sees "Manage and track team tasks" — wrong wording for agents
+2. Agents cannot create their own tasks (personal to-dos)
+3. Notes like "document_request", "action_required", "info_request" from StudentNotesTab don't appear as tasks — easy to miss
+4. Need clear visual distinction between assigned tasks (from owner/admin) and self-created tasks
 
-### 1. Database
+### Changes
 
-**New table: `tasks`**
-| Column | Type | Default | Notes |
-|--------|------|---------|-------|
-| id | uuid | gen_random_uuid() | PK |
-| title | text | — | Required |
-| description | text | null | Optional |
-| status | text | 'todo' | 'todo', 'in_progress', 'done' |
-| priority | text | 'medium' | 'low', 'medium', 'high' |
-| assigned_to | uuid | null | References profiles(id) — the agent |
-| created_by | uuid | — | The owner/admin who created it |
-| deadline | timestamptz | null | Optional due date |
-| created_at | timestamptz | now() | |
-| updated_at | timestamptz | now() | |
+#### 1. Database: Add `source` column + allow agent INSERT
 
-**RLS policies:**
-- Owner: full access (ALL)
-- Admin: SELECT/INSERT/UPDATE on tasks where `assigned_to` is self or one of their agents; also tasks they created
-- Agent: SELECT/UPDATE own tasks (`assigned_to = auth.uid()`)
+**Migration:**
+- Add `source` column to `tasks` table: `text NOT NULL DEFAULT 'manual'` (values: `manual`, `student_note`)
+- Add `student_id` column: `uuid REFERENCES profiles(id) ON DELETE SET NULL` — links task to a student when auto-created from notes
+- Add RLS policy: **Agent inserts own tasks** — `WITH CHECK (created_by = auth.uid() AND assigned_to = auth.uid())` — agents can only create tasks assigned to themselves
+- Add RLS policy: **Agent deletes own created tasks** — agents can delete tasks they created themselves (not ones assigned by admin/owner)
 
-**Trigger:** `update_updated_at_column` on UPDATE (already exists as a function).
+#### 2. Auto-create tasks from Student Notes
 
-### 2. Frontend — New Page
+In `StudentNotesTab.tsx`, when an admin/owner adds a note of type `document_request`, `info_request`, or `action_required`:
+- After inserting the note, also insert a task into the `tasks` table:
+  - `title`: auto-generated from note type + student name (e.g. "Document Request: John Smith")
+  - `description`: the note content
+  - `assigned_to`: the student's `agent_id`
+  - `created_by`: the admin/owner user id
+  - `source`: `"student_note"`
+  - `student_id`: the student's id
+  - `priority`: `"high"` if urgent, `"medium"` otherwise
 
-**File: `src/pages/shared/TasksPage.tsx`**
+This guarantees every actionable request appears in the agent's Tasks board.
 
-Kanban board with 3 columns: **To Do**, **In Progress**, **Done**
+#### 3. TasksPage UI changes
 
-Each task card shows:
-- Title, priority badge (color-coded)
-- Assigned agent name (avatar or initials)
-- Deadline (with overdue highlighting in red)
-- Click to open detail dialog
+**Header text:**
+- Owner/Admin: "Manage and track team tasks"
+- Agent: "Your tasks and to-dos"
 
-**Create Task Dialog** (owner/admin only):
-- Title (required), Description (textarea), Priority (select), Assigned To (select from agents list), Deadline (date picker)
+**Agent can create tasks:**
+- Show "New Task" button for agents too
+- Agent create form: simpler — no "Assigned To" dropdown (auto-assigns to self)
+- Agent-created tasks get `source: 'manual'`
 
-**Task Detail Dialog:**
-- View/edit all fields
-- Owner/admin can edit everything; agent can only change status (drag or dropdown)
+**Visual distinction on task cards:**
+- Tasks with `source === 'student_note'` show a small badge/icon (e.g. `GraduationCap` icon + student name link)
+- Tasks created by the agent themselves show a "Personal" badge
+- Tasks assigned by admin/owner show "Assigned" badge with creator name
 
-**Drag-and-drop:** Use native HTML drag & drop for moving cards between columns (no extra library needed).
+**Task card enhancement:**
+- If `student_id` is set, show student name and make it clickable (navigates to student detail)
 
-### 3. Routing & Sidebar
+#### 4. Places where admin/owner can trigger tasks for agents
 
-- Add route `/owner/tasks`, `/admin/tasks`, `/agent/tasks` → `<TasksPage />`
-- Add "Tasks" item to sidebar `mainItems` array with `ListTodo` icon (from lucide-react), visible to all roles
+| Location | Trigger | How it creates a task |
+|----------|---------|----------------------|
+| **Student Notes Tab** | Adding `document_request`, `info_request`, `action_required` note | Auto-inserts task assigned to student's agent |
+| **Tasks Page** | Manual "New Task" creation | Owner/admin picks agent from dropdown |
 
-### 4. Technical Details
+These are the two entry points. The StudentNotesTab auto-creation ensures nothing is missed.
 
-- React Query for data fetching with `queryKey: ["tasks"]`
-- Mutations for create, update status, update details
-- Agent dropdown populated from `profiles` table filtered by role
-- Date picker using Shadcn Popover + Calendar pattern with `pointer-events-auto`
-- No additional dependencies needed
+### Technical details
+
+- New migration: `ALTER TABLE tasks ADD COLUMN source text NOT NULL DEFAULT 'manual'`, `ADD COLUMN student_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL`
+- New RLS: agent INSERT policy with `created_by = auth.uid() AND assigned_to = auth.uid()`
+- New RLS: agent DELETE policy with `created_by = auth.uid()`
+- `StudentNotesTab.tsx`: after `addNote` mutation succeeds for actionable types, call `supabase.from("tasks").insert(...)` to create the linked task
+- `TasksPage.tsx`: fetch `profiles` for all roles (not just canManage) to show names; adjust header/subtitle; add source badges; allow agent to create tasks
+
+### Files to modify
+- **Migration**: new SQL migration
+- `src/pages/shared/TasksPage.tsx` — UI changes, agent create, source badges
+- `src/components/student-detail/StudentNotesTab.tsx` — auto-create task on actionable notes
 
