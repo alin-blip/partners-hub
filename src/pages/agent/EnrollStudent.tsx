@@ -167,12 +167,80 @@ export default function EnrollStudent() {
 
       return student.id;
     },
-    onSuccess: (studentId) => {
+    onSuccess: async (studentId) => {
       queryClient.invalidateQueries({ queryKey: ["agent-students"] });
       queryClient.invalidateQueries({ queryKey: ["students"] });
       queryClient.invalidateQueries({ queryKey: ["enrollments"] });
       toast({ title: "Student enrolled!", description: "The application has been submitted." });
+
+      // Send notification email to admin/owner
+      const selectedUni = universities.find((u: any) => u.id === universityId);
+      const selectedCrs = courses.find((c: any) => c.id === courseId);
+      const studentName = `${firstName} ${lastName}`;
       const navPrefix = role === "owner" ? "/owner" : role === "admin" ? "/admin" : "/agent";
+      const studentUrl = `${window.location.origin}/owner/students/${studentId}`;
+
+      try {
+        // Fetch agent's admin (if any) and owner to notify
+        const recipients: string[] = [];
+
+        // Get agent's profile to find admin_id
+        const { data: agentProfile } = await supabase
+          .from("profiles")
+          .select("full_name, admin_id")
+          .eq("id", user!.id)
+          .single();
+
+        const agentName = agentProfile?.full_name || user!.email || "Agent";
+
+        // If agent has an admin, notify them
+        if (agentProfile?.admin_id) {
+          const { data: adminProfile } = await supabase
+            .from("profiles")
+            .select("email")
+            .eq("id", agentProfile.admin_id)
+            .single();
+          if (adminProfile?.email) recipients.push(adminProfile.email);
+        }
+
+        // Notify owner(s)
+        const { data: ownerRoles } = await supabase
+          .from("user_roles")
+          .select("user_id")
+          .eq("role", "owner");
+        if (ownerRoles) {
+          for (const ownerRole of ownerRoles) {
+            const { data: ownerProfile } = await supabase
+              .from("profiles")
+              .select("email")
+              .eq("id", ownerRole.user_id)
+              .single();
+            if (ownerProfile?.email && !recipients.includes(ownerProfile.email)) {
+              recipients.push(ownerProfile.email);
+            }
+          }
+        }
+
+        for (const recipientEmail of recipients) {
+          await supabase.functions.invoke("send-transactional-email", {
+            body: {
+              templateName: "new-student-assigned",
+              recipientEmail,
+              idempotencyKey: `new-student-${studentId}-${recipientEmail}`,
+              templateData: {
+                studentName,
+                universityName: selectedUni?.name,
+                courseName: selectedCrs?.name,
+                agentName,
+                studentUrl,
+              },
+            },
+          });
+        }
+      } catch (err) {
+        console.error("Failed to send new student notification:", err);
+      }
+
       navigate(`${navPrefix}/students/${studentId}`);
     },
     onError: (error: any) => {
