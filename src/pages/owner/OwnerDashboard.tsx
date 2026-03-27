@@ -23,6 +23,7 @@ import {
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { PromoBanner } from "@/components/PromoBanner";
+import { EmailLogSection } from "@/components/EmailLogSection";
 
 const chartConfig: ChartConfig = {
   students: { label: "Students", color: "hsl(var(--primary))" },
@@ -403,8 +404,11 @@ export default function OwnerDashboard() {
                 )}
               </TableBody>
             </Table>
-          </div>
         </div>
+
+        {/* Email Log */}
+        <EmailLogSection />
+      </div>
       </div>
     </DashboardLayout>
   );
