@@ -67,7 +67,6 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
   const [files, setFiles] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
   const [processProgress, setProcessProgress] = useState({ done: 0, total: 0 });
-  // Items grouped by doc type
   const [itemsByType, setItemsByType] = useState<Record<DocType, any[]>>({
     courses: [], timetable: [], campuses: [], intakes: [],
   });
@@ -76,6 +75,8 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
   });
   const [activeTab, setActiveTab] = useState<DocType>("courses");
   const [saving, setSaving] = useState(false);
+  const [savedSummary, setSavedSummary] = useState<Record<DocType, number>>({ courses: 0, timetable: 0, campuses: 0, intakes: 0 });
+  const [savingToKB, setSavingToKB] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
