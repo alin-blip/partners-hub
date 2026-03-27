@@ -113,12 +113,34 @@ export function StudentNotesTab({ studentId, studentName, canSendRequests }: Pro
       } as any);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       if (isUrgent || noteType === "action_required" || noteType === "info_request") {
         sendNoteEmailToAgent(studentId, studentName || "Student", noteType, content, profile?.full_name || "Admin");
       }
+      // Auto-create task for actionable note types
+      const actionableTypes = ["document_request", "info_request", "action_required"];
+      if (actionableTypes.includes(noteType)) {
+        try {
+          const { data: student } = await supabase.from("students").select("agent_id").eq("id", studentId).single();
+          if (student?.agent_id) {
+            const typeLabel = NOTE_TYPE_CONFIG[noteType]?.label || noteType;
+            await supabase.from("tasks").insert({
+              title: `${typeLabel}: ${studentName || "Student"}`,
+              description: content,
+              assigned_to: student.agent_id,
+              created_by: user!.id,
+              source: "student_note",
+              student_id: studentId,
+              priority: isUrgent ? "high" : "medium",
+            } as any);
+          }
+        } catch (err) {
+          console.error("Failed to auto-create task:", err);
+        }
+      }
       qc.invalidateQueries({ queryKey: ["student-notes", studentId] });
       qc.invalidateQueries({ queryKey: ["urgent-note-counts"] });
+      qc.invalidateQueries({ queryKey: ["tasks"] });
       setContent("");
       setNoteType("note");
       setIsUrgent(false);
