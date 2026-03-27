@@ -28,6 +28,7 @@ import DigitalCardPage from "./pages/shared/DigitalCardPage";
 
 import FeedbackPage from "./pages/owner/FeedbackPage";
 import LeadsPage from "./pages/shared/LeadsPage";
+import TasksPage from "./pages/shared/TasksPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
