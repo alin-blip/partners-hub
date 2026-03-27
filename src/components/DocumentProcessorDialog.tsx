@@ -545,7 +545,7 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
               </div>
               <div className="flex gap-2 justify-end">
                 <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
-                <Button onClick={handleSave} disabled={totalSelected === 0 || saving || (!saveToTables && !saveToKB)}>
+                <Button onClick={handleSave} disabled={totalSelected === 0 || saving || (!saveToTables && !saveToKBOption)}>
                   {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</> : <>Save {totalSelected} Selected</>}
                 </Button>
               </div>
