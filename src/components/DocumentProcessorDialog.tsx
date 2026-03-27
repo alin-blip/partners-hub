@@ -16,6 +16,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Upload, Loader2, FileText, Check, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type DocType = "courses" | "timetable" | "campuses" | "intakes";
 
@@ -40,6 +42,8 @@ const COLUMNS: Record<DocType, string[]> = {
   intakes: ["label", "start_date", "application_deadline"],
 };
 
+const ALL_DOC_TYPES: DocType[] = ["courses", "campuses", "intakes", "timetable"];
+
 const ACCEPTED = ".pdf,.xlsx,.xls,.docx,.doc,.jpg,.jpeg,.png,.webp";
 
 function readFileAsBase64(file: File): Promise<string> {
@@ -56,13 +60,21 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
   const qc = useQueryClient();
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [docType, setDocType] = useState<DocType>(defaultDocType || "courses");
+  const [selectedTypes, setSelectedTypes] = useState<Set<DocType>>(
+    new Set(defaultDocType ? [defaultDocType] : ["courses"])
+  );
   const [universityId, setUniversityId] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
   const [processProgress, setProcessProgress] = useState({ done: 0, total: 0 });
-  const [items, setItems] = useState<any[]>([]);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
+  // Items grouped by doc type
+  const [itemsByType, setItemsByType] = useState<Record<DocType, any[]>>({
+    courses: [], timetable: [], campuses: [], intakes: [],
+  });
+  const [selectedByType, setSelectedByType] = useState<Record<DocType, Set<number>>>({
+    courses: new Set(), timetable: new Set(), campuses: new Set(), intakes: new Set(),
+  });
+  const [activeTab, setActiveTab] = useState<DocType>("courses");
   const [saving, setSaving] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -70,12 +82,24 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
   const reset = () => {
     setStep(1);
     setFiles([]);
-    setItems([]);
-    setSelected(new Set());
+    setItemsByType({ courses: [], timetable: [], campuses: [], intakes: [] });
+    setSelectedByType({ courses: new Set(), timetable: new Set(), campuses: new Set(), intakes: new Set() });
     setProcessing(false);
     setSaving(false);
     setDragOver(false);
     setProcessProgress({ done: 0, total: 0 });
+  };
+
+  const toggleType = (type: DocType) => {
+    setSelectedTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) {
+        if (next.size > 1) next.delete(type);
+      } else {
+        next.add(type);
+      }
+      return next;
+    });
   };
 
   const addFiles = useCallback((newFiles: FileList | File[]) => {
@@ -108,40 +132,66 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
   }, []);
 
   const handleProcess = async () => {
-    if (files.length === 0 || !universityId) return;
+    if (files.length === 0 || !universityId || selectedTypes.size === 0) return;
     setProcessing(true);
-    setProcessProgress({ done: 0, total: files.length });
 
-    const allItems: any[] = [];
+    const types = Array.from(selectedTypes);
+    const totalOps = files.length * types.length;
+    setProcessProgress({ done: 0, total: totalOps });
+
+    const newItemsByType: Record<DocType, any[]> = {
+      courses: [], timetable: [], campuses: [], intakes: [],
+    };
+    let doneCount = 0;
 
     try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+      // Process each file for each selected type
+      for (const file of files) {
         const base64 = await readFileAsBase64(file);
 
-        const { data, error } = await supabase.functions.invoke("process-settings-document", {
-          body: { file_base64: base64, file_type: file.type, document_type: docType },
-        });
+        for (const docType of types) {
+          const { data, error } = await supabase.functions.invoke("process-settings-document", {
+            body: { file_base64: base64, file_type: file.type, document_type: docType },
+          });
 
-        if (error) throw error;
-        if (!data?.success) throw new Error(data?.error || `Processing failed for ${file.name}`);
+          if (error) throw error;
+          if (!data?.success) throw new Error(data?.error || `Processing failed for ${file.name} (${docType})`);
 
-        const extracted = data.items || [];
-        // Tag items with source file for reference
-        extracted.forEach((item: any) => { item._source = file.name; });
-        allItems.push(...extracted);
+          const extracted = data.items || [];
+          extracted.forEach((item: any) => { item._source = file.name; });
+          newItemsByType[docType].push(...extracted);
 
-        setProcessProgress({ done: i + 1, total: files.length });
+          doneCount++;
+          setProcessProgress({ done: doneCount, total: totalOps });
+        }
       }
 
-      setItems(allItems);
-      setSelected(new Set(allItems.map((_: any, i: number) => i)));
+      setItemsByType(newItemsByType);
+
+      // Auto-select all items
+      const newSelected: Record<DocType, Set<number>> = {
+        courses: new Set(), timetable: new Set(), campuses: new Set(), intakes: new Set(),
+      };
+      for (const t of types) {
+        newSelected[t] = new Set(newItemsByType[t].map((_: any, i: number) => i));
+      }
+      setSelectedByType(newSelected);
+
+      // Set active tab to first type with results
+      const firstWithData = types.find((t) => newItemsByType[t].length > 0) || types[0];
+      setActiveTab(firstWithData);
+
       setStep(2);
 
-      if (allItems.length === 0) {
+      const totalItems = types.reduce((sum, t) => sum + newItemsByType[t].length, 0);
+      if (totalItems === 0) {
         toast({ title: "No data found", description: "AI could not extract items from the uploaded documents.", variant: "destructive" });
       } else {
-        toast({ title: `${allItems.length} items extracted from ${files.length} file(s)` });
+        const breakdown = types
+          .filter((t) => newItemsByType[t].length > 0)
+          .map((t) => `${newItemsByType[t].length} ${DOC_TYPE_LABELS[t].toLowerCase()}`)
+          .join(", ");
+        toast({ title: `Extracted: ${breakdown}` });
       }
     } catch (err: any) {
       toast({ title: "Error", description: err.message || "Failed to process documents", variant: "destructive" });
@@ -150,72 +200,88 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
     }
   };
 
-  const toggleSelect = (idx: number) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
+  const toggleSelect = (type: DocType, idx: number) => {
+    setSelectedByType((prev) => {
+      const next = new Set(prev[type]);
       if (next.has(idx)) next.delete(idx); else next.add(idx);
-      return next;
+      return { ...prev, [type]: next };
     });
   };
 
-  const toggleAll = () => {
-    if (selected.size === items.length) setSelected(new Set());
-    else setSelected(new Set(items.map((_, i) => i)));
+  const toggleAll = (type: DocType) => {
+    setSelectedByType((prev) => {
+      const items = itemsByType[type];
+      const current = prev[type];
+      const next = current.size === items.length ? new Set<number>() : new Set(items.map((_: any, i: number) => i));
+      return { ...prev, [type]: next };
+    });
   };
 
-  const updateItem = (idx: number, field: string, value: string) => {
-    setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, [field]: value } : item)));
+  const updateItem = (type: DocType, idx: number, field: string, value: string) => {
+    setItemsByType((prev) => ({
+      ...prev,
+      [type]: prev[type].map((item, i) => (i === idx ? { ...item, [field]: value } : item)),
+    }));
   };
 
   const handleSave = async () => {
-    const toInsert = items.filter((_, i) => selected.has(i));
-    if (toInsert.length === 0) return;
     setSaving(true);
+    let totalSaved = 0;
 
     try {
-      // Strip internal _source field
-      const clean = toInsert.map(({ _source, ...rest }) => rest);
+      const types = Array.from(selectedTypes);
 
-      if (docType === "courses") {
-        const rows = clean.map((item) => ({
-          university_id: universityId,
-          name: item.name,
-          level: item.level || "undergraduate",
-          study_mode: item.study_mode || "blended",
-        }));
-        const { error } = await supabase.from("courses").insert(rows);
-        if (error) throw error;
-        qc.invalidateQueries({ queryKey: ["all-courses"] });
-      } else if (docType === "timetable") {
-        const rows = clean.map((item) => ({
-          university_id: universityId,
-          label: item.label,
-        }));
-        const { error } = await supabase.from("timetable_options").insert(rows);
-        if (error) throw error;
-        qc.invalidateQueries({ queryKey: ["timetable-options"] });
-      } else if (docType === "campuses") {
-        const rows = clean.map((item) => ({
-          university_id: universityId,
-          name: item.name,
-          city: item.city || null,
-        }));
-        const { error } = await supabase.from("campuses").insert(rows);
-        if (error) throw error;
-        qc.invalidateQueries({ queryKey: ["all-campuses"] });
-      } else {
-        const rows = clean.map((item) => ({
-          university_id: universityId,
-          label: item.label,
-          start_date: item.start_date,
-          application_deadline: item.application_deadline || null,
-        }));
-        const { error } = await supabase.from("intakes").insert(rows);
-        if (error) throw error;
-        qc.invalidateQueries({ queryKey: ["all-intakes"] });
+      for (const docType of types) {
+        const items = itemsByType[docType];
+        const sel = selectedByType[docType];
+        const toInsert = items.filter((_, i) => sel.has(i));
+        if (toInsert.length === 0) continue;
+
+        const clean = toInsert.map(({ _source, ...rest }) => rest);
+
+        if (docType === "courses") {
+          const rows = clean.map((item) => ({
+            university_id: universityId,
+            name: item.name,
+            level: item.level || "undergraduate",
+            study_mode: item.study_mode || "blended",
+          }));
+          const { error } = await supabase.from("courses").insert(rows);
+          if (error) throw error;
+          qc.invalidateQueries({ queryKey: ["all-courses"] });
+        } else if (docType === "timetable") {
+          const rows = clean.map((item) => ({
+            university_id: universityId,
+            label: item.label,
+          }));
+          const { error } = await supabase.from("timetable_options").insert(rows);
+          if (error) throw error;
+          qc.invalidateQueries({ queryKey: ["timetable-options"] });
+        } else if (docType === "campuses") {
+          const rows = clean.map((item) => ({
+            university_id: universityId,
+            name: item.name,
+            city: item.city || null,
+          }));
+          const { error } = await supabase.from("campuses").insert(rows);
+          if (error) throw error;
+          qc.invalidateQueries({ queryKey: ["all-campuses"] });
+        } else if (docType === "intakes") {
+          const rows = clean.map((item) => ({
+            university_id: universityId,
+            label: item.label,
+            start_date: item.start_date,
+            application_deadline: item.application_deadline || null,
+          }));
+          const { error } = await supabase.from("intakes").insert(rows);
+          if (error) throw error;
+          qc.invalidateQueries({ queryKey: ["all-intakes"] });
+        }
+
+        totalSaved += toInsert.length;
       }
 
-      toast({ title: `${toInsert.length} items added successfully` });
+      toast({ title: `${totalSaved} items added successfully` });
       setStep(3);
     } catch (err: any) {
       toast({ title: "Error saving", description: err.message, variant: "destructive" });
@@ -224,7 +290,8 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
     }
   };
 
-  const cols = COLUMNS[docType];
+  const typesWithItems = Array.from(selectedTypes).filter((t) => itemsByType[t].length > 0);
+  const totalSelected = Array.from(selectedTypes).reduce((sum, t) => sum + selectedByType[t].size, 0);
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
@@ -240,15 +307,23 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
         {step === 1 && (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Document Type</Label>
-              <Select value={docType} onValueChange={(v) => setDocType(v as DocType)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(DOC_TYPE_LABELS).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>What to extract (select one or more)</Label>
+              <div className="flex flex-wrap gap-2">
+                {ALL_DOC_TYPES.map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => toggleType(type)}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium border transition-colors
+                      ${selectedTypes.has(type)
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                      }`}
+                  >
+                    {selectedTypes.has(type) && <Check className="h-3 w-3" />}
+                    {DOC_TYPE_LABELS[type]}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -304,16 +379,17 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
               )}
             </div>
 
-            <Button onClick={handleProcess} disabled={files.length === 0 || !universityId || processing} className="w-full">
+            <Button onClick={handleProcess} disabled={files.length === 0 || !universityId || processing || selectedTypes.size === 0} className="w-full">
               {processing ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Processing {processProgress.done}/{processProgress.total} files...
+                  Processing {processProgress.done}/{processProgress.total}...
                 </>
               ) : (
                 <>
                   <Upload className="h-4 w-4" />
                   Process {files.length > 0 ? `${files.length} Document${files.length > 1 ? "s" : ""}` : "Documents"}
+                  {selectedTypes.size > 1 && ` × ${selectedTypes.size} types`}
                 </>
               )}
             </Button>
@@ -323,48 +399,79 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
         {step === 2 && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Found {items.length} items from {files.length} file(s). Edit if needed, then select and confirm.
+              Review extracted data across {typesWithItems.length} categor{typesWithItems.length === 1 ? "y" : "ies"}.
+              Edit if needed, then confirm.
             </p>
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10">
-                    <Checkbox checked={selected.size === items.length && items.length > 0} onCheckedChange={toggleAll} />
-                  </TableHead>
-                  {cols.map((c) => (
-                    <TableHead key={c} className="capitalize">{c.replace(/_/g, " ")}</TableHead>
+            {typesWithItems.length > 0 ? (
+              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DocType)}>
+                <TabsList className="w-full justify-start">
+                  {typesWithItems.map((type) => (
+                    <TabsTrigger key={type} value={type} className="gap-1.5">
+                      {DOC_TYPE_LABELS[type]}
+                      <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+                        {selectedByType[type].size}/{itemsByType[type].length}
+                      </Badge>
+                    </TabsTrigger>
                   ))}
-                  <TableHead>Source</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((item, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell>
-                      <Checkbox checked={selected.has(idx)} onCheckedChange={() => toggleSelect(idx)} />
-                    </TableCell>
-                    {cols.map((col) => (
-                      <TableCell key={col}>
-                        <Input
-                          value={item[col] || ""}
-                          onChange={(e) => updateItem(idx, col, e.target.value)}
-                          className="h-8 text-sm"
-                        />
-                      </TableCell>
-                    ))}
-                    <TableCell>
-                      <span className="text-xs text-muted-foreground truncate max-w-[120px] block">{item._source}</span>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TabsList>
+
+                {typesWithItems.map((type) => {
+                  const cols = COLUMNS[type];
+                  const items = itemsByType[type];
+                  const sel = selectedByType[type];
+
+                  return (
+                    <TabsContent key={type} value={type}>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-10">
+                              <Checkbox
+                                checked={sel.size === items.length && items.length > 0}
+                                onCheckedChange={() => toggleAll(type)}
+                              />
+                            </TableHead>
+                            {cols.map((c) => (
+                              <TableHead key={c} className="capitalize">{c.replace(/_/g, " ")}</TableHead>
+                            ))}
+                            <TableHead>Source</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {items.map((item, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell>
+                                <Checkbox checked={sel.has(idx)} onCheckedChange={() => toggleSelect(type, idx)} />
+                              </TableCell>
+                              {cols.map((col) => (
+                                <TableCell key={col}>
+                                  <Input
+                                    value={item[col] || ""}
+                                    onChange={(e) => updateItem(type, idx, col, e.target.value)}
+                                    className="h-8 text-sm"
+                                  />
+                                </TableCell>
+                              ))}
+                              <TableCell>
+                                <span className="text-xs text-muted-foreground truncate max-w-[120px] block">{item._source}</span>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TabsContent>
+                  );
+                })}
+              </Tabs>
+            ) : (
+              <p className="text-center py-8 text-muted-foreground">No data extracted from the uploaded documents.</p>
+            )}
 
             <div className="flex gap-2 justify-end">
               <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
-              <Button onClick={handleSave} disabled={selected.size === 0 || saving}>
-                {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</> : <>Add {selected.size} Selected</>}
+              <Button onClick={handleSave} disabled={totalSelected === 0 || saving}>
+                {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</> : <>Add {totalSelected} Selected</>}
               </Button>
             </div>
           </div>
