@@ -89,6 +89,8 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
     setSaving(false);
     setDragOver(false);
     setProcessProgress({ done: 0, total: 0 });
+    setSavedSummary({ courses: 0, timetable: 0, campuses: 0, intakes: 0 });
+    setSavingToKB(false);
   };
 
   const toggleType = (type: DocType) => {
