@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Send, AlertTriangle, MessageSquare, FileWarning, DollarSign, Info, AlertCircle, RefreshCw, Flame, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
 import { StatusBadge } from "@/components/StatusBadge";
+import { notifyAgentOfStatusChange } from "@/lib/enrollment-emails";
 
 const NOTE_TYPE_CONFIG: Record<string, { label: string; icon: any; color: string }> = {
   note: { label: "Note", icon: MessageSquare, color: "bg-blue-500/10 text-blue-700" },
