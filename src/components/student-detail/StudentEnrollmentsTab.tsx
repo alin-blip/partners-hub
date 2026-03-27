@@ -23,6 +23,16 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
   const { toast } = useToast();
   const qc = useQueryClient();
 
+  const { data: profile } = useQuery({
+    queryKey: ["my-profile-name"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const { data } = await supabase.from("profiles").select("full_name").eq("id", user.id).single();
+      return data;
+    },
+  });
+
   const { data: enrollments = [] } = useQuery({
     queryKey: ["student-enrollments", studentId],
     queryFn: async () => {
@@ -36,13 +46,15 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
   });
 
   const updateStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+    mutationFn: async ({ id, status, oldStatus }: { id: string; status: string; oldStatus: string }) => {
       const { error } = await supabase.from("enrollments").update({ status }).eq("id", id);
       if (error) throw error;
+      return { id, status, oldStatus };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ["student-enrollments", studentId] });
       toast({ title: "Status updated" });
+      notifyAgentOfStatusChange(result.id, result.status, result.oldStatus, profile?.full_name);
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
