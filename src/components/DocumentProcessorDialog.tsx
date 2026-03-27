@@ -536,8 +536,8 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
                   </label>
                   <label className="flex items-center gap-2 text-sm cursor-pointer">
                     <Checkbox
-                      checked={saveToKB}
-                      onCheckedChange={(v) => setSaveToKB(!!v)}
+                      checked={saveToKBOption}
+                      onCheckedChange={(v) => setSaveToKBOption(!!v)}
                     />
                     Knowledge Base (AI)
                   </label>
