@@ -1084,7 +1084,9 @@ export type Database = {
           description: string | null
           id: string
           priority: string
+          source: string
           status: string
+          student_id: string | null
           title: string
           updated_at: string
         }
@@ -1096,7 +1098,9 @@ export type Database = {
           description?: string | null
           id?: string
           priority?: string
+          source?: string
           status?: string
+          student_id?: string | null
           title: string
           updated_at?: string
         }
@@ -1108,7 +1112,9 @@ export type Database = {
           description?: string | null
           id?: string
           priority?: string
+          source?: string
           status?: string
+          student_id?: string | null
           title?: string
           updated_at?: string
         }
@@ -1125,6 +1131,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
             referencedColumns: ["id"]
           },
         ]
