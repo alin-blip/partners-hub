@@ -67,7 +67,6 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
   const [files, setFiles] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
   const [processProgress, setProcessProgress] = useState({ done: 0, total: 0 });
-  // Items grouped by doc type
   const [itemsByType, setItemsByType] = useState<Record<DocType, any[]>>({
     courses: [], timetable: [], campuses: [], intakes: [],
   });
@@ -76,6 +75,8 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
   });
   const [activeTab, setActiveTab] = useState<DocType>("courses");
   const [saving, setSaving] = useState(false);
+  const [savedSummary, setSavedSummary] = useState<Record<DocType, number>>({ courses: 0, timetable: 0, campuses: 0, intakes: 0 });
+  const [savingToKB, setSavingToKB] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -88,6 +89,8 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
     setSaving(false);
     setDragOver(false);
     setProcessProgress({ done: 0, total: 0 });
+    setSavedSummary({ courses: 0, timetable: 0, campuses: 0, intakes: 0 });
+    setSavingToKB(false);
   };
 
   const toggleType = (type: DocType) => {
@@ -227,6 +230,7 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
   const handleSave = async () => {
     setSaving(true);
     let totalSaved = 0;
+    const summary: Record<DocType, number> = { courses: 0, timetable: 0, campuses: 0, intakes: 0 };
 
     try {
       const types = Array.from(selectedTypes);
@@ -278,15 +282,62 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
           qc.invalidateQueries({ queryKey: ["all-intakes"] });
         }
 
+        summary[docType] = toInsert.length;
         totalSaved += toInsert.length;
       }
 
+      setSavedSummary(summary);
       toast({ title: `${totalSaved} items added successfully` });
       setStep(3);
     } catch (err: any) {
       toast({ title: "Error saving", description: err.message, variant: "destructive" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const universityName = universities.find((u) => u.id === universityId)?.name || "University";
+
+  const handleSaveToKB = async () => {
+    setSavingToKB(true);
+    try {
+      const types = Array.from(selectedTypes).filter((t) => savedSummary[t] > 0);
+      const kbEntries = types.map((docType) => {
+        const items = itemsByType[docType];
+        const sel = selectedByType[docType];
+        const saved = items.filter((_, i) => sel.has(i));
+
+        let content = "";
+        if (docType === "courses") {
+          content = saved.map((c) => `- ${c.name} (${c.level}, ${c.study_mode})`).join("\n");
+        } else if (docType === "campuses") {
+          content = saved.map((c) => `- ${c.name}${c.city ? ` — ${c.city}` : ""}`).join("\n");
+        } else if (docType === "intakes") {
+          content = saved.map((c) => `- ${c.label} (starts ${c.start_date}${c.application_deadline ? `, deadline ${c.application_deadline}` : ""})`).join("\n");
+        } else if (docType === "timetable") {
+          content = saved.map((c) => `- ${c.label}`).join("\n");
+        }
+
+        return {
+          title: `${universityName} — ${DOC_TYPE_LABELS[docType]}`,
+          content,
+          category: docType,
+        };
+      });
+
+      if (kbEntries.length > 0) {
+        const { error } = await supabase.from("ai_knowledge_base").insert(kbEntries);
+        if (error) throw error;
+        qc.invalidateQueries({ queryKey: ["knowledge-base"] });
+      }
+
+      toast({ title: "Saved to Knowledge Base" });
+      reset();
+      onOpenChange(false);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingToKB(false);
     }
   };
 
@@ -478,13 +529,35 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
         )}
 
         {step === 3 && (
-          <div className="text-center space-y-4 py-6">
+          <div className="space-y-5 py-4">
             <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
               <Check className="h-6 w-6 text-primary" />
             </div>
-            <p className="text-lg font-medium">Import Complete!</p>
-            <p className="text-sm text-muted-foreground">Data has been added to your platform settings.</p>
-            <Button onClick={() => { reset(); onOpenChange(false); }}>Done</Button>
+            <div className="text-center">
+              <p className="text-lg font-medium">Import Complete!</p>
+              <p className="text-sm text-muted-foreground mt-1">{universityName}</p>
+            </div>
+
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+              <p className="text-sm font-medium mb-2">Summary</p>
+              {Array.from(selectedTypes)
+                .filter((t) => savedSummary[t] > 0)
+                .map((t) => (
+                  <div key={t} className="flex items-center gap-2 text-sm">
+                    <Check className="h-4 w-4 text-primary shrink-0" />
+                    <span>{savedSummary[t]} {DOC_TYPE_LABELS[t]}</span>
+                  </div>
+                ))}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Button onClick={handleSaveToKB} disabled={savingToKB} variant="outline" className="w-full">
+                {savingToKB ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving to Knowledge Base...</> : <>
+                  <FileText className="h-4 w-4" /> Save to Knowledge Base
+                </>}
+              </Button>
+              <Button onClick={() => { reset(); onOpenChange(false); }} className="w-full">Done</Button>
+            </div>
           </div>
         )}
       </DialogContent>
