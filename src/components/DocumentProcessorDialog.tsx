@@ -594,16 +594,13 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
                     <span>{savedSummary[t]} {DOC_TYPE_LABELS[t]}</span>
                   </div>
                 ))}
+              <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t">
+                {saveToTables && <Badge variant="secondary">Database</Badge>}
+                {saveToKBOption && <Badge variant="secondary">Knowledge Base</Badge>}
+              </div>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <Button onClick={handleSaveToKB} disabled={savingToKB} variant="outline" className="w-full">
-                {savingToKB ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving to Knowledge Base...</> : <>
-                  <FileText className="h-4 w-4" /> Save to Knowledge Base
-                </>}
-              </Button>
-              <Button onClick={() => { reset(); onOpenChange(false); }} className="w-full">Done</Button>
-            </div>
+            <Button onClick={() => { reset(); onOpenChange(false); }} className="w-full">Done</Button>
           </div>
         )}
       </DialogContent>
