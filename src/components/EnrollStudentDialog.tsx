@@ -115,6 +115,23 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
     enabled: !!universityId,
   });
 
+  // Query distinct course IDs available at this campus
+  const { data: campusCourseIds = [] } = useQuery({
+    queryKey: ["campus-courses", campusId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("course_timetable_groups")
+        .select("course_id")
+        .eq("campus_id", campusId);
+      return [...new Set((data || []).map((r: any) => r.course_id))];
+    },
+    enabled: !!campusId,
+  });
+
+  const filteredCourses = campusCourseIds.length > 0
+    ? courses.filter((c: any) => campusCourseIds.includes(c.id))
+    : courses;
+
   const { data: courseTimetableGroups = [] } = useQuery({
     queryKey: ["course-timetable-groups", courseId, campusId],
     queryFn: async () => {
@@ -250,16 +267,16 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
               <>
                 <div className="space-y-2">
                   <Label>Campus</Label>
-                  <Select value={campusId} onValueChange={setCampusId}>
+                  <Select value={campusId} onValueChange={(v) => { setCampusId(v); setCourseId(""); setStudyPattern([]); }}>
                     <SelectTrigger><SelectValue placeholder="Select campus (optional)" /></SelectTrigger>
                     <SelectContent>{campuses.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}{c.city ? ` — ${c.city}` : ""}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Course *</Label>
-                  <Select value={courseId} onValueChange={setCourseId}>
+                  <Select value={courseId} onValueChange={(v) => { setCourseId(v); setStudyPattern([]); }}>
                     <SelectTrigger><SelectValue placeholder="Select course" /></SelectTrigger>
-                    <SelectContent>{courses.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name} ({c.level})</SelectItem>)}</SelectContent>
+                    <SelectContent>{filteredCourses.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name} ({c.level})</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
