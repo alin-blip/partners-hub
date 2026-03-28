@@ -60,12 +60,12 @@ function readFileAsBase64(file: File): Promise<string> {
 }
 
 const EMPTY_ITEMS: Record<DocType, any[]> = {
-  courses: [], timetable: [], campuses: [], intakes: [], course_timetable: [],
+  courses: [], timetable: [], campuses: [], intakes: [], course_timetable: [], course_details: [],
 };
 const EMPTY_SELECTED: Record<DocType, Set<number>> = {
-  courses: new Set(), timetable: new Set(), campuses: new Set(), intakes: new Set(), course_timetable: new Set(),
+  courses: new Set(), timetable: new Set(), campuses: new Set(), intakes: new Set(), course_timetable: new Set(), course_details: new Set(),
 };
-const EMPTY_SUMMARY: Record<DocType, number> = { courses: 0, timetable: 0, campuses: 0, intakes: 0, course_timetable: 0 };
+const EMPTY_SUMMARY: Record<DocType, number> = { courses: 0, timetable: 0, campuses: 0, intakes: 0, course_timetable: 0, course_details: 0 };
 
 export function DocumentProcessorDialog({ open, onOpenChange, universities, defaultDocType }: Props) {
   const { toast } = useToast();
