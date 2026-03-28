@@ -18,6 +18,7 @@ export function StudentAIDocumentsTab({ studentId, studentName }: Props) {
   const [generating, setGenerating] = useState<"cv" | "personal_statement" | null>(null);
   const [cvContent, setCvContent] = useState<string | null>(null);
   const [psContent, setPsContent] = useState<string | null>(null);
+  const [useGuidelines, setUseGuidelines] = useState(true);
   const printRef = useRef<HTMLDivElement>(null);
 
   const generate = async (type: "cv" | "personal_statement") => {
