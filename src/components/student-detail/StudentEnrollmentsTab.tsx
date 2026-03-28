@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,6 +9,9 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { notifyAgentOfStatusChange } from "@/lib/enrollment-emails";
+import { CourseDetailsInfoCard } from "@/components/CourseDetailsInfoCard";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const STATUSES = [
   "applied", "documents_pending", "documents_submitted", "processing",
