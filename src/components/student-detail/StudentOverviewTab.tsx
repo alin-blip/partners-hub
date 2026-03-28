@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 const IMMIGRATION_OPTIONS = ["Pre-settled", "Settled", "British Citizen", "Visa Holder", "Refugee", "Other"];
 const TITLE_OPTIONS = ["Mr", "Mrs", "Ms", "Miss", "Dr", "Other"];
 const GENDER_OPTIONS = ["Male", "Female", "Other", "Prefer not to say"];
+const STUDY_PATTERNS_FALLBACK = ["Weekdays", "Weekend", "Evenings"];
 
 interface Props {
   student: any;
