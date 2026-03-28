@@ -496,7 +496,7 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
                 <Upload className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
                 <p className="text-sm font-medium">Drag & drop files here or click to browse</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Support for multiple files · PDF, JPG, PNG
+                  Support for multiple files · PDF, XLSX, JPG, PNG
                 </p>
               </div>
 
