@@ -82,17 +82,10 @@ If you cannot find any relevant data, return an empty array [].`;
       });
       userContent.push({ type: "text", text: "Extract the structured data from this PDF document." });
     } else {
-      // For other file types (XLSX, DOCX), decode base64 text content
-      let textContent: string;
-      try {
-        const bytes = Uint8Array.from(atob(file_base64), (c) => c.charCodeAt(0));
-        textContent = new TextDecoder().decode(bytes);
-      } catch {
-        textContent = atob(file_base64);
-      }
-      userContent.push({
-        type: "text",
-        text: `Extract the structured data from this document content:\n\n${textContent.substring(0, 50000)}`,
+      // Unsupported binary formats (XLSX, DOCX etc.) cannot be parsed as text
+      return new Response(JSON.stringify({ success: false, error: "Unsupported file type. Please upload a PDF or image (JPG, PNG)." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
