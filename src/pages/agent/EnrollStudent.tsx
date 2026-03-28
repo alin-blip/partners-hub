@@ -404,6 +404,7 @@ export default function EnrollStudent() {
                   </div>
                 </>
               )}
+              {courseId && <CourseDetailsInfoCard courseId={courseId} compact />}
               <div className="flex justify-end pt-2">
                 <Button onClick={() => setStep(2)} disabled={!canProceedStep1} className="bg-accent text-accent-foreground hover:bg-accent/90">
                   Next <ArrowRight className="w-4 h-4 ml-1" />
