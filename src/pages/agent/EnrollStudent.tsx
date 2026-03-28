@@ -152,8 +152,9 @@ export default function EnrollStudent() {
     enabled: !!universityId,
   });
 
-  const displayTimetableOptions = courseTimetableGroups.length > 0
-    ? courseTimetableGroups
+  // Show course-specific groups only when a course is selected; fall back to university-wide only when NO course is selected
+  const displayTimetableOptions = courseId
+    ? (courseTimetableGroups.length > 0 ? courseTimetableGroups : null)
     : (universityTimetableOptions.length > 0 ? universityTimetableOptions : null);
 
   const handleAddFile = (e: React.ChangeEvent<HTMLInputElement>) => {
