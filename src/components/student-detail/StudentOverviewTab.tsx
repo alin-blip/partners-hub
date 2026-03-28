@@ -60,6 +60,17 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
     enabled: !!firstEnrollment?.course_id,
   });
 
+  const { data: universityTimetableOptions = [] } = useQuery({
+    queryKey: ["timetable-options", firstEnrollment?.university_id],
+    queryFn: async () => {
+      const { data } = await supabase.from("timetable_options").select("id, label").eq("university_id", firstEnrollment.university_id).order("label");
+      return data || [];
+    },
+    enabled: !!firstEnrollment?.university_id,
+  });
+
+  const displayTimetableOptions = timetableGroups.length > 0 ? timetableGroups : universityTimetableOptions.length > 0 ? universityTimetableOptions : null;
+
   const updateStudent = useMutation({
     mutationFn: async (updates: any) => {
       const { error } = await supabase.from("students").update(updates).eq("id", student.id);
@@ -165,9 +176,9 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
             )}
             <div className="space-y-2">
               <Label>Study Pattern / Timetable Group</Label>
-              {timetableGroups.length > 0 ? (
+              {displayTimetableOptions ? (
                 <div className="flex flex-wrap gap-3">
-                  {timetableGroups.map((g) => {
+                  {displayTimetableOptions.map((g) => {
                     const currentPatterns = (editData.study_pattern || "").split(", ").filter(Boolean);
                     return (
                       <label key={g.id} className="flex items-center gap-2 text-sm">

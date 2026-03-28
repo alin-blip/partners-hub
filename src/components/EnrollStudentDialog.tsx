@@ -134,6 +134,17 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
     enabled: !!courseId,
   });
 
+  const { data: universityTimetableOptions = [] } = useQuery({
+    queryKey: ["timetable-options", universityId],
+    queryFn: async () => {
+      const { data } = await supabase.from("timetable_options").select("id, label").eq("university_id", universityId).order("label");
+      return data || [];
+    },
+    enabled: !!universityId,
+  });
+
+  const displayTimetableOptions = courseTimetableGroups.length > 0 ? courseTimetableGroups : universityTimetableOptions.length > 0 ? universityTimetableOptions : null;
+
   const handleAddFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) setDocFiles((prev) => [...prev, { file, docType: selectedDocType }]);
@@ -262,8 +273,8 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
                   <Label>Study Pattern / Timetable Group</Label>
                   {(selectedUniversity as any)?.timetable_available === false ? (
                     <div className="p-3 rounded-md bg-muted text-sm text-muted-foreground border"><Calendar className="w-4 h-4 inline mr-2" />{(selectedUniversity as any)?.timetable_message || "Timetable will be assigned."}</div>
-                  ) : courseTimetableGroups.length > 0 ? (
-                    <div className="flex flex-wrap gap-3">{courseTimetableGroups.map((g) => (
+                  ) : displayTimetableOptions ? (
+                    <div className="flex flex-wrap gap-3">{displayTimetableOptions.map((g) => (
                       <label key={g.id} className="flex items-center gap-2 text-sm">
                         <Checkbox checked={studyPattern.includes(g.label)} onCheckedChange={(checked) => setStudyPattern(checked ? [...studyPattern, g.label] : studyPattern.filter((p) => p !== g.label))} />{g.label}
                       </label>
