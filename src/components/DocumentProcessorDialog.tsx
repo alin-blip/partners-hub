@@ -308,7 +308,7 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
             const existingLabels = new Set((existingIntakes || []).map((i) => i.label.toLowerCase().trim()));
             const rows = clean
               .filter((item) => !existingLabels.has(item.label?.toLowerCase().trim()))
-              .map((item) => ({ university_id: universityId, label: item.label, start_date: item.start_date, application_deadline: item.application_deadline || null }));
+              .map((item) => ({ university_id: universityId, label: item.label, start_date: item.start_date || new Date().toISOString().split("T")[0], application_deadline: item.application_deadline || null }));
             if (rows.length > 0) {
               const { error } = await supabase.from("intakes").insert(rows);
               if (error) throw error;
