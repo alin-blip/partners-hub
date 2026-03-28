@@ -29,6 +29,37 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState<any>(null);
 
+  // Fetch enrollments to get course/campus for timetable lookup
+  const { data: enrollments = [] } = useQuery({
+    queryKey: ["student-enrollments-overview", student.id],
+    queryFn: async () => {
+      const { data } = await supabase.from("enrollments").select("course_id, campus_id, university_id").eq("student_id", student.id).limit(1);
+      return data || [];
+    },
+  });
+
+  const firstEnrollment = enrollments[0] as any;
+
+  // Fetch dynamic timetable groups for the student's course + campus
+  const { data: timetableGroups = [] } = useQuery({
+    queryKey: ["course-timetable-groups", firstEnrollment?.course_id, firstEnrollment?.campus_id],
+    queryFn: async () => {
+      let query = supabase
+        .from("course_timetable_groups")
+        .select("id, timetable_option_id, timetable_options(id, label)")
+        .eq("course_id", firstEnrollment.course_id);
+      if (firstEnrollment.campus_id) {
+        query = query.eq("campus_id", firstEnrollment.campus_id);
+      }
+      const { data } = await query;
+      return (data || []).map((row: any) => ({
+        id: row.timetable_option_id,
+        label: row.timetable_options?.label || "Unknown",
+      }));
+    },
+    enabled: !!firstEnrollment?.course_id,
+  });
+
   const updateStudent = useMutation({
     mutationFn: async (updates: any) => {
       const { error } = await supabase.from("students").update(updates).eq("id", student.id);
