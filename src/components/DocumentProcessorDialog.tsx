@@ -19,7 +19,7 @@ import { Upload, Loader2, FileText, Check, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-type DocType = "courses" | "timetable" | "campuses" | "intakes";
+type DocType = "courses" | "timetable" | "campuses" | "intakes" | "course_timetable";
 
 interface Props {
   open: boolean;
@@ -33,6 +33,7 @@ const DOC_TYPE_LABELS: Record<DocType, string> = {
   timetable: "Timetable Options",
   campuses: "Campuses",
   intakes: "Intakes",
+  course_timetable: "Course–Timetable Matrix",
 };
 
 const COLUMNS: Record<DocType, string[]> = {
@@ -40,9 +41,10 @@ const COLUMNS: Record<DocType, string[]> = {
   timetable: ["label"],
   campuses: ["name", "city"],
   intakes: ["label", "start_date", "application_deadline"],
+  course_timetable: ["course_name", "campus", "groups"],
 };
 
-const ALL_DOC_TYPES: DocType[] = ["courses", "campuses", "intakes", "timetable"];
+const ALL_DOC_TYPES: DocType[] = ["courses", "campuses", "intakes", "timetable", "course_timetable"];
 
 const ACCEPTED = ".pdf,.xlsx,.xls,.docx,.doc,.jpg,.jpeg,.png,.webp";
 
@@ -54,6 +56,14 @@ function readFileAsBase64(file: File): Promise<string> {
     reader.readAsDataURL(file);
   });
 }
+
+const EMPTY_ITEMS: Record<DocType, any[]> = {
+  courses: [], timetable: [], campuses: [], intakes: [], course_timetable: [],
+};
+const EMPTY_SELECTED: Record<DocType, Set<number>> = {
+  courses: new Set(), timetable: new Set(), campuses: new Set(), intakes: new Set(), course_timetable: new Set(),
+};
+const EMPTY_SUMMARY: Record<DocType, number> = { courses: 0, timetable: 0, campuses: 0, intakes: 0, course_timetable: 0 };
 
 export function DocumentProcessorDialog({ open, onOpenChange, universities, defaultDocType }: Props) {
   const { toast } = useToast();
@@ -67,16 +77,11 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
   const [files, setFiles] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
   const [processProgress, setProcessProgress] = useState({ done: 0, total: 0 });
-  const [itemsByType, setItemsByType] = useState<Record<DocType, any[]>>({
-    courses: [], timetable: [], campuses: [], intakes: [],
-  });
-  const [selectedByType, setSelectedByType] = useState<Record<DocType, Set<number>>>({
-    courses: new Set(), timetable: new Set(), campuses: new Set(), intakes: new Set(),
-  });
+  const [itemsByType, setItemsByType] = useState<Record<DocType, any[]>>({ ...EMPTY_ITEMS });
+  const [selectedByType, setSelectedByType] = useState<Record<DocType, Set<number>>>({ ...EMPTY_SELECTED });
   const [activeTab, setActiveTab] = useState<DocType>("courses");
   const [saving, setSaving] = useState(false);
-  const [savedSummary, setSavedSummary] = useState<Record<DocType, number>>({ courses: 0, timetable: 0, campuses: 0, intakes: 0 });
-  const [savingToKB, setSavingToKB] = useState(false);
+  const [savedSummary, setSavedSummary] = useState<Record<DocType, number>>({ ...EMPTY_SUMMARY });
   const [saveToTables, setSaveToTables] = useState(true);
   const [saveToKBOption, setSaveToKBOption] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -85,14 +90,15 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
   const reset = () => {
     setStep(1);
     setFiles([]);
-    setItemsByType({ courses: [], timetable: [], campuses: [], intakes: [] });
-    setSelectedByType({ courses: new Set(), timetable: new Set(), campuses: new Set(), intakes: new Set() });
+    setItemsByType({ ...EMPTY_ITEMS });
+    setSelectedByType({
+      courses: new Set(), timetable: new Set(), campuses: new Set(), intakes: new Set(), course_timetable: new Set(),
+    });
     setProcessing(false);
     setSaving(false);
     setDragOver(false);
     setProcessProgress({ done: 0, total: 0 });
-    setSavedSummary({ courses: 0, timetable: 0, campuses: 0, intakes: 0 });
-    setSavingToKB(false);
+    setSavedSummary({ ...EMPTY_SUMMARY });
     setSaveToTables(true);
     setSaveToKBOption(false);
   };
@@ -146,28 +152,32 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
     const totalOps = files.length * types.length;
     setProcessProgress({ done: 0, total: totalOps });
 
-    const newItemsByType: Record<DocType, any[]> = {
-      courses: [], timetable: [], campuses: [], intakes: [],
-    };
+    const newItemsByType: Record<DocType, any[]> = { ...EMPTY_ITEMS, courses: [], timetable: [], campuses: [], intakes: [], course_timetable: [] };
     let doneCount = 0;
 
     try {
-      // Process each file for each selected type
       for (const file of files) {
         const base64 = await readFileAsBase64(file);
-
         for (const docType of types) {
           const { data, error } = await supabase.functions.invoke("process-settings-document", {
             body: { file_base64: base64, file_type: file.type, document_type: docType },
           });
-
           if (error) throw error;
           if (!data?.success) throw new Error(data?.error || `Processing failed for ${file.name} (${docType})`);
 
           const extracted = data.items || [];
           extracted.forEach((item: any) => { item._source = file.name; });
-          newItemsByType[docType].push(...extracted);
 
+          // For course_timetable, stringify groups array for display
+          if (docType === "course_timetable") {
+            extracted.forEach((item: any) => {
+              if (Array.isArray(item.groups)) {
+                item.groups = item.groups.join(", ");
+              }
+            });
+          }
+
+          newItemsByType[docType].push(...extracted);
           doneCount++;
           setProcessProgress({ done: doneCount, total: totalOps });
         }
@@ -175,19 +185,16 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
 
       setItemsByType(newItemsByType);
 
-      // Auto-select all items
       const newSelected: Record<DocType, Set<number>> = {
-        courses: new Set(), timetable: new Set(), campuses: new Set(), intakes: new Set(),
+        courses: new Set(), timetable: new Set(), campuses: new Set(), intakes: new Set(), course_timetable: new Set(),
       };
       for (const t of types) {
         newSelected[t] = new Set(newItemsByType[t].map((_: any, i: number) => i));
       }
       setSelectedByType(newSelected);
 
-      // Set active tab to first type with results
       const firstWithData = types.find((t) => newItemsByType[t].length > 0) || types[0];
       setActiveTab(firstWithData);
-
       setStep(2);
 
       const totalItems = types.reduce((sum, t) => sum + newItemsByType[t].length, 0);
@@ -234,13 +241,12 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
   const handleSave = async () => {
     setSaving(true);
     let totalSaved = 0;
-    const summary: Record<DocType, number> = { courses: 0, timetable: 0, campuses: 0, intakes: 0 };
+    const summary: Record<DocType, number> = { ...EMPTY_SUMMARY };
 
     try {
       const types = Array.from(selectedTypes);
 
-      // Collect selected items per type
-      const selectedItemsByType: Record<DocType, any[]> = { courses: [], timetable: [], campuses: [], intakes: [] };
+      const selectedItemsByType: Record<DocType, any[]> = { courses: [], timetable: [], campuses: [], intakes: [], course_timetable: [] };
       for (const docType of types) {
         const items = itemsByType[docType];
         const sel = selectedByType[docType];
@@ -278,6 +284,48 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
             const { error } = await supabase.from("intakes").insert(rows);
             if (error) throw error;
             qc.invalidateQueries({ queryKey: ["all-intakes"] });
+          } else if (docType === "course_timetable") {
+            // Match course names and campus names to existing IDs, then insert into course_timetable_groups
+            const { data: existingCourses } = await supabase.from("courses").select("id, name").eq("university_id", universityId);
+            const { data: existingCampuses } = await supabase.from("campuses").select("id, name").eq("university_id", universityId);
+            const { data: existingTimetables } = await supabase.from("timetable_options").select("id, label").eq("university_id", universityId);
+
+            const courseMap = new Map((existingCourses || []).map((c) => [c.name.toLowerCase().trim(), c.id]));
+            const campusMap = new Map((existingCampuses || []).map((c) => [c.name.toLowerCase().trim(), c.id]));
+            // Map timetable options by single letter extracted from label (e.g. "Group A – Monday..." -> "a")
+            const timetableByLetter = new Map<string, string>();
+            for (const t of existingTimetables || []) {
+              const match = t.label.match(/^(?:Group\s+)?([A-Z])/i);
+              if (match) timetableByLetter.set(match[1].toLowerCase(), t.id);
+            }
+
+            const rows: any[] = [];
+            for (const item of clean) {
+              const courseId = courseMap.get(item.course_name?.toLowerCase().trim());
+              const campusId = campusMap.get(item.campus?.toLowerCase().trim());
+              if (!courseId) continue;
+
+              const groupLetters = typeof item.groups === "string"
+                ? item.groups.split(",").map((g: string) => g.trim().toLowerCase())
+                : [];
+
+              for (const letter of groupLetters) {
+                const timetableId = timetableByLetter.get(letter);
+                if (!timetableId) continue;
+                rows.push({
+                  course_id: courseId,
+                  campus_id: campusId || null,
+                  timetable_option_id: timetableId,
+                  university_id: universityId,
+                });
+              }
+            }
+
+            if (rows.length > 0) {
+              const { error } = await supabase.from("course_timetable_groups").insert(rows);
+              if (error) throw error;
+              qc.invalidateQueries({ queryKey: ["course-timetable-groups"] });
+            }
           }
         }
       }
@@ -297,8 +345,10 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
               content = saved.map((c) => `- ${c.label} (starts ${c.start_date}${c.application_deadline ? `, deadline ${c.application_deadline}` : ""})`).join("\n");
             } else if (docType === "timetable") {
               content = saved.map((c) => `- ${c.label}`).join("\n");
+            } else if (docType === "course_timetable") {
+              content = saved.map((c) => `- ${c.course_name} @ ${c.campus}: Groups ${c.groups}`).join("\n");
             }
-            return { title: `${universityName} — ${DOC_TYPE_LABELS[docType]}`, content, category: docType };
+            return { title: `${universityName} — ${DOC_TYPE_LABELS[docType]}`, content, category: docType === "course_timetable" ? "timetable" : docType };
           });
 
         if (kbEntries.length > 0) {
@@ -322,7 +372,6 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
   };
 
   const universityName = universities.find((u) => u.id === universityId)?.name || "University";
-
 
   const typesWithItems = Array.from(selectedTypes).filter((t) => itemsByType[t].length > 0);
   const totalSelected = Array.from(selectedTypes).reduce((sum, t) => sum + selectedByType[t].size, 0);
@@ -439,7 +488,7 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
 
             {typesWithItems.length > 0 ? (
               <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DocType)}>
-                <TabsList className="w-full justify-start">
+                <TabsList className="w-full justify-start flex-wrap h-auto gap-1">
                   {typesWithItems.map((type) => (
                     <TabsTrigger key={type} value={type} className="gap-1.5">
                       {DOC_TYPE_LABELS[type]}
@@ -457,43 +506,45 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
 
                   return (
                     <TabsContent key={type} value={type}>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-10">
-                              <Checkbox
-                                checked={sel.size === items.length && items.length > 0}
-                                onCheckedChange={() => toggleAll(type)}
-                              />
-                            </TableHead>
-                            {cols.map((c) => (
-                              <TableHead key={c} className="capitalize">{c.replace(/_/g, " ")}</TableHead>
-                            ))}
-                            <TableHead>Source</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {items.map((item, idx) => (
-                            <TableRow key={idx}>
-                              <TableCell>
-                                <Checkbox checked={sel.has(idx)} onCheckedChange={() => toggleSelect(type, idx)} />
-                              </TableCell>
-                              {cols.map((col) => (
-                                <TableCell key={col}>
-                                  <Input
-                                    value={item[col] || ""}
-                                    onChange={(e) => updateItem(type, idx, col, e.target.value)}
-                                    className="h-8 text-sm"
-                                  />
-                                </TableCell>
+                      <div className="max-h-[40vh] overflow-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-10">
+                                <Checkbox
+                                  checked={sel.size === items.length && items.length > 0}
+                                  onCheckedChange={() => toggleAll(type)}
+                                />
+                              </TableHead>
+                              {cols.map((c) => (
+                                <TableHead key={c} className="capitalize">{c.replace(/_/g, " ")}</TableHead>
                               ))}
-                              <TableCell>
-                                <span className="text-xs text-muted-foreground truncate max-w-[120px] block">{item._source}</span>
-                              </TableCell>
+                              <TableHead>Source</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                          </TableHeader>
+                          <TableBody>
+                            {items.map((item, idx) => (
+                              <TableRow key={idx}>
+                                <TableCell>
+                                  <Checkbox checked={sel.has(idx)} onCheckedChange={() => toggleSelect(type, idx)} />
+                                </TableCell>
+                                {cols.map((col) => (
+                                  <TableCell key={col}>
+                                    <Input
+                                      value={item[col] || ""}
+                                      onChange={(e) => updateItem(type, idx, col, e.target.value)}
+                                      className="h-8 text-sm"
+                                    />
+                                  </TableCell>
+                                ))}
+                                <TableCell>
+                                  <span className="text-xs text-muted-foreground truncate max-w-[120px] block">{item._source}</span>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
                     </TabsContent>
                   );
                 })}
