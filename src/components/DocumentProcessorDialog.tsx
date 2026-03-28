@@ -48,7 +48,7 @@ const COLUMNS: Record<DocType, string[]> = {
 
 const ALL_DOC_TYPES: DocType[] = ["courses", "campuses", "intakes", "timetable", "course_timetable", "course_details"];
 
-const ACCEPTED = ".pdf,.jpg,.jpeg,.png,.webp";
+const ACCEPTED = ".pdf,.xlsx,.xls,.jpg,.jpeg,.png,.webp";
 
 function readFileAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -476,7 +476,7 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
             </div>
 
             <div className="space-y-2">
-              <Label>Upload Files (PDF, Image)</Label>
+              <Label>Upload Files (PDF, XLSX, Image)</Label>
               <div
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
@@ -496,7 +496,7 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
                 <Upload className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
                 <p className="text-sm font-medium">Drag & drop files here or click to browse</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Support for multiple files · PDF, JPG, PNG
+                  Support for multiple files · PDF, XLSX, JPG, PNG
                 </p>
               </div>
 

@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import * as XLSX from "npm:xlsx@0.18.5";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,6 +30,33 @@ Extract ALL sections from the document, preserving specific details like word co
 If information applies to all courses in the document, repeat it for each course.
 Example: [{"course_name":"BSc (Hons) Computing","personal_statement_guidelines":"150 words covering: why this course, long-term goals, relevant experience","admission_test_info":"Tests at 10:30 AM and 2:00 PM, 3 chances to pass","interview_info":"On campus, online only in exceptional cases","entry_requirements":"Level 3 qualification or Level 2 + 1 year work experience for 21+","documents_required":"Passport, CV (3 years work experience), NINO, Proof of address, Share Code","additional_info":"Max 1.5 hours travel time from postcode to campus, DBS check required"}]`,
 };
+
+/**
+ * Parse an XLSX/XLS file from base64 and return all sheets as readable text.
+ * Each sheet is formatted as a markdown-style table for the AI to parse.
+ */
+function parseSpreadsheet(base64: string): string {
+  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  const workbook = XLSX.read(bytes, { type: "array" });
+
+  const parts: string[] = [];
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sheetName];
+    // Convert to array of arrays
+    const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+    if (rows.length === 0) continue;
+
+    parts.push(`\n=== Sheet: ${sheetName} ===`);
+    for (const row of rows) {
+      const line = row.map((cell: any) => String(cell ?? "").trim()).join(" | ");
+      if (line.replace(/\|/g, "").trim()) {
+        parts.push(line);
+      }
+    }
+  }
+
+  return parts.join("\n");
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -65,6 +93,11 @@ If you cannot find any relevant data, return an empty array [].`;
     // Determine media type for the content
     const isImage = file_type?.startsWith("image/");
     const isPdf = file_type === "application/pdf";
+    const isSpreadsheet = [
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel",
+      "application/xlsx",
+    ].includes(file_type) || file_type?.includes("spreadsheet") || file_type?.includes("excel");
 
     // Build the user message content
     const userContent: any[] = [];
@@ -81,9 +114,29 @@ If you cannot find any relevant data, return an empty array [].`;
         image_url: { url: `data:application/pdf;base64,${file_base64}` },
       });
       userContent.push({ type: "text", text: "Extract the structured data from this PDF document." });
+    } else if (isSpreadsheet) {
+      // Parse XLSX/XLS server-side into text, then send as text prompt
+      try {
+        const textContent = parseSpreadsheet(file_base64);
+        if (!textContent.trim()) {
+          return new Response(JSON.stringify({ success: false, error: "Spreadsheet appears to be empty." }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        userContent.push({
+          type: "text",
+          text: `Extract the structured data from this spreadsheet content:\n\n${textContent.substring(0, 50000)}`,
+        });
+      } catch (parseErr) {
+        console.error("XLSX parse error:", parseErr);
+        return new Response(JSON.stringify({ success: false, error: "Failed to parse spreadsheet. Please ensure it's a valid XLSX/XLS file." }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     } else {
-      // Unsupported binary formats (XLSX, DOCX etc.) cannot be parsed as text
-      return new Response(JSON.stringify({ success: false, error: "Unsupported file type. Please upload a PDF or image (JPG, PNG)." }), {
+      return new Response(JSON.stringify({ success: false, error: "Unsupported file type. Please upload a PDF, image (JPG, PNG), or spreadsheet (XLSX, XLS)." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
