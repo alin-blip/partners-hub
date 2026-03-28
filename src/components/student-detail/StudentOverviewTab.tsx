@@ -69,7 +69,10 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
     enabled: !!firstEnrollment?.university_id,
   });
 
-  const displayTimetableOptions = timetableGroups.length > 0 ? timetableGroups : universityTimetableOptions.length > 0 ? universityTimetableOptions : null;
+  // Show course-specific groups only; fall back to university-wide only when no course context
+  const displayTimetableOptions = firstEnrollment?.course_id
+    ? (timetableGroups.length > 0 ? timetableGroups : null)
+    : (universityTimetableOptions.length > 0 ? universityTimetableOptions : null);
 
   const updateStudent = useMutation({
     mutationFn: async (updates: any) => {
