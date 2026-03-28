@@ -352,7 +352,6 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
           }
         }
       }
-      }
 
       // Save to Knowledge Base
       if (saveToKBOption) {
