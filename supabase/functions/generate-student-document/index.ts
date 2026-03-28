@@ -55,12 +55,32 @@ serve(async (req) => {
     // Fetch enrollments with university/course info
     const { data: enrollments } = await adminClient
       .from("enrollments")
-      .select("status, notes, universities(name), courses(name, level, study_mode)")
+      .select("status, notes, course_id, universities(name), courses(name, level, study_mode)")
       .eq("student_id", student_id);
 
     const enrollmentInfo = (enrollments || []).map((e: any) =>
       `${e.courses?.name || "Unknown course"} (${e.courses?.level || ""}) at ${e.universities?.name || "Unknown"} — Status: ${e.status}`
     ).join("\n");
+
+    // Fetch course details for personal statement guidelines
+    let courseDetailsInfo = "";
+    if (document_type === "personal_statement" && enrollments && enrollments.length > 0) {
+      const courseIds = enrollments.map((e: any) => e.course_id).filter(Boolean);
+      if (courseIds.length > 0) {
+        const { data: courseDetails } = await adminClient
+          .from("course_details")
+          .select("personal_statement_guidelines, entry_requirements, courses(name)")
+          .in("course_id", courseIds);
+        if (courseDetails && courseDetails.length > 0) {
+          courseDetailsInfo = courseDetails.map((cd: any) => {
+            const parts = [`Course: ${cd.courses?.name || "Unknown"}`];
+            if (cd.personal_statement_guidelines) parts.push(`Guidelines: ${cd.personal_statement_guidelines}`);
+            if (cd.entry_requirements) parts.push(`Entry Requirements: ${cd.entry_requirements}`);
+            return parts.join("\n");
+          }).join("\n\n");
+        }
+      }
+    }
 
     // Build student profile summary
     const profileSummary = [
