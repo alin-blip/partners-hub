@@ -43,12 +43,12 @@ const COLUMNS: Record<DocType, string[]> = {
   campuses: ["name", "city"],
   intakes: ["label", "start_date", "application_deadline"],
   course_timetable: ["course_name", "campus", "groups"],
-  course_details: ["course_name", "entry_requirements", "admission_test_info"],
+  course_details: ["course_name", "entry_requirements", "admission_test_info", "interview_info", "documents_required", "personal_statement_guidelines", "additional_info"],
 };
 
 const ALL_DOC_TYPES: DocType[] = ["courses", "campuses", "intakes", "timetable", "course_timetable", "course_details"];
 
-const ACCEPTED = ".pdf,.xlsx,.xls,.docx,.doc,.jpg,.jpeg,.png,.webp";
+const ACCEPTED = ".pdf,.jpg,.jpeg,.png,.webp";
 
 function readFileAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
