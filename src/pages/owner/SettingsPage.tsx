@@ -1191,6 +1191,10 @@ export default function SettingsPage() {
             <TimetableSection universities={universities} />
           </TabsContent>
 
+          <TabsContent value="course-details" className="mt-4">
+            <CourseDetailsSection universities={universities} courses={courses} />
+          </TabsContent>
+
           <TabsContent value="campuses" className="mt-4">
             <CrudSection
               title="Campuses"

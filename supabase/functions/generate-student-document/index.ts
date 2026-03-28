@@ -118,7 +118,7 @@ Guidelines:
 
 Guidelines:
 - Write in first person from the student's perspective
-- 500-700 words ideal length
+- 500-700 words ideal length (unless specific guidelines say otherwise)
 - Include motivation for chosen course/field of study
 - Highlight qualifications and relevant experience
 - Show passion for the subject area
@@ -127,6 +127,10 @@ Guidelines:
 - Suitable for UCAS or direct university applications in the UK
 - Use the enrollment/course information to tailor the statement
 - Output ONLY the personal statement text in Markdown, no explanations`;
+
+      if (courseDetailsInfo) {
+        systemPrompt += `\n\nIMPORTANT — Follow these SPECIFIC university/course guidelines:\n${courseDetailsInfo}\n\nYou MUST adhere to any word count limits, specific topics to cover, and formatting requirements specified above.`;
+      }
     }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
