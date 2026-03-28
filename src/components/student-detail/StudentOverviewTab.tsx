@@ -180,6 +180,8 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
             <div className="space-y-2">
               <Label>Study Pattern / Timetable Group</Label>
               {displayTimetableOptions ? (
+                <>
+                <p className="text-xs text-muted-foreground">Classes currently available. Please note these may fill up, and you may be offered other options after the admission test.</p>
                 <div className="flex flex-wrap gap-3">
                   {displayTimetableOptions.map((g) => {
                     const currentPatterns = (editData.study_pattern || "").split(", ").filter(Boolean);
