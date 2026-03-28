@@ -201,6 +201,7 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
                     );
                   })}
                 </div>
+                </>
               ) : (
                 <div className="flex gap-4">
                   {STUDY_PATTERNS_FALLBACK.map((sp) => {

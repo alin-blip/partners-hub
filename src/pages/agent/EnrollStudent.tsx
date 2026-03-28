@@ -396,7 +396,8 @@ export default function EnrollStudent() {
                             {g.label}
                           </label>
                         ))}
-                      </div>
+                        </div>
+                      </>
                     ) : (
                       <div className="flex gap-4">
                         {STUDY_PATTERNS_FALLBACK.map((sp) => (
