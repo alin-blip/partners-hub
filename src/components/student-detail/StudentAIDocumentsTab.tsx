@@ -25,7 +25,7 @@ export function StudentAIDocumentsTab({ studentId, studentName }: Props) {
     setGenerating(type);
     try {
       const { data, error } = await supabase.functions.invoke("generate-student-document", {
-        body: { student_id: studentId, document_type: type },
+        body: { student_id: studentId, document_type: type, use_guidelines: type === "personal_statement" ? useGuidelines : true },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
