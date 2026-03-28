@@ -1045,8 +1045,8 @@ function CourseDetailsSection({ universities, courses }: { universities: any[]; 
   const { data: courseDetails = [] } = useQuery({
     queryKey: ["course-details-all"],
     queryFn: async () => {
-      const { data } = await supabase.from("course_details" as any).select("*, courses(name, university_id, universities(name))");
-      return data || [];
+      const { data } = await supabase.from("course_details" as any).select("*, courses(name, university_id, universities(name))") as any;
+      return (data || []) as any[];
     },
   });
 
