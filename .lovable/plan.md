@@ -1,61 +1,65 @@
 
 
-## Fix: Show University Timetable Options as Fallback
+## Cascading Flow: University → Campus → Course → Timetable
 
 ### Problem
-When enrolling a student, the "Study Pattern / Timetable Group" section shows hardcoded static values ("Weekdays", "Weekend", "Evenings") instead of the timetable options you've configured in Settings for each university.
+Currently, selecting a university loads ALL courses for that university regardless of campus. The user wants courses filtered by the selected campus, and timetable options filtered by the selected course+campus.
 
-**Root cause**: The `course_timetable_groups` table is empty (no mappings imported yet), so it falls back to static values. The fallback should instead show the `timetable_options` from the selected university.
+### Solution
 
-### Fix
-
-Change the fallback logic in both enrollment forms:
+Use the existing `course_timetable_groups` table to drive the cascade. This table already links `course_id + campus_id + timetable_option_id`. The flow becomes:
 
 ```text
-Current flow:
-  1. Check course_timetable_groups → empty
-  2. Show static ["Weekdays", "Weekend", "Evenings"]  ← wrong
-
-Fixed flow:
-  1. Check course_timetable_groups → if found, show those
-  2. Else check timetable_options for university → if found, show those
-  3. Else show static fallback (last resort only)
+University  →  Campus  →  Course (filtered by campus via course_timetable_groups)  →  Timetable (filtered by course+campus)
 ```
+
+**When campus is selected AND course_timetable_groups has data for that campus:**
+- Query distinct `course_id` from `course_timetable_groups` where `campus_id = selected` to get available courses
+- Show only those courses in the Course dropdown
+- After course is selected, show only the timetable options linked to that course+campus
+
+**Fallback (no course_timetable_groups data for this campus):**
+- Show all university courses as before
+- Show university-wide timetable options
 
 ### Changes
 
-**1. `src/components/EnrollStudentDialog.tsx`**
-- Add a query for `timetable_options` filtered by `universityId`
-- Update the fallback: if `courseTimetableGroups` is empty but `universityTimetableOptions` has data, show those instead of static values
+**Files to modify (3):**
 
-**2. `src/pages/agent/EnrollStudent.tsx`**
-- Same change: add university timetable options query and update fallback logic
+1. **`src/pages/agent/EnrollStudent.tsx`**
+   - Add query for courses filtered by campus via `course_timetable_groups`
+   - Use filtered courses when available, fall back to all university courses
+   - Reset courseId when campusId changes
+   - Timetable already filters by course+campus (no change needed there)
 
-**3. `src/components/student-detail/StudentOverviewTab.tsx`**
-- Same pattern for the edit view
+2. **`src/components/EnrollStudentDialog.tsx`**
+   - Same cascading logic as above
+
+3. **`src/components/student-detail/StudentOverviewTab.tsx`**
+   - Same cascading logic for the edit view
 
 ### Technical detail
 
-Add this query to each file:
+New query added to each file:
 ```typescript
-const { data: universityTimetableOptions = [] } = useQuery({
-  queryKey: ["timetable-options", universityId],
+const { data: campusCourseIds = [] } = useQuery({
+  queryKey: ["campus-courses", campusId],
   queryFn: async () => {
     const { data } = await supabase
-      .from("timetable_options")
-      .select("id, label")
-      .eq("university_id", universityId)
-      .order("label");
-    return data || [];
+      .from("course_timetable_groups")
+      .select("course_id")
+      .eq("campus_id", campusId);
+    // Get unique course IDs
+    return [...new Set((data || []).map(r => r.course_id))];
   },
-  enabled: !!universityId,
+  enabled: !!campusId,
 });
+
+// Filter courses: if campus has mapped courses, show only those; otherwise show all
+const filteredCourses = campusCourseIds.length > 0
+  ? courses.filter(c => campusCourseIds.includes(c.id))
+  : courses;
 ```
 
-Then update the rendering logic:
-```
-courseTimetableGroups.length > 0  → show course-specific groups
-universityTimetableOptions.length > 0  → show university-level options
-else → show static fallback
-```
+When `campusId` changes → reset `courseId`. When `courseId` changes → reset `studyPattern`.
 
