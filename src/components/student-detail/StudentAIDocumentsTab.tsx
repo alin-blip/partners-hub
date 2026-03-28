@@ -2,6 +2,8 @@ import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { FileText, Download, Loader2, ScrollText } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -16,13 +18,14 @@ export function StudentAIDocumentsTab({ studentId, studentName }: Props) {
   const [generating, setGenerating] = useState<"cv" | "personal_statement" | null>(null);
   const [cvContent, setCvContent] = useState<string | null>(null);
   const [psContent, setPsContent] = useState<string | null>(null);
+  const [useGuidelines, setUseGuidelines] = useState(true);
   const printRef = useRef<HTMLDivElement>(null);
 
   const generate = async (type: "cv" | "personal_statement") => {
     setGenerating(type);
     try {
       const { data, error } = await supabase.functions.invoke("generate-student-document", {
-        body: { student_id: studentId, document_type: type },
+        body: { student_id: studentId, document_type: type, use_guidelines: type === "personal_statement" ? useGuidelines : true },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -128,7 +131,13 @@ export function StudentAIDocumentsTab({ studentId, studentName }: Props) {
         Generate AI-powered documents based on this student's profile and enrollment data.
       </p>
       <DocumentCard title="Curriculum Vitae (CV)" icon={FileText} type="cv" content={cvContent} />
-      <DocumentCard title="Personal Statement" icon={ScrollText} type="personal_statement" content={psContent} />
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Switch id="use-guidelines" checked={useGuidelines} onCheckedChange={setUseGuidelines} />
+          <Label htmlFor="use-guidelines" className="text-sm cursor-pointer">Use course-specific guidelines</Label>
+        </div>
+        <DocumentCard title="Personal Statement" icon={ScrollText} type="personal_statement" content={psContent} />
+      </div>
     </div>
   );
 }

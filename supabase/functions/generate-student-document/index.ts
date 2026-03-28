@@ -30,7 +30,7 @@ serve(async (req) => {
       });
     }
 
-    const { student_id, document_type } = await req.json();
+    const { student_id, document_type, use_guidelines = true } = await req.json();
     if (!student_id || !document_type) {
       return new Response(JSON.stringify({ error: "student_id and document_type are required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -64,7 +64,7 @@ serve(async (req) => {
 
     // Fetch course details for personal statement guidelines
     let courseDetailsInfo = "";
-    if (document_type === "personal_statement" && enrollments && enrollments.length > 0) {
+    if (document_type === "personal_statement" && use_guidelines && enrollments && enrollments.length > 0) {
       const courseIds = enrollments.map((e: any) => e.course_id).filter(Boolean);
       if (courseIds.length > 0) {
         const { data: courseDetails } = await adminClient
