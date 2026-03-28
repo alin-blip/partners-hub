@@ -349,9 +349,9 @@ export default function EnrollStudent() {
                         <Calendar className="w-4 h-4 inline mr-2" />
                         {(selectedUniversity as any)?.timetable_message || "Timetable will be assigned by the university."}
                       </div>
-                    ) : courseTimetableGroups.length > 0 ? (
+                    ) : displayTimetableOptions ? (
                       <div className="flex flex-wrap gap-3">
-                        {courseTimetableGroups.map((g) => (
+                        {displayTimetableOptions.map((g) => (
                           <label key={g.id} className="flex items-center gap-2 text-sm">
                             <Checkbox
                               checked={studyPattern.includes(g.label)}

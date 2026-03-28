@@ -165,9 +165,9 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
             )}
             <div className="space-y-2">
               <Label>Study Pattern / Timetable Group</Label>
-              {timetableGroups.length > 0 ? (
+              {displayTimetableOptions ? (
                 <div className="flex flex-wrap gap-3">
-                  {timetableGroups.map((g) => {
+                  {displayTimetableOptions.map((g) => {
                     const currentPatterns = (editData.study_pattern || "").split(", ").filter(Boolean);
                     return (
                       <label key={g.id} className="flex items-center gap-2 text-sm">
