@@ -83,41 +83,44 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
           </TableHeader>
           <TableBody>
             {enrollments.map((e: any) => (
-              <TableRow key={e.id}>
-                <TableCell className="font-medium">{e.universities?.name}</TableCell>
-                <TableCell>{e.courses?.name}</TableCell>
-                <TableCell>
-                  {canChangeStatus ? (
-                    <Select value={e.status} onValueChange={(v) => updateStatus.mutate({ id: e.id, status: v, oldStatus: e.status })}>
-                      <SelectTrigger className="w-[180px] h-8">
-                        <StatusBadge status={e.status} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {STATUSES.map((s) => (
-                          <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <StatusBadge status={e.status} />
-                  )}
-                </TableCell>
-                <TableCell className="text-muted-foreground text-sm">{format(new Date(e.created_at), "dd MMM yyyy")}</TableCell>
-                <TableCell>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpandedId(expandedId === e.id ? null : e.id)}>
-                    {expandedId === e.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </Button>
-                </TableCell>
-              </TableRow>
-              {expandedId === e.id && (e as any).course_id && (
+              <React.Fragment key={e.id}>
                 <TableRow>
-                  <TableCell colSpan={5} className="p-2">
-                    <CourseDetailsInfoCard courseId={(e as any).course_id} compact />
+                  <TableCell className="font-medium">{e.universities?.name}</TableCell>
+                  <TableCell>{e.courses?.name}</TableCell>
+                  <TableCell>
+                    {canChangeStatus ? (
+                      <Select value={e.status} onValueChange={(v) => updateStatus.mutate({ id: e.id, status: v, oldStatus: e.status })}>
+                        <SelectTrigger className="w-[180px] h-8">
+                          <StatusBadge status={e.status} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STATUSES.map((s) => (
+                            <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <StatusBadge status={e.status} />
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm">{format(new Date(e.created_at), "dd MMM yyyy")}</TableCell>
+                  <TableCell>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpandedId(expandedId === e.id ? null : e.id)}>
+                      {expandedId === e.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </Button>
                   </TableCell>
                 </TableRow>
-              )}
+                {expandedId === e.id && e.course_id && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="p-2">
+                      <CourseDetailsInfoCard courseId={e.course_id} compact />
+                    </TableCell>
+                  </TableRow>
+                )}
+              </React.Fragment>
+            ))}
             {enrollments.length === 0 && (
-              <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">No enrollments</TableCell></TableRow>
+              <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No enrollments</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
