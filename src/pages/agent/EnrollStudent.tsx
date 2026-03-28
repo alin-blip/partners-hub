@@ -105,6 +105,26 @@ export default function EnrollStudent() {
     enabled: !!universityId,
   });
 
+  // Fetch dynamic timetable groups for selected course + campus
+  const { data: courseTimetableGroups = [] } = useQuery({
+    queryKey: ["course-timetable-groups", courseId, campusId],
+    queryFn: async () => {
+      let query = supabase
+        .from("course_timetable_groups")
+        .select("id, timetable_option_id, timetable_options(id, label)")
+        .eq("course_id", courseId);
+      if (campusId) {
+        query = query.eq("campus_id", campusId);
+      }
+      const { data } = await query;
+      return (data || []).map((row: any) => ({
+        id: row.timetable_option_id,
+        label: row.timetable_options?.label || "Unknown",
+      }));
+    },
+    enabled: !!courseId,
+  });
+
   const handleAddFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
