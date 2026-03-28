@@ -99,6 +99,9 @@ If you cannot find any relevant data, return an empty array [].`;
       "application/vnd.ms-excel",
       "application/xlsx",
     ].includes(file_type) || file_type?.includes("spreadsheet") || file_type?.includes("excel");
+    const isDocx = file_type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      || file_type === "application/docx"
+      || file_type?.includes("wordprocessingml");
 
     // Build the user message content
     const userContent: any[] = [];
@@ -115,6 +118,48 @@ If you cannot find any relevant data, return an empty array [].`;
         image_url: { url: `data:application/pdf;base64,${file_base64}` },
       });
       userContent.push({ type: "text", text: "Extract the structured data from this PDF document." });
+    } else if (isDocx) {
+      // Parse DOCX server-side: extract text from word/document.xml
+      try {
+        const bytes = Uint8Array.from(atob(file_base64), (c) => c.charCodeAt(0));
+        const zip = await JSZip.loadAsync(bytes);
+        const docXml = await zip.file("word/document.xml")?.async("string");
+        if (!docXml) {
+          return new Response(JSON.stringify({ success: false, error: "Invalid DOCX file – no document.xml found." }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        // Strip XML tags, keep text content
+        const textContent = docXml
+          .replace(/<w:br[^>]*\/>/gi, "\n")
+          .replace(/<\/w:p>/gi, "\n")
+          .replace(/<\/w:tr>/gi, "\n")
+          .replace(/<[^>]+>/g, "")
+          .replace(/&amp;/g, "&")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/&quot;/g, '"')
+          .replace(/&apos;/g, "'")
+          .replace(/\n{3,}/g, "\n\n")
+          .trim();
+        if (!textContent) {
+          return new Response(JSON.stringify({ success: false, error: "DOCX appears to be empty." }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        userContent.push({
+          type: "text",
+          text: `Extract the structured data from this document content:\n\n${textContent.substring(0, 50000)}`,
+        });
+      } catch (parseErr) {
+        console.error("DOCX parse error:", parseErr);
+        return new Response(JSON.stringify({ success: false, error: "Failed to parse DOCX. Please ensure it's a valid .docx file." }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     } else if (isSpreadsheet) {
       // Parse XLSX/XLS server-side into text, then send as text prompt
       try {
@@ -137,7 +182,7 @@ If you cannot find any relevant data, return an empty array [].`;
         });
       }
     } else {
-      return new Response(JSON.stringify({ success: false, error: "Unsupported file type. Please upload a PDF, image (JPG, PNG), or spreadsheet (XLSX, XLS)." }), {
+      return new Response(JSON.stringify({ success: false, error: "Unsupported file type. Please upload a PDF, DOCX, image (JPG, PNG), or spreadsheet (XLSX, XLS)." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
