@@ -105,6 +105,23 @@ export default function EnrollStudent() {
     enabled: !!universityId,
   });
 
+  // Query distinct course IDs available at this campus
+  const { data: campusCourseIds = [] } = useQuery({
+    queryKey: ["campus-courses", campusId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("course_timetable_groups")
+        .select("course_id")
+        .eq("campus_id", campusId);
+      return [...new Set((data || []).map((r: any) => r.course_id))];
+    },
+    enabled: !!campusId,
+  });
+
+  const filteredCourses = campusCourseIds.length > 0
+    ? courses.filter((c: any) => campusCourseIds.includes(c.id))
+    : courses;
+
   // Fetch dynamic timetable groups for selected course + campus
   const { data: courseTimetableGroups = [] } = useQuery({
     queryKey: ["course-timetable-groups", courseId, campusId],
