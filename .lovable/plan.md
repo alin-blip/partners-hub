@@ -1,34 +1,80 @@
 
 
-## Enhanced Import Summary + Knowledge Base Save Option
+## Course–Timetable Groups & Enhanced Document Extraction
 
-### What changes
-Replace the current simple "Import Complete" step (step 3) with a detailed summary and action buttons.
+### Problem
+1. **Study Pattern** on students only offers static options ("Weekdays", "Weekend", "Evenings") instead of the actual timetable groups (A, B, C, E, K, N etc.) defined in settings.
+2. There is no relationship between courses and which timetable groups are available for each course per campus.
+3. The document processor does not extract the course–timetable–campus matrix from uploaded documents (like the image you shared).
 
-### Step 3 redesign
+### Solution
 
-After saving, show:
+#### 1. New junction table: `course_timetable_groups`
 
-1. **Summary breakdown** — list each type saved with counts (e.g. "✓ 12 Courses, ✓ 3 Campuses, ✓ 5 Intakes")
-2. **University name** displayed for context
-3. **"Save to Knowledge Base" button** — inserts the imported data into `ai_knowledge_base` table so the AI chat can reference it (same pattern as `bulk-import-university` edge function)
-4. **"Done" button** — closes without KB save
+Links courses to their available timetable groups per campus.
 
-### Knowledge Base save logic
+```text
+course_timetable_groups
+├── id (uuid, PK)
+├── course_id (uuid → courses)
+├── campus_id (uuid → campuses, nullable)
+├── timetable_option_id (uuid → timetable_options)
+├── university_id (uuid)
+└── created_at (timestamptz)
+```
 
-When user clicks "Save to Knowledge Base":
-- For each type that was imported, create one `ai_knowledge_base` entry per type:
-  - Title: `"{University Name} — {Type}s"` (e.g. "Oxford — Courses")
-  - Content: formatted list of all saved items with their details
-  - Category: `"courses"` / `"campuses"` / etc.
-- Show a toast on success, then close dialog
+RLS: Owner manages all, authenticated can read.
 
-### State tracking
+#### 2. New document extraction type: `course_timetable_matrix`
 
-- Store `savedSummary` (record of type → count) after handleSave succeeds
-- Store `universityName` (looked up from `universities` prop) for display
-- Add `savingToKB` loading state for the KB button
+Add a new extraction schema to `process-settings-document` edge function that extracts a matrix like:
+```json
+[
+  {
+    "course_name": "BSc (Hons) Computing with Foundation Year",
+    "campus": "East London",
+    "groups": ["A", "K", "N"]
+  }
+]
+```
 
-### File to modify
-- `src/components/DocumentProcessorDialog.tsx` — expand step 3 UI, add KB save handler
+This maps the uploaded documents (like the spreadsheet image) into structured data linking courses → campuses → timetable groups.
+
+#### 3. Update Study Pattern selection in EnrollStudent
+
+Replace the static checkboxes with a dynamic dropdown/multi-select that:
+- Fetches `course_timetable_groups` for the selected course + campus
+- Shows the available timetable group labels (e.g. "Group A – Monday 09:45-14:45")
+- Falls back to current static options if no groups are configured
+
+Similarly update `StudentOverviewTab` to use the same dynamic selection.
+
+#### 4. Update DocumentProcessorDialog
+
+- Add `"course_timetable"` as a new DocType option
+- In the review step, show course name + campus + available groups
+- On save, match course/campus names to existing IDs, then insert into `course_timetable_groups`
+- Auto-save extracted data to Knowledge Base when that option is selected
+
+#### 5. Save uploaded documents to Knowledge Base
+
+Parse all uploaded documents and save their content to `ai_knowledge_base` so the AI chat can reference them.
+
+### Files to modify/create
+
+| File | Change |
+|------|--------|
+| DB migration | Create `course_timetable_groups` table with RLS |
+| `supabase/functions/process-settings-document/index.ts` | Add `course_timetable` schema |
+| `src/components/DocumentProcessorDialog.tsx` | Add new doc type, review UI, save logic |
+| `src/pages/agent/EnrollStudent.tsx` | Replace static study patterns with dynamic timetable groups |
+| `src/components/student-detail/StudentOverviewTab.tsx` | Same dynamic selection for editing |
+| `src/pages/owner/SettingsPage.tsx` | Optional: UI to manage course–timetable assignments |
+
+### Implementation order
+1. Create migration for `course_timetable_groups`
+2. Update edge function with new extraction schema
+3. Update DocumentProcessorDialog with new type + save logic
+4. Update EnrollStudent and StudentOverviewTab for dynamic timetable selection
+5. Save documents to Knowledge Base
 
