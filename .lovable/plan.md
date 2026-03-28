@@ -1,37 +1,46 @@
 
+Goal: fix the timetable filter so it only shows options relevant to the selected course/campus, confirm persistence, and add the English notice above the timetable choices.
 
-## Fix: Timetable Options Not Showing + Course Requirements Only for One Course
+1. Fix the timetable filtering logic
+- Update the timetable option logic in:
+  - `src/pages/agent/EnrollStudent.tsx`
+  - `src/components/EnrollStudentDialog.tsx`
+  - `src/components/student-detail/StudentOverviewTab.tsx`
+- Current issue:
+  - the UI falls back to `timetable_options` for the whole university, which can surface labels that belong to other courses
+- Planned behavior:
+  - if a course is selected, show only timetable options mapped through `course_timetable_groups` for that course
+  - if a campus is selected, also filter by that campus
+  - if no mapped options exist for that selected course/campus, do not show unrelated university-wide options; use the normal fallback only when appropriate so the UI stays predictable
 
-### Two Issues Found
+2. Keep the saved timetable behavior
+- Yes: the selected timetable/study pattern is already being saved on the student record in `students.study_pattern`
+- I will preserve that behavior exactly:
+  - enrollment page saves `studyPattern.join(", ")`
+  - enrollment dialog saves `studyPattern.join(", ")`
+  - student overview edit screen also reads/writes `student.study_pattern`
 
-**1. Timetable not showing after course selection**
-The previous fix was too strict. When a course is selected but has NO entries in `course_timetable_groups`, `displayTimetableOptions` returns `null` — which hides timetable entirely instead of falling back to the university-wide options or the static fallback.
+3. Add the English helper text above the timetable selection
+- Add this text directly above the timetable choices on the enrollment card(s):
+  - “Classes currently available. Please note these may fill up, and you may be offered other options after the admission test.”
+- Apply it in both places where the selection is shown:
+  - full enrollment page
+  - enrollment dialog
+- If needed, I can also mirror the same helper text in the student edit view for consistency
 
-**Fix:** When a course is selected and has no course-specific timetable groups, fall back to university-wide timetable options instead of returning `null`.
+4. Consistency check
+- Make sure the same filtering rules are used everywhere timetable options appear, so:
+  - new enrollment
+  - quick-enroll dialog
+  - student overview edit mode
+  all behave the same way
 
-```
-// Current (broken):
-const displayTimetableOptions = courseId
-  ? (courseTimetableGroups.length > 0 ? courseTimetableGroups : null)
-  : (universityTimetableOptions.length > 0 ? universityTimetableOptions : null);
+Files to update
+- `src/pages/agent/EnrollStudent.tsx`
+- `src/components/EnrollStudentDialog.tsx`
+- `src/components/student-detail/StudentOverviewTab.tsx`
 
-// Fixed:
-const displayTimetableOptions = courseTimetableGroups.length > 0
-  ? courseTimetableGroups
-  : (universityTimetableOptions.length > 0 ? universityTimetableOptions : null);
-```
-
-This way: course-specific groups take priority, but if none exist, university-wide options are shown. If neither exist, falls through to the static fallback (Weekdays/Weekend/Evenings).
-
-**2. Course Requirements card only shows for one course**
-The `CourseDetailsInfoCard` queries `course_details` using `from("course_details" as any)` — the `as any` cast suggests the types file may not have this table properly typed yet, but functionally it should work. The real issue is likely that only one course has data in the `course_details` table (only one was imported/entered). This is a data issue, not a code bug — the card correctly returns `null` when no details exist.
-
-No code change needed for this — it will show for every course once course details are populated via Settings > Course Details or Document Import.
-
-### Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/pages/agent/EnrollStudent.tsx` | Fix `displayTimetableOptions` fallback logic (line 155-157) |
-| `src/components/EnrollStudentDialog.tsx` | Same fix (line 164-166) |
-
+Expected result
+- Selecting a course will no longer show timetable labels from other courses
+- The chosen timetable remains saved on the student record
+- The warning/help text appears above the selectable timetable options in English
