@@ -15,7 +15,7 @@ import { ArrowLeft, ArrowRight, Check, Calendar, Upload, FileText, X } from "luc
 const IMMIGRATION_OPTIONS = ["Pre-settled", "Settled", "British Citizen", "Visa Holder", "Refugee", "Other"];
 const TITLE_OPTIONS = ["Mr", "Mrs", "Ms", "Miss", "Dr", "Other"];
 const GENDER_OPTIONS = ["Male", "Female", "Other", "Prefer not to say"];
-const STUDY_PATTERNS = ["Weekdays", "Weekend", "Evenings"];
+const STUDY_PATTERNS_FALLBACK = ["Weekdays", "Weekend", "Evenings"];
 const RELATIONSHIP_OPTIONS = ["Parent", "Spouse", "Sibling", "Friend", "Other"];
 const DOC_TYPES_ENROLL = ["Passport", "Proof of Address", "Other"];
 
@@ -113,6 +113,25 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
       return data || [];
     },
     enabled: !!universityId,
+  });
+
+  const { data: courseTimetableGroups = [] } = useQuery({
+    queryKey: ["course-timetable-groups", courseId, campusId],
+    queryFn: async () => {
+      let query = supabase
+        .from("course_timetable_groups")
+        .select("id, timetable_option_id, timetable_options(id, label)")
+        .eq("course_id", courseId);
+      if (campusId) {
+        query = query.eq("campus_id", campusId);
+      }
+      const { data } = await query;
+      return (data || []).map((row: any) => ({
+        id: row.timetable_option_id,
+        label: row.timetable_options?.label || "Unknown",
+      }));
+    },
+    enabled: !!courseId,
   });
 
   const handleAddFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -240,11 +259,17 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Study Pattern</Label>
+                  <Label>Study Pattern / Timetable Group</Label>
                   {(selectedUniversity as any)?.timetable_available === false ? (
                     <div className="p-3 rounded-md bg-muted text-sm text-muted-foreground border"><Calendar className="w-4 h-4 inline mr-2" />{(selectedUniversity as any)?.timetable_message || "Timetable will be assigned."}</div>
+                  ) : courseTimetableGroups.length > 0 ? (
+                    <div className="flex flex-wrap gap-3">{courseTimetableGroups.map((g) => (
+                      <label key={g.id} className="flex items-center gap-2 text-sm">
+                        <Checkbox checked={studyPattern.includes(g.label)} onCheckedChange={(checked) => setStudyPattern(checked ? [...studyPattern, g.label] : studyPattern.filter((p) => p !== g.label))} />{g.label}
+                      </label>
+                    ))}</div>
                   ) : (
-                    <div className="flex gap-4">{STUDY_PATTERNS.map((sp) => (
+                    <div className="flex gap-4">{STUDY_PATTERNS_FALLBACK.map((sp) => (
                       <label key={sp} className="flex items-center gap-2 text-sm">
                         <Checkbox checked={studyPattern.includes(sp)} onCheckedChange={(checked) => setStudyPattern(checked ? [...studyPattern, sp] : studyPattern.filter((p) => p !== sp))} />{sp}
                       </label>

@@ -11,6 +11,12 @@ const schemaByType: Record<string, string> = {
   timetable: `Return a JSON array of objects with: label (string – the group/pattern name with day and times). Example: [{"label":"Group A – Monday 9am-1pm"},{"label":"Group B – Tuesday 2pm-6pm"}]`,
   campuses: `Return a JSON array of objects with: name (string), city (string or null). Example: [{"name":"Main Campus","city":"London"}]`,
   intakes: `Return a JSON array of objects with: label (string), start_date (YYYY-MM-DD), application_deadline (YYYY-MM-DD or null). Example: [{"label":"September 2026","start_date":"2026-09-15","application_deadline":"2026-08-01"}]`,
+  course_timetable: `You are extracting a matrix that maps courses to their available timetable groups per campus/location.
+Return a JSON array of objects with: course_name (string - the full course name), campus (string - the campus/location name like "East London", "West London", "Birmingham", "Manchester", "Leeds"), groups (array of single-letter group codes like ["A","B","C","K","N","E","P","G"]).
+Each combination of course + campus should be a separate object. Only include entries where groups are actually listed (not empty).
+The groups are typically single letters (A, B, C, E, K, N, P, G etc.) that correspond to timetable schedules.
+Also look for the provider/university name associated with each course.
+Example: [{"course_name":"BSc (Hons) Computing with Foundation Year","campus":"East London","groups":["A","K","N"]},{"course_name":"BSc (Hons) Computing with Foundation Year","campus":"West London","groups":["B","C","K"]}]`,
 };
 
 serve(async (req) => {
@@ -59,7 +65,6 @@ If you cannot find any relevant data, return an empty array [].`;
       });
       userContent.push({ type: "text", text: "Extract the structured data from this image." });
     } else if (isPdf) {
-      // For PDFs, send as inline_data for Gemini vision
       userContent.push({
         type: "image_url",
         image_url: { url: `data:application/pdf;base64,${file_base64}` },

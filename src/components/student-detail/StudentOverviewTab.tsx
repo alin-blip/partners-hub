@@ -4,16 +4,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Pencil, Save, X } from "lucide-react";
 import { format } from "date-fns";
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 const IMMIGRATION_OPTIONS = ["Pre-settled", "Settled", "British Citizen", "Visa Holder", "Refugee", "Other"];
 const TITLE_OPTIONS = ["Mr", "Mrs", "Ms", "Miss", "Dr", "Other"];
 const GENDER_OPTIONS = ["Male", "Female", "Other", "Prefer not to say"];
+const STUDY_PATTERNS_FALLBACK = ["Weekdays", "Weekend", "Evenings"];
 
 interface Props {
   student: any;
@@ -26,6 +28,37 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState<any>(null);
+
+  // Fetch enrollments to get course/campus for timetable lookup
+  const { data: enrollments = [] } = useQuery({
+    queryKey: ["student-enrollments-overview", student.id],
+    queryFn: async () => {
+      const { data } = await supabase.from("enrollments").select("course_id, campus_id, university_id").eq("student_id", student.id).limit(1);
+      return data || [];
+    },
+  });
+
+  const firstEnrollment = enrollments[0] as any;
+
+  // Fetch dynamic timetable groups for the student's course + campus
+  const { data: timetableGroups = [] } = useQuery({
+    queryKey: ["course-timetable-groups", firstEnrollment?.course_id, firstEnrollment?.campus_id],
+    queryFn: async () => {
+      let query = supabase
+        .from("course_timetable_groups")
+        .select("id, timetable_option_id, timetable_options(id, label)")
+        .eq("course_id", firstEnrollment.course_id);
+      if (firstEnrollment.campus_id) {
+        query = query.eq("campus_id", firstEnrollment.campus_id);
+      }
+      const { data } = await query;
+      return (data || []).map((row: any) => ({
+        id: row.timetable_option_id,
+        label: row.timetable_options?.label || "Unknown",
+      }));
+    },
+    enabled: !!firstEnrollment?.course_id,
+  });
 
   const updateStudent = useMutation({
     mutationFn: async (updates: any) => {
@@ -130,7 +163,50 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
                 <p className="text-xs text-muted-foreground">Numărul de referință SFE al studentului</p>
               </div>
             )}
-            <div className="space-y-2"><Label>Study Pattern</Label><Input value={editData.study_pattern} onChange={(e) => setEditData({ ...editData, study_pattern: e.target.value })} /></div>
+            <div className="space-y-2">
+              <Label>Study Pattern / Timetable Group</Label>
+              {timetableGroups.length > 0 ? (
+                <div className="flex flex-wrap gap-3">
+                  {timetableGroups.map((g) => {
+                    const currentPatterns = (editData.study_pattern || "").split(", ").filter(Boolean);
+                    return (
+                      <label key={g.id} className="flex items-center gap-2 text-sm">
+                        <Checkbox
+                          checked={currentPatterns.includes(g.label)}
+                          onCheckedChange={(checked) => {
+                            const updated = checked
+                              ? [...currentPatterns, g.label]
+                              : currentPatterns.filter((p: string) => p !== g.label);
+                            setEditData({ ...editData, study_pattern: updated.join(", ") });
+                          }}
+                        />
+                        {g.label}
+                      </label>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex gap-4">
+                  {STUDY_PATTERNS_FALLBACK.map((sp) => {
+                    const currentPatterns = (editData.study_pattern || "").split(", ").filter(Boolean);
+                    return (
+                      <label key={sp} className="flex items-center gap-2 text-sm">
+                        <Checkbox
+                          checked={currentPatterns.includes(sp)}
+                          onCheckedChange={(checked) => {
+                            const updated = checked
+                              ? [...currentPatterns, sp]
+                              : currentPatterns.filter((p: string) => p !== sp);
+                            setEditData({ ...editData, study_pattern: updated.join(", ") });
+                          }}
+                        />
+                        {sp}
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
             <div className="space-y-2 sm:col-span-2"><Label>Qualifications</Label><Textarea value={editData.qualifications} onChange={(e) => setEditData({ ...editData, qualifications: e.target.value })} /></div>
             <div className="space-y-2 sm:col-span-2"><Label>Notes</Label><Textarea value={editData.notes} onChange={(e) => setEditData({ ...editData, notes: e.target.value })} /></div>
             <div className="sm:col-span-2 border-t pt-4 mt-2">
