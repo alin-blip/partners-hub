@@ -382,7 +382,9 @@ export default function EnrollStudent() {
                         {(selectedUniversity as any)?.timetable_message || "Timetable will be assigned by the university."}
                       </div>
                     ) : displayTimetableOptions ? (
-                      <div className="flex flex-wrap gap-3">
+                      <>
+                        <p className="text-xs text-muted-foreground">Classes currently available. Please note these may fill up, and you may be offered other options after the admission test.</p>
+                        <div className="flex flex-wrap gap-3">
                         {displayTimetableOptions.map((g) => (
                           <label key={g.id} className="flex items-center gap-2 text-sm">
                             <Checkbox
