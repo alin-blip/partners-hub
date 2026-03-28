@@ -163,7 +163,50 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
                 <p className="text-xs text-muted-foreground">Numărul de referință SFE al studentului</p>
               </div>
             )}
-            <div className="space-y-2"><Label>Study Pattern</Label><Input value={editData.study_pattern} onChange={(e) => setEditData({ ...editData, study_pattern: e.target.value })} /></div>
+            <div className="space-y-2">
+              <Label>Study Pattern / Timetable Group</Label>
+              {timetableGroups.length > 0 ? (
+                <div className="flex flex-wrap gap-3">
+                  {timetableGroups.map((g) => {
+                    const currentPatterns = (editData.study_pattern || "").split(", ").filter(Boolean);
+                    return (
+                      <label key={g.id} className="flex items-center gap-2 text-sm">
+                        <Checkbox
+                          checked={currentPatterns.includes(g.label)}
+                          onCheckedChange={(checked) => {
+                            const updated = checked
+                              ? [...currentPatterns, g.label]
+                              : currentPatterns.filter((p: string) => p !== g.label);
+                            setEditData({ ...editData, study_pattern: updated.join(", ") });
+                          }}
+                        />
+                        {g.label}
+                      </label>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex gap-4">
+                  {STUDY_PATTERNS_FALLBACK.map((sp) => {
+                    const currentPatterns = (editData.study_pattern || "").split(", ").filter(Boolean);
+                    return (
+                      <label key={sp} className="flex items-center gap-2 text-sm">
+                        <Checkbox
+                          checked={currentPatterns.includes(sp)}
+                          onCheckedChange={(checked) => {
+                            const updated = checked
+                              ? [...currentPatterns, sp]
+                              : currentPatterns.filter((p: string) => p !== sp);
+                            setEditData({ ...editData, study_pattern: updated.join(", ") });
+                          }}
+                        />
+                        {sp}
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
             <div className="space-y-2 sm:col-span-2"><Label>Qualifications</Label><Textarea value={editData.qualifications} onChange={(e) => setEditData({ ...editData, qualifications: e.target.value })} /></div>
             <div className="space-y-2 sm:col-span-2"><Label>Notes</Label><Textarea value={editData.notes} onChange={(e) => setEditData({ ...editData, notes: e.target.value })} /></div>
             <div className="sm:col-span-2 border-t pt-4 mt-2">
