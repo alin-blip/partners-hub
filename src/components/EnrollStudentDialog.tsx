@@ -161,8 +161,8 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
     enabled: !!universityId,
   });
 
-  const displayTimetableOptions = courseTimetableGroups.length > 0
-    ? courseTimetableGroups
+  const displayTimetableOptions = courseId
+    ? (courseTimetableGroups.length > 0 ? courseTimetableGroups : null)
     : (universityTimetableOptions.length > 0 ? universityTimetableOptions : null);
 
   const handleAddFile = (e: React.ChangeEvent<HTMLInputElement>) => {
