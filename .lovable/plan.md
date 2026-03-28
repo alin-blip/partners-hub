@@ -1,65 +1,56 @@
 
 
-## Cascading Flow: University → Campus → Course → Timetable
+## Insert GBS Timetable Data from Document
 
-### Problem
-Currently, selecting a university loads ALL courses for that university regardless of campus. The user wants courses filtered by the selected campus, and timetable options filtered by the selected course+campus.
+### Analysis of the Document
 
-### Solution
+The image shows a **course-timetable matrix for Global Banking School (GBS)** with two sections:
 
-Use the existing `course_timetable_groups` table to drive the cascade. This table already links `course_id + campus_id + timetable_option_id`. The flow becomes:
+**1. Group Schedules (bottom section):**
 
-```text
-University  →  Campus  →  Course (filtered by campus via course_timetable_groups)  →  Timetable (filtered by course+campus)
-```
+| Group | Days & Times |
+|-------|-------------|
+| A | Mon & Tue 09:45–14:45 |
+| B | Wed & Thu 09:45–14:45 |
+| C | Mon, Tue & Wed 18:00–21:20 |
+| E | Fri & Sat 09:45–14:45 |
+| G | (appears once, no schedule shown) |
+| K | Thu & Fri 16:30–21:30 |
+| N | Mon 15:00–18:00 & Sun 10:00–16:00 |
+| P | (Pearson HND courses, no schedule shown) |
 
-**When campus is selected AND course_timetable_groups has data for that campus:**
-- Query distinct `course_id` from `course_timetable_groups` where `campus_id = selected` to get available courses
-- Show only those courses in the Course dropdown
-- After course is selected, show only the timetable options linked to that course+campus
+**2. Course × Campus × Groups matrix (top section):**
 
-**Fallback (no course_timetable_groups data for this campus):**
-- Show all university courses as before
-- Show university-wide timetable options
+Each course has specific groups available at each campus (East London, West London, Birmingham, Manchester, Leeds).
 
-### Changes
+### Campus Mapping
 
-**Files to modify (3):**
+| Image | DB Campus ID |
+|-------|-------------|
+| East London | `4c59d6a8` (London - Stratford) |
+| West London | `b7f3ce1e` (London - Greenford) |
+| Birmingham | `50ae957d` |
+| Manchester | `bd1ddb19` |
+| Leeds | `1e3668af` |
 
-1. **`src/pages/agent/EnrollStudent.tsx`**
-   - Add query for courses filtered by campus via `course_timetable_groups`
-   - Use filtered courses when available, fall back to all university courses
-   - Reset courseId when campusId changes
-   - Timetable already filters by course+campus (no change needed there)
+### Plan
 
-2. **`src/components/EnrollStudentDialog.tsx`**
-   - Same cascading logic as above
+**Step 1: Delete existing timetable_options** for GBS (14 records with split-day labels)
 
-3. **`src/components/student-detail/StudentOverviewTab.tsx`**
-   - Same cascading logic for the edit view
+**Step 2: Insert 8 timetable_options** with combined-day labels:
+- "Group A – Mon & Tue 09:45-14:45"
+- "Group B – Wed & Thu 09:45-14:45"
+- "Group C – Mon, Tue & Wed 18:00-21:20"
+- "Group E – Fri & Sat 09:45-14:45"
+- "Group G"
+- "Group K – Thu & Fri 16:30-21:30"
+- "Group N – Mon 15:00-18:00 & Sun 10:00-16:00"
+- "Group P"
 
-### Technical detail
+**Step 3: Insert ~250+ course_timetable_groups** records mapping each course × campus × group combination from the matrix.
 
-New query added to each file:
-```typescript
-const { data: campusCourseIds = [] } = useQuery({
-  queryKey: ["campus-courses", campusId],
-  queryFn: async () => {
-    const { data } = await supabase
-      .from("course_timetable_groups")
-      .select("course_id")
-      .eq("campus_id", campusId);
-    // Get unique course IDs
-    return [...new Set((data || []).map(r => r.course_id))];
-  },
-  enabled: !!campusId,
-});
+**Note:** There are duplicate courses in the DB (e.g., two "BSc (Hons) Computing with Foundation Year"). I'll pick one ID per course name for the mappings.
 
-// Filter courses: if campus has mapped courses, show only those; otherwise show all
-const filteredCourses = campusCourseIds.length > 0
-  ? courses.filter(c => campusCourseIds.includes(c.id))
-  : courses;
-```
-
-When `campusId` changes → reset `courseId`. When `courseId` changes → reset `studyPattern`.
+### Technical Detail
+All done via SQL INSERT statements using the insert tool — no code changes needed.
 
