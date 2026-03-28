@@ -94,7 +94,7 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
     setFiles([]);
     setItemsByType({ ...EMPTY_ITEMS });
     setSelectedByType({
-      courses: new Set(), timetable: new Set(), campuses: new Set(), intakes: new Set(), course_timetable: new Set(),
+      courses: new Set(), timetable: new Set(), campuses: new Set(), intakes: new Set(), course_timetable: new Set(), course_details: new Set(),
     });
     setProcessing(false);
     setSaving(false);
