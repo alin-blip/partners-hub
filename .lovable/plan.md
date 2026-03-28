@@ -1,25 +1,37 @@
 
 
-## Add "Use Course Guidelines" Toggle for Personal Statement Generation
+## Fix: Timetable Options Not Showing + Course Requirements Only for One Course
 
-### What
-Add a checkbox/switch on the AI Documents tab so the agent can choose whether to apply the stored course-specific personal statement guidelines when generating. Some universities don't have or need specific guidelines.
+### Two Issues Found
 
-### How
+**1. Timetable not showing after course selection**
+The previous fix was too strict. When a course is selected but has NO entries in `course_timetable_groups`, `displayTimetableOptions` returns `null` — which hides timetable entirely instead of falling back to the university-wide options or the static fallback.
 
-**1. `src/components/student-detail/StudentAIDocumentsTab.tsx`**
-- Add a `useGuidelines` boolean state (default: `true`)
-- Show a Switch next to the Personal Statement card: "Use course guidelines"
-- Pass `use_guidelines: useGuidelines` in the request body to the edge function
+**Fix:** When a course is selected and has no course-specific timetable groups, fall back to university-wide timetable options instead of returning `null`.
 
-**2. `supabase/functions/generate-student-document/index.ts`**
-- Read `use_guidelines` from the request body (default `true`)
-- Only fetch and inject `course_details` into the prompt when `use_guidelines` is `true`
-- When `false`, generate a generic personal statement based solely on the student profile
+```
+// Current (broken):
+const displayTimetableOptions = courseId
+  ? (courseTimetableGroups.length > 0 ? courseTimetableGroups : null)
+  : (universityTimetableOptions.length > 0 ? universityTimetableOptions : null);
 
-### Files to modify
+// Fixed:
+const displayTimetableOptions = courseTimetableGroups.length > 0
+  ? courseTimetableGroups
+  : (universityTimetableOptions.length > 0 ? universityTimetableOptions : null);
+```
+
+This way: course-specific groups take priority, but if none exist, university-wide options are shown. If neither exist, falls through to the static fallback (Weekdays/Weekend/Evenings).
+
+**2. Course Requirements card only shows for one course**
+The `CourseDetailsInfoCard` queries `course_details` using `from("course_details" as any)` — the `as any` cast suggests the types file may not have this table properly typed yet, but functionally it should work. The real issue is likely that only one course has data in the `course_details` table (only one was imported/entered). This is a data issue, not a code bug — the card correctly returns `null` when no details exist.
+
+No code change needed for this — it will show for every course once course details are populated via Settings > Course Details or Document Import.
+
+### Files to Modify
+
 | File | Change |
 |------|--------|
-| `StudentAIDocumentsTab.tsx` | Add Switch + pass flag |
-| `generate-student-document/index.ts` | Conditionally skip course guidelines |
+| `src/pages/agent/EnrollStudent.tsx` | Fix `displayTimetableOptions` fallback logic (line 155-157) |
+| `src/components/EnrollStudentDialog.tsx` | Same fix (line 164-166) |
 
