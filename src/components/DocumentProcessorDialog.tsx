@@ -248,7 +248,7 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
     try {
       const types = Array.from(selectedTypes);
 
-      const selectedItemsByType: Record<DocType, any[]> = { courses: [], timetable: [], campuses: [], intakes: [], course_timetable: [] };
+      const selectedItemsByType: Record<DocType, any[]> = { courses: [], timetable: [], campuses: [], intakes: [], course_timetable: [], course_details: [] };
       for (const docType of types) {
         const items = itemsByType[docType];
         const sel = selectedByType[docType];
