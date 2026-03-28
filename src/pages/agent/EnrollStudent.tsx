@@ -343,15 +343,29 @@ export default function EnrollStudent() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Study Pattern</Label>
+                    <Label>Study Pattern / Timetable Group</Label>
                     {(selectedUniversity as any)?.timetable_available === false ? (
                       <div className="p-3 rounded-md bg-muted text-sm text-muted-foreground border">
                         <Calendar className="w-4 h-4 inline mr-2" />
                         {(selectedUniversity as any)?.timetable_message || "Timetable will be assigned by the university."}
                       </div>
+                    ) : courseTimetableGroups.length > 0 ? (
+                      <div className="flex flex-wrap gap-3">
+                        {courseTimetableGroups.map((g) => (
+                          <label key={g.id} className="flex items-center gap-2 text-sm">
+                            <Checkbox
+                              checked={studyPattern.includes(g.label)}
+                              onCheckedChange={(checked) =>
+                                setStudyPattern(checked ? [...studyPattern, g.label] : studyPattern.filter((p) => p !== g.label))
+                              }
+                            />
+                            {g.label}
+                          </label>
+                        ))}
+                      </div>
                     ) : (
                       <div className="flex gap-4">
-                        {STUDY_PATTERNS.map((sp) => (
+                        {STUDY_PATTERNS_FALLBACK.map((sp) => (
                           <label key={sp} className="flex items-center gap-2 text-sm">
                             <Checkbox checked={studyPattern.includes(sp)} onCheckedChange={(checked) => setStudyPattern(checked ? [...studyPattern, sp] : studyPattern.filter((p) => p !== sp))} />
                             {sp}
