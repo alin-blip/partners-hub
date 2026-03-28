@@ -30,7 +30,7 @@ serve(async (req) => {
       });
     }
 
-    const { student_id, document_type } = await req.json();
+    const { student_id, document_type, use_guidelines = true } = await req.json();
     if (!student_id || !document_type) {
       return new Response(JSON.stringify({ error: "student_id and document_type are required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
