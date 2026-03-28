@@ -188,7 +188,7 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
       setItemsByType(newItemsByType);
 
       const newSelected: Record<DocType, Set<number>> = {
-        courses: new Set(), timetable: new Set(), campuses: new Set(), intakes: new Set(), course_timetable: new Set(),
+        courses: new Set(), timetable: new Set(), campuses: new Set(), intakes: new Set(), course_timetable: new Set(), course_details: new Set(),
       };
       for (const t of types) {
         newSelected[t] = new Set(newItemsByType[t].map((_: any, i: number) => i));
