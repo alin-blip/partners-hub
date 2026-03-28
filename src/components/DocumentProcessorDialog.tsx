@@ -476,7 +476,7 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
             </div>
 
             <div className="space-y-2">
-              <Label>Upload Files (PDF, XLSX, Image)</Label>
+              <Label>Upload Files (PDF, DOCX, XLSX, Image)</Label>
               <div
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
