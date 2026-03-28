@@ -351,7 +351,7 @@ export default function EnrollStudent() {
                 <>
                   <div className="space-y-2">
                     <Label>Campus</Label>
-                    <Select value={campusId} onValueChange={setCampusId}>
+                    <Select value={campusId} onValueChange={(v) => { setCampusId(v); setCourseId(""); setStudyPattern([]); }}>
                       <SelectTrigger><SelectValue placeholder="Select campus (optional)" /></SelectTrigger>
                       <SelectContent>{campuses.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}{c.city ? ` — ${c.city}` : ""}</SelectItem>)}</SelectContent>
                     </Select>
