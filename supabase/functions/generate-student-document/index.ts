@@ -64,7 +64,7 @@ serve(async (req) => {
 
     // Fetch course details for personal statement guidelines
     let courseDetailsInfo = "";
-    if (document_type === "personal_statement" && enrollments && enrollments.length > 0) {
+    if (document_type === "personal_statement" && use_guidelines && enrollments && enrollments.length > 0) {
       const courseIds = enrollments.map((e: any) => e.course_id).filter(Boolean);
       if (courseIds.length > 0) {
         const { data: courseDetails } = await adminClient

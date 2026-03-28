@@ -131,7 +131,13 @@ export function StudentAIDocumentsTab({ studentId, studentName }: Props) {
         Generate AI-powered documents based on this student's profile and enrollment data.
       </p>
       <DocumentCard title="Curriculum Vitae (CV)" icon={FileText} type="cv" content={cvContent} />
-      <DocumentCard title="Personal Statement" icon={ScrollText} type="personal_statement" content={psContent} />
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Switch id="use-guidelines" checked={useGuidelines} onCheckedChange={setUseGuidelines} />
+          <Label htmlFor="use-guidelines" className="text-sm cursor-pointer">Use course-specific guidelines</Label>
+        </div>
+        <DocumentCard title="Personal Statement" icon={ScrollText} type="personal_statement" content={psContent} />
+      </div>
     </div>
   );
 }
