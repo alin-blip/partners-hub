@@ -328,8 +328,30 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
               if (error) throw error;
               qc.invalidateQueries({ queryKey: ["course-timetable-groups"] });
             }
+          } else if (docType === "course_details") {
+            // Match course names to existing course IDs, then upsert into course_details
+            const { data: existingCourses } = await supabase.from("courses").select("id, name").eq("university_id", universityId);
+            const courseMap = new Map((existingCourses || []).map((c) => [c.name.toLowerCase().trim(), c.id]));
+
+            for (const item of clean) {
+              const courseId = courseMap.get(item.course_name?.toLowerCase().trim());
+              if (!courseId) continue;
+              const row = {
+                course_id: courseId,
+                personal_statement_guidelines: item.personal_statement_guidelines || null,
+                admission_test_info: item.admission_test_info || null,
+                interview_info: item.interview_info || null,
+                entry_requirements: item.entry_requirements || null,
+                documents_required: item.documents_required || null,
+                additional_info: item.additional_info || null,
+              };
+              const { error } = await supabase.from("course_details" as any).upsert(row, { onConflict: "course_id" });
+              if (error) throw error;
+            }
+            qc.invalidateQueries({ queryKey: ["course-details"] });
           }
         }
+      }
       }
 
       // Save to Knowledge Base
