@@ -134,6 +134,17 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
     enabled: !!courseId,
   });
 
+  const { data: universityTimetableOptions = [] } = useQuery({
+    queryKey: ["timetable-options", universityId],
+    queryFn: async () => {
+      const { data } = await supabase.from("timetable_options").select("id, label").eq("university_id", universityId).order("label");
+      return data || [];
+    },
+    enabled: !!universityId,
+  });
+
+  const displayTimetableOptions = courseTimetableGroups.length > 0 ? courseTimetableGroups : universityTimetableOptions.length > 0 ? universityTimetableOptions : null;
+
   const handleAddFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) setDocFiles((prev) => [...prev, { file, docType: selectedDocType }]);

@@ -60,6 +60,17 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
     enabled: !!firstEnrollment?.course_id,
   });
 
+  const { data: universityTimetableOptions = [] } = useQuery({
+    queryKey: ["timetable-options", firstEnrollment?.university_id],
+    queryFn: async () => {
+      const { data } = await supabase.from("timetable_options").select("id, label").eq("university_id", firstEnrollment.university_id).order("label");
+      return data || [];
+    },
+    enabled: !!firstEnrollment?.university_id,
+  });
+
+  const displayTimetableOptions = timetableGroups.length > 0 ? timetableGroups : universityTimetableOptions.length > 0 ? universityTimetableOptions : null;
+
   const updateStudent = useMutation({
     mutationFn: async (updates: any) => {
       const { error } = await supabase.from("students").update(updates).eq("id", student.id);
