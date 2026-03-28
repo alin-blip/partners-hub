@@ -289,6 +289,53 @@ export type Database = {
         }
         Relationships: []
       }
+      course_details: {
+        Row: {
+          additional_info: string | null
+          admission_test_info: string | null
+          course_id: string
+          created_at: string
+          documents_required: string | null
+          entry_requirements: string | null
+          id: string
+          interview_info: string | null
+          personal_statement_guidelines: string | null
+          updated_at: string
+        }
+        Insert: {
+          additional_info?: string | null
+          admission_test_info?: string | null
+          course_id: string
+          created_at?: string
+          documents_required?: string | null
+          entry_requirements?: string | null
+          id?: string
+          interview_info?: string | null
+          personal_statement_guidelines?: string | null
+          updated_at?: string
+        }
+        Update: {
+          additional_info?: string | null
+          admission_test_info?: string | null
+          course_id?: string
+          created_at?: string
+          documents_required?: string | null
+          entry_requirements?: string | null
+          id?: string
+          interview_info?: string | null
+          personal_statement_guidelines?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_details_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: true
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       course_timetable_groups: {
         Row: {
           campus_id: string | null
