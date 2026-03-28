@@ -44,7 +44,7 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
     queryFn: async () => {
       const { data } = await supabase
         .from("enrollments")
-        .select("id, status, created_at, funding_status, funding_type, funding_reference, funding_notes, universities!inner(name), courses!inner(name)")
+        .select("id, status, created_at, course_id, funding_status, funding_type, funding_reference, funding_notes, universities!inner(name), courses!inner(name)")
         .eq("student_id", studentId)
         .order("created_at", { ascending: false });
       return data || [];
