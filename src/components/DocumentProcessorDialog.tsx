@@ -19,7 +19,7 @@ import { Upload, Loader2, FileText, Check, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-type DocType = "courses" | "timetable" | "campuses" | "intakes" | "course_timetable";
+type DocType = "courses" | "timetable" | "campuses" | "intakes" | "course_timetable" | "course_details";
 
 interface Props {
   open: boolean;
