@@ -267,24 +267,53 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
           const clean = toInsert.map(({ _source, ...rest }) => rest);
 
           if (docType === "courses") {
-            const rows = clean.map((item) => ({ university_id: universityId, name: item.name, level: item.level || "undergraduate", study_mode: item.study_mode || "blended" }));
-            const { error } = await supabase.from("courses").insert(rows);
-            if (error) throw error;
+            // Duplicate prevention: check existing courses by name
+            const { data: existingCourses } = await supabase.from("courses").select("name").eq("university_id", universityId);
+            const existingNames = new Set((existingCourses || []).map((c) => c.name.toLowerCase().trim()));
+            const rows = clean
+              .filter((item) => !existingNames.has(item.name?.toLowerCase().trim()))
+              .map((item) => ({ university_id: universityId, name: item.name, level: item.level || "undergraduate", study_mode: item.study_mode || "blended" }));
+            if (rows.length > 0) {
+              const { error } = await supabase.from("courses").insert(rows);
+              if (error) throw error;
+            }
+            summary[docType] = rows.length;
             qc.invalidateQueries({ queryKey: ["all-courses"] });
           } else if (docType === "timetable") {
-            const rows = clean.map((item) => ({ university_id: universityId, label: item.label }));
-            const { error } = await supabase.from("timetable_options").insert(rows);
-            if (error) throw error;
+            const { data: existingTimetables } = await supabase.from("timetable_options").select("label").eq("university_id", universityId);
+            const existingLabels = new Set((existingTimetables || []).map((t) => t.label.toLowerCase().trim()));
+            const rows = clean
+              .filter((item) => !existingLabels.has(item.label?.toLowerCase().trim()))
+              .map((item) => ({ university_id: universityId, label: item.label }));
+            if (rows.length > 0) {
+              const { error } = await supabase.from("timetable_options").insert(rows);
+              if (error) throw error;
+            }
+            summary[docType] = rows.length;
             qc.invalidateQueries({ queryKey: ["timetable-options"] });
           } else if (docType === "campuses") {
-            const rows = clean.map((item) => ({ university_id: universityId, name: item.name, city: item.city || null }));
-            const { error } = await supabase.from("campuses").insert(rows);
-            if (error) throw error;
+            const { data: existingCampuses } = await supabase.from("campuses").select("name").eq("university_id", universityId);
+            const existingNames = new Set((existingCampuses || []).map((c) => c.name.toLowerCase().trim()));
+            const rows = clean
+              .filter((item) => !existingNames.has(item.name?.toLowerCase().trim()))
+              .map((item) => ({ university_id: universityId, name: item.name, city: item.city || null }));
+            if (rows.length > 0) {
+              const { error } = await supabase.from("campuses").insert(rows);
+              if (error) throw error;
+            }
+            summary[docType] = rows.length;
             qc.invalidateQueries({ queryKey: ["all-campuses"] });
           } else if (docType === "intakes") {
-            const rows = clean.map((item) => ({ university_id: universityId, label: item.label, start_date: item.start_date, application_deadline: item.application_deadline || null }));
-            const { error } = await supabase.from("intakes").insert(rows);
-            if (error) throw error;
+            const { data: existingIntakes } = await supabase.from("intakes").select("label").eq("university_id", universityId);
+            const existingLabels = new Set((existingIntakes || []).map((i) => i.label.toLowerCase().trim()));
+            const rows = clean
+              .filter((item) => !existingLabels.has(item.label?.toLowerCase().trim()))
+              .map((item) => ({ university_id: universityId, label: item.label, start_date: item.start_date, application_deadline: item.application_deadline || null }));
+            if (rows.length > 0) {
+              const { error } = await supabase.from("intakes").insert(rows);
+              if (error) throw error;
+            }
+            summary[docType] = rows.length;
             qc.invalidateQueries({ queryKey: ["all-intakes"] });
           } else if (docType === "course_timetable") {
             // Match course names and campus names to existing IDs, then insert into course_timetable_groups
