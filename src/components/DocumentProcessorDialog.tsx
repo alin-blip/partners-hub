@@ -34,6 +34,7 @@ const DOC_TYPE_LABELS: Record<DocType, string> = {
   campuses: "Campuses",
   intakes: "Intakes",
   course_timetable: "Course–Timetable Matrix",
+  course_details: "Course Details (Requirements)",
 };
 
 const COLUMNS: Record<DocType, string[]> = {
@@ -42,9 +43,10 @@ const COLUMNS: Record<DocType, string[]> = {
   campuses: ["name", "city"],
   intakes: ["label", "start_date", "application_deadline"],
   course_timetable: ["course_name", "campus", "groups"],
+  course_details: ["course_name", "entry_requirements", "admission_test_info"],
 };
 
-const ALL_DOC_TYPES: DocType[] = ["courses", "campuses", "intakes", "timetable", "course_timetable"];
+const ALL_DOC_TYPES: DocType[] = ["courses", "campuses", "intakes", "timetable", "course_timetable", "course_details"];
 
 const ACCEPTED = ".pdf,.xlsx,.xls,.docx,.doc,.jpg,.jpeg,.png,.webp";
 
