@@ -103,8 +103,19 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
                   )}
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">{format(new Date(e.created_at), "dd MMM yyyy")}</TableCell>
+                <TableCell>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpandedId(expandedId === e.id ? null : e.id)}>
+                    {expandedId === e.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </Button>
+                </TableCell>
               </TableRow>
-            ))}
+              {expandedId === e.id && (e as any).course_id && (
+                <TableRow>
+                  <TableCell colSpan={5} className="p-2">
+                    <CourseDetailsInfoCard courseId={(e as any).course_id} compact />
+                  </TableCell>
+                </TableRow>
+              )}
             {enrollments.length === 0 && (
               <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">No enrollments</TableCell></TableRow>
             )}
