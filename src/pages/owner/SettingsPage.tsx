@@ -717,12 +717,38 @@ function UniversitiesSection({ universities, addUni, deleteItem, updateUni }: { 
 function TimetableSection({ universities }: { universities: any[] }) {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [newOption, setNewOption] = useState<{ uniId: string; label: string }>({ uniId: "", label: "" });
+  const [newOption, setNewOption] = useState<{ uniId: string; label: string; courseIds: string[]; campusIds: string[] }>({ uniId: "", label: "", courseIds: [], campusIds: [] });
 
   const { data: timetableOptions = [] } = useQuery({
     queryKey: ["timetable-options"],
     queryFn: async () => {
       const { data } = await supabase.from("timetable_options" as any).select("*").order("label");
+      return (data || []) as any[];
+    },
+  });
+
+  const { data: allCourses = [] } = useQuery({
+    queryKey: ["timetable-courses", newOption.uniId],
+    queryFn: async () => {
+      const { data } = await supabase.from("courses").select("id, name").eq("university_id", newOption.uniId).order("name");
+      return data || [];
+    },
+    enabled: !!newOption.uniId,
+  });
+
+  const { data: allCampuses = [] } = useQuery({
+    queryKey: ["timetable-campuses", newOption.uniId],
+    queryFn: async () => {
+      const { data } = await supabase.from("campuses").select("id, name").eq("university_id", newOption.uniId).order("name");
+      return data || [];
+    },
+    enabled: !!newOption.uniId,
+  });
+
+  const { data: courseGroups = [] } = useQuery({
+    queryKey: ["course-timetable-groups"],
+    queryFn: async () => {
+      const { data } = await supabase.from("course_timetable_groups" as any).select("*");
       return (data || []) as any[];
     },
   });
@@ -744,28 +770,66 @@ function TimetableSection({ universities }: { universities: any[] }) {
   });
 
   const addOption = useMutation({
-    mutationFn: async ({ university_id, label }: { university_id: string; label: string }) => {
-      const { error } = await (supabase.from("timetable_options" as any) as any).insert({ university_id, label });
+    mutationFn: async ({ university_id, label, courseIds, campusIds }: { university_id: string; label: string; courseIds: string[]; campusIds: string[] }) => {
+      // Insert timetable option
+      const { data: inserted, error } = await (supabase.from("timetable_options" as any) as any).insert({ university_id, label }).select("id").single();
       if (error) throw error;
+      const optionId = inserted.id;
+
+      // Create course_timetable_groups for each course × campus combination
+      if (courseIds.length > 0 && campusIds.length > 0) {
+        const rows = courseIds.flatMap(courseId =>
+          campusIds.map(campusId => ({
+            course_id: courseId,
+            campus_id: campusId,
+            timetable_option_id: optionId,
+            university_id,
+          }))
+        );
+        const { error: ctgError } = await (supabase.from("course_timetable_groups" as any) as any).insert(rows);
+        if (ctgError) throw ctgError;
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["timetable-options"] });
-      setNewOption({ uniId: "", label: "" });
-      toast({ title: "Timetable option added" });
+      qc.invalidateQueries({ queryKey: ["course-timetable-groups"] });
+      setNewOption({ uniId: "", label: "", courseIds: [], campusIds: [] });
+      toast({ title: "Timetable option added with course mappings" });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const deleteOption = useMutation({
     mutationFn: async (id: string) => {
+      // Delete course_timetable_groups first
+      await (supabase.from("course_timetable_groups" as any) as any).delete().eq("timetable_option_id", id);
       const { error } = await (supabase.from("timetable_options" as any) as any).delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["timetable-options"] });
+      qc.invalidateQueries({ queryKey: ["course-timetable-groups"] });
       toast({ title: "Option removed" });
     },
   });
+
+  const toggleCourse = (courseId: string) => {
+    setNewOption(p => ({
+      ...p,
+      courseIds: p.courseIds.includes(courseId)
+        ? p.courseIds.filter(id => id !== courseId)
+        : [...p.courseIds, courseId],
+    }));
+  };
+
+  const toggleCampus = (campusId: string) => {
+    setNewOption(p => ({
+      ...p,
+      campusIds: p.campusIds.includes(campusId)
+        ? p.campusIds.filter(id => id !== campusId)
+        : [...p.campusIds, campusId],
+    }));
+  };
 
   return (
     <div className="space-y-6">
@@ -834,40 +898,94 @@ function TimetableSection({ universities }: { universities: any[] }) {
               Available Timetable Options
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Add the study patterns / programs students can choose from per university (e.g. Morning, Afternoon, Evening).
+              Add study patterns per university. Select which courses and campuses each option applies to.
             </p>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-end gap-3">
-            <div className="space-y-1 flex-1">
-              <Label className="text-xs">University</Label>
-              <select
-                className="w-full h-10 rounded-md border px-3 text-sm"
-                value={newOption.uniId}
-                onChange={(e) => setNewOption((p) => ({ ...p, uniId: e.target.value }))}
-              >
-                <option value="">Select university…</option>
-                {universities.filter((u: any) => u.timetable_available !== false).map((u: any) => (
-                  <option key={u.id} value={u.id}>{u.name}</option>
-                ))}
-              </select>
+          <div className="space-y-3 border rounded-lg p-4 bg-muted/30">
+            <div className="flex items-end gap-3">
+              <div className="space-y-1 flex-1">
+                <Label className="text-xs">University</Label>
+                <select
+                  className="w-full h-10 rounded-md border px-3 text-sm bg-background"
+                  value={newOption.uniId}
+                  onChange={(e) => setNewOption({ uniId: e.target.value, label: "", courseIds: [], campusIds: [] })}
+                >
+                  <option value="">Select university…</option>
+                  {universities.filter((u: any) => u.timetable_available !== false).map((u: any) => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1 flex-1">
+                <Label className="text-xs">Program Label</Label>
+                <Input
+                  value={newOption.label}
+                  onChange={(e) => setNewOption((p) => ({ ...p, label: e.target.value }))}
+                  placeholder="e.g. Group A – Mon & Tue 09:45-14:45"
+                />
+              </div>
             </div>
-            <div className="space-y-1 flex-1">
-              <Label className="text-xs">Program Label</Label>
-              <Input
-                value={newOption.label}
-                onChange={(e) => setNewOption((p) => ({ ...p, label: e.target.value }))}
-                placeholder="e.g. Morning (9:00 - 13:00)"
-              />
-            </div>
+
+            {newOption.uniId && (
+              <>
+                <div className="space-y-1">
+                  <Label className="text-xs">Campuses (select where this option is available)</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {allCampuses.map((c: any) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => toggleCampus(c.id)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                          newOption.campusIds.includes(c.id)
+                            ? "bg-accent text-accent-foreground border-accent"
+                            : "bg-background text-muted-foreground border-border hover:border-accent/50"
+                        }`}
+                      >
+                        {c.name}
+                      </button>
+                    ))}
+                    {allCampuses.length === 0 && <span className="text-xs text-muted-foreground">No campuses for this university</span>}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">Courses (select which courses use this timetable option)</Label>
+                  <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                    {allCourses.map((c: any) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => toggleCourse(c.id)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                          newOption.courseIds.includes(c.id)
+                            ? "bg-accent text-accent-foreground border-accent"
+                            : "bg-background text-muted-foreground border-border hover:border-accent/50"
+                        }`}
+                      >
+                        {c.name}
+                      </button>
+                    ))}
+                    {allCourses.length === 0 && <span className="text-xs text-muted-foreground">No courses for this university</span>}
+                  </div>
+                </div>
+              </>
+            )}
+
             <Button
               size="sm"
               className="bg-accent text-accent-foreground hover:bg-accent/90"
               disabled={!newOption.uniId || !newOption.label.trim()}
-              onClick={() => addOption.mutate({ university_id: newOption.uniId, label: newOption.label.trim() })}
+              onClick={() => addOption.mutate({
+                university_id: newOption.uniId,
+                label: newOption.label.trim(),
+                courseIds: newOption.courseIds,
+                campusIds: newOption.campusIds,
+              })}
             >
-              <Plus className="w-3 h-3 mr-1" /> Add
+              <Plus className="w-3 h-3 mr-1" /> Add Option
             </Button>
           </div>
 
@@ -877,18 +995,28 @@ function TimetableSection({ universities }: { universities: any[] }) {
             return (
               <div key={u.id} className="space-y-2">
                 <h4 className="text-sm font-semibold text-muted-foreground">{u.name}</h4>
-                <div className="flex flex-wrap gap-2">
-                  {opts.map((o: any) => (
-                    <div key={o.id} className="flex items-center gap-1 bg-muted rounded-full px-3 py-1 text-sm">
-                      <span>{o.label}</span>
-                      <button
-                        className="ml-1 text-destructive hover:text-destructive/80"
-                        onClick={() => deleteOption.mutate(o.id)}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
+                <div className="space-y-1">
+                  {opts.map((o: any) => {
+                    const mappings = courseGroups.filter((g: any) => g.timetable_option_id === o.id);
+                    const mappedCourseCount = new Set(mappings.map((m: any) => m.course_id)).size;
+                    const mappedCampusCount = new Set(mappings.map((m: any) => m.campus_id)).size;
+                    return (
+                      <div key={o.id} className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 text-sm">
+                        <span className="font-medium">{o.label}</span>
+                        {mappings.length > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            ({mappedCourseCount} courses × {mappedCampusCount} campuses)
+                          </span>
+                        )}
+                        <button
+                          className="ml-auto text-destructive hover:text-destructive/80"
+                          onClick={() => deleteOption.mutate(o.id)}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
