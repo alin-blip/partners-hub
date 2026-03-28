@@ -27,7 +27,6 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const qc = useQueryClient();
 
   const { data: profile } = useQuery({
     queryKey: ["my-profile-name"],
