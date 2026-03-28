@@ -1171,11 +1171,12 @@ export default function SettingsPage() {
         />
 
         <Tabs defaultValue="universities">
-          <TabsList>
+          <TabsList className="flex-wrap h-auto gap-1">
             <TabsTrigger value="universities">Universities</TabsTrigger>
             <TabsTrigger value="campuses">Campuses</TabsTrigger>
             <TabsTrigger value="courses">Courses</TabsTrigger>
             <TabsTrigger value="intakes">Intakes</TabsTrigger>
+            <TabsTrigger value="course-details">Course Details</TabsTrigger>
             <TabsTrigger value="commissions">Commission Tiers</TabsTrigger>
             <TabsTrigger value="promotions">Promotions</TabsTrigger>
             <TabsTrigger value="timetable">Timetable</TabsTrigger>
