@@ -161,8 +161,8 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
     enabled: !!universityId,
   });
 
-  const displayTimetableOptions = courseTimetableGroups.length > 0
-    ? courseTimetableGroups
+  const displayTimetableOptions = courseId
+    ? (courseTimetableGroups.length > 0 ? courseTimetableGroups : null)
     : (universityTimetableOptions.length > 0 ? universityTimetableOptions : null);
 
   const handleAddFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -294,11 +294,14 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
                   {(selectedUniversity as any)?.timetable_available === false ? (
                     <div className="p-3 rounded-md bg-muted text-sm text-muted-foreground border"><Calendar className="w-4 h-4 inline mr-2" />{(selectedUniversity as any)?.timetable_message || "Timetable will be assigned."}</div>
                   ) : displayTimetableOptions ? (
-                    <div className="flex flex-wrap gap-3">{displayTimetableOptions.map((g) => (
-                      <label key={g.id} className="flex items-center gap-2 text-sm">
-                        <Checkbox checked={studyPattern.includes(g.label)} onCheckedChange={(checked) => setStudyPattern(checked ? [...studyPattern, g.label] : studyPattern.filter((p) => p !== g.label))} />{g.label}
-                      </label>
-                    ))}</div>
+                    <>
+                      <p className="text-xs text-muted-foreground">Classes currently available. Please note these may fill up, and you may be offered other options after the admission test.</p>
+                      <div className="flex flex-wrap gap-3">{displayTimetableOptions.map((g) => (
+                        <label key={g.id} className="flex items-center gap-2 text-sm">
+                          <Checkbox checked={studyPattern.includes(g.label)} onCheckedChange={(checked) => setStudyPattern(checked ? [...studyPattern, g.label] : studyPattern.filter((p) => p !== g.label))} />{g.label}
+                        </label>
+                      ))}</div>
+                    </>
                   ) : (
                     <div className="flex gap-4">{STUDY_PATTERNS_FALLBACK.map((sp) => (
                       <label key={sp} className="flex items-center gap-2 text-sm">

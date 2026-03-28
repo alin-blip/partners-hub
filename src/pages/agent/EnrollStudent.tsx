@@ -152,8 +152,9 @@ export default function EnrollStudent() {
     enabled: !!universityId,
   });
 
-  const displayTimetableOptions = courseTimetableGroups.length > 0
-    ? courseTimetableGroups
+  // Show course-specific groups only when a course is selected; fall back to university-wide only when NO course is selected
+  const displayTimetableOptions = courseId
+    ? (courseTimetableGroups.length > 0 ? courseTimetableGroups : null)
     : (universityTimetableOptions.length > 0 ? universityTimetableOptions : null);
 
   const handleAddFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -381,7 +382,9 @@ export default function EnrollStudent() {
                         {(selectedUniversity as any)?.timetable_message || "Timetable will be assigned by the university."}
                       </div>
                     ) : displayTimetableOptions ? (
-                      <div className="flex flex-wrap gap-3">
+                      <>
+                        <p className="text-xs text-muted-foreground">Classes currently available. Please note these may fill up, and you may be offered other options after the admission test.</p>
+                        <div className="flex flex-wrap gap-3">
                         {displayTimetableOptions.map((g) => (
                           <label key={g.id} className="flex items-center gap-2 text-sm">
                             <Checkbox
@@ -393,7 +396,8 @@ export default function EnrollStudent() {
                             {g.label}
                           </label>
                         ))}
-                      </div>
+                        </div>
+                      </>
                     ) : (
                       <div className="flex gap-4">
                         {STUDY_PATTERNS_FALLBACK.map((sp) => (

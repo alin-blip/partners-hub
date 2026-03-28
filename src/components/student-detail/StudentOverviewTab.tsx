@@ -69,7 +69,10 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
     enabled: !!firstEnrollment?.university_id,
   });
 
-  const displayTimetableOptions = timetableGroups.length > 0 ? timetableGroups : universityTimetableOptions.length > 0 ? universityTimetableOptions : null;
+  // Show course-specific groups only; fall back to university-wide only when no course context
+  const displayTimetableOptions = firstEnrollment?.course_id
+    ? (timetableGroups.length > 0 ? timetableGroups : null)
+    : (universityTimetableOptions.length > 0 ? universityTimetableOptions : null);
 
   const updateStudent = useMutation({
     mutationFn: async (updates: any) => {
@@ -177,6 +180,8 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
             <div className="space-y-2">
               <Label>Study Pattern / Timetable Group</Label>
               {displayTimetableOptions ? (
+                <>
+                <p className="text-xs text-muted-foreground">Classes currently available. Please note these may fill up, and you may be offered other options after the admission test.</p>
                 <div className="flex flex-wrap gap-3">
                   {displayTimetableOptions.map((g) => {
                     const currentPatterns = (editData.study_pattern || "").split(", ").filter(Boolean);
@@ -196,6 +201,7 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
                     );
                   })}
                 </div>
+                </>
               ) : (
                 <div className="flex gap-4">
                   {STUDY_PATTERNS_FALLBACK.map((sp) => {
