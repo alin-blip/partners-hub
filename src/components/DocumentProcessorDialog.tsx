@@ -154,7 +154,7 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
     const totalOps = files.length * types.length;
     setProcessProgress({ done: 0, total: totalOps });
 
-    const newItemsByType: Record<DocType, any[]> = { ...EMPTY_ITEMS, courses: [], timetable: [], campuses: [], intakes: [], course_timetable: [] };
+    const newItemsByType: Record<DocType, any[]> = { courses: [], timetable: [], campuses: [], intakes: [], course_timetable: [], course_details: [] };
     let doneCount = 0;
 
     try {
