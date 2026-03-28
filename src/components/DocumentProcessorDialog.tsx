@@ -371,6 +371,8 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
               content = saved.map((c) => `- ${c.label}`).join("\n");
             } else if (docType === "course_timetable") {
               content = saved.map((c) => `- ${c.course_name} @ ${c.campus}: Groups ${c.groups}`).join("\n");
+            } else if (docType === "course_details") {
+              content = saved.map((c) => `- ${c.course_name}: Entry=${c.entry_requirements || "N/A"}, Test=${c.admission_test_info || "N/A"}, PS=${c.personal_statement_guidelines || "N/A"}`).join("\n");
             }
             return { title: `${universityName} — ${DOC_TYPE_LABELS[docType]}`, content, category: docType === "course_timetable" ? "timetable" : docType };
           });
