@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, ArrowRight, Check, Calendar, Upload, FileText, X } from "lucide-react";
+import { CourseDetailsInfoCard } from "@/components/CourseDetailsInfoCard";
 
 const IMMIGRATION_OPTIONS = ["Pre-settled", "Settled", "British Citizen", "Visa Holder", "Refugee", "Other"];
 const TITLE_OPTIONS = ["Mr", "Mrs", "Ms", "Miss", "Dr", "Other"];
@@ -404,6 +405,7 @@ export default function EnrollStudent() {
                   </div>
                 </>
               )}
+              {courseId && <CourseDetailsInfoCard courseId={courseId} compact />}
               <div className="flex justify-end pt-2">
                 <Button onClick={() => setStep(2)} disabled={!canProceedStep1} className="bg-accent text-accent-foreground hover:bg-accent/90">
                   Next <ArrowRight className="w-4 h-4 ml-1" />

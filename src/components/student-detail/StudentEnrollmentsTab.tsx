@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,6 +9,9 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { notifyAgentOfStatusChange } from "@/lib/enrollment-emails";
+import { CourseDetailsInfoCard } from "@/components/CourseDetailsInfoCard";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const STATUSES = [
   "applied", "documents_pending", "documents_submitted", "processing",
@@ -22,6 +26,7 @@ interface Props {
 export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { data: profile } = useQuery({
     queryKey: ["my-profile-name"],
@@ -38,7 +43,7 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
     queryFn: async () => {
       const { data } = await supabase
         .from("enrollments")
-        .select("id, status, created_at, funding_status, funding_type, funding_reference, funding_notes, universities!inner(name), courses!inner(name)")
+        .select("id, status, created_at, course_id, funding_status, funding_type, funding_reference, funding_notes, universities!inner(name), courses!inner(name)")
         .eq("student_id", studentId)
         .order("created_at", { ascending: false });
       return data || [];
@@ -70,34 +75,51 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
               <TableHead>Course</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Date</TableHead>
+              <TableHead className="w-10" />
+              <TableHead>Status</TableHead>
+              <TableHead>Date</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {enrollments.map((e: any) => (
-              <TableRow key={e.id}>
-                <TableCell className="font-medium">{e.universities?.name}</TableCell>
-                <TableCell>{e.courses?.name}</TableCell>
-                <TableCell>
-                  {canChangeStatus ? (
-                    <Select value={e.status} onValueChange={(v) => updateStatus.mutate({ id: e.id, status: v, oldStatus: e.status })}>
-                      <SelectTrigger className="w-[180px] h-8">
-                        <StatusBadge status={e.status} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {STATUSES.map((s) => (
-                          <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <StatusBadge status={e.status} />
-                  )}
-                </TableCell>
-                <TableCell className="text-muted-foreground text-sm">{format(new Date(e.created_at), "dd MMM yyyy")}</TableCell>
-              </TableRow>
+              <React.Fragment key={e.id}>
+                <TableRow>
+                  <TableCell className="font-medium">{e.universities?.name}</TableCell>
+                  <TableCell>{e.courses?.name}</TableCell>
+                  <TableCell>
+                    {canChangeStatus ? (
+                      <Select value={e.status} onValueChange={(v) => updateStatus.mutate({ id: e.id, status: v, oldStatus: e.status })}>
+                        <SelectTrigger className="w-[180px] h-8">
+                          <StatusBadge status={e.status} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STATUSES.map((s) => (
+                            <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <StatusBadge status={e.status} />
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm">{format(new Date(e.created_at), "dd MMM yyyy")}</TableCell>
+                  <TableCell>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpandedId(expandedId === e.id ? null : e.id)}>
+                      {expandedId === e.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+                {expandedId === e.id && e.course_id && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="p-2">
+                      <CourseDetailsInfoCard courseId={e.course_id} compact />
+                    </TableCell>
+                  </TableRow>
+                )}
+              </React.Fragment>
             ))}
             {enrollments.length === 0 && (
-              <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">No enrollments</TableCell></TableRow>
+              <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No enrollments</TableCell></TableRow>
             )}
           </TableBody>
         </Table>

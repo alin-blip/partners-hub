@@ -17,6 +17,17 @@ Each combination of course + campus should be a separate object. Only include en
 The groups are typically single letters (A, B, C, E, K, N, P, G etc.) that correspond to timetable schedules.
 Also look for the provider/university name associated with each course.
 Example: [{"course_name":"BSc (Hons) Computing with Foundation Year","campus":"East London","groups":["A","K","N"]},{"course_name":"BSc (Hons) Computing with Foundation Year","campus":"West London","groups":["B","C","K"]}]`,
+  course_details: `You are extracting detailed course requirement information from a university/college document.
+Return a JSON array of objects with: course_name (string - the full course name),
+personal_statement_guidelines (string or null - word count, topics to cover, specific requirements),
+admission_test_info (string or null - test times, number of attempts, format, what is tested),
+interview_info (string or null - on-campus/online, process, preparation, forms to complete),
+entry_requirements (string or null - qualifications needed, work experience, age requirements, alternative routes),
+documents_required (string or null - list of all documents needed for application),
+additional_info (string or null - travel time limits, DBS checks, SFE requirements, any other important info).
+Extract ALL sections from the document, preserving specific details like word counts, times, number of attempts, qualification levels, years of experience, travel time limits etc.
+If information applies to all courses in the document, repeat it for each course.
+Example: [{"course_name":"BSc (Hons) Computing","personal_statement_guidelines":"150 words covering: why this course, long-term goals, relevant experience","admission_test_info":"Tests at 10:30 AM and 2:00 PM, 3 chances to pass","interview_info":"On campus, online only in exceptional cases","entry_requirements":"Level 3 qualification or Level 2 + 1 year work experience for 21+","documents_required":"Passport, CV (3 years work experience), NINO, Proof of address, Share Code","additional_info":"Max 1.5 hours travel time from postcode to campus, DBS check required"}]`,
 };
 
 serve(async (req) => {

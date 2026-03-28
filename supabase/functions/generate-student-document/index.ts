@@ -55,12 +55,32 @@ serve(async (req) => {
     // Fetch enrollments with university/course info
     const { data: enrollments } = await adminClient
       .from("enrollments")
-      .select("status, notes, universities(name), courses(name, level, study_mode)")
+      .select("status, notes, course_id, universities(name), courses(name, level, study_mode)")
       .eq("student_id", student_id);
 
     const enrollmentInfo = (enrollments || []).map((e: any) =>
       `${e.courses?.name || "Unknown course"} (${e.courses?.level || ""}) at ${e.universities?.name || "Unknown"} — Status: ${e.status}`
     ).join("\n");
+
+    // Fetch course details for personal statement guidelines
+    let courseDetailsInfo = "";
+    if (document_type === "personal_statement" && enrollments && enrollments.length > 0) {
+      const courseIds = enrollments.map((e: any) => e.course_id).filter(Boolean);
+      if (courseIds.length > 0) {
+        const { data: courseDetails } = await adminClient
+          .from("course_details")
+          .select("personal_statement_guidelines, entry_requirements, courses(name)")
+          .in("course_id", courseIds);
+        if (courseDetails && courseDetails.length > 0) {
+          courseDetailsInfo = courseDetails.map((cd: any) => {
+            const parts = [`Course: ${cd.courses?.name || "Unknown"}`];
+            if (cd.personal_statement_guidelines) parts.push(`Guidelines: ${cd.personal_statement_guidelines}`);
+            if (cd.entry_requirements) parts.push(`Entry Requirements: ${cd.entry_requirements}`);
+            return parts.join("\n");
+          }).join("\n\n");
+        }
+      }
+    }
 
     // Build student profile summary
     const profileSummary = [
@@ -98,7 +118,7 @@ Guidelines:
 
 Guidelines:
 - Write in first person from the student's perspective
-- 500-700 words ideal length
+- 500-700 words ideal length (unless specific guidelines say otherwise)
 - Include motivation for chosen course/field of study
 - Highlight qualifications and relevant experience
 - Show passion for the subject area
@@ -107,6 +127,10 @@ Guidelines:
 - Suitable for UCAS or direct university applications in the UK
 - Use the enrollment/course information to tailor the statement
 - Output ONLY the personal statement text in Markdown, no explanations`;
+
+      if (courseDetailsInfo) {
+        systemPrompt += `\n\nIMPORTANT — Follow these SPECIFIC university/course guidelines:\n${courseDetailsInfo}\n\nYou MUST adhere to any word count limits, specific topics to cover, and formatting requirements specified above.`;
+      }
     }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {

@@ -19,7 +19,7 @@ import { Upload, Loader2, FileText, Check, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-type DocType = "courses" | "timetable" | "campuses" | "intakes" | "course_timetable";
+type DocType = "courses" | "timetable" | "campuses" | "intakes" | "course_timetable" | "course_details";
 
 interface Props {
   open: boolean;
@@ -34,6 +34,7 @@ const DOC_TYPE_LABELS: Record<DocType, string> = {
   campuses: "Campuses",
   intakes: "Intakes",
   course_timetable: "Course–Timetable Matrix",
+  course_details: "Course Details (Requirements)",
 };
 
 const COLUMNS: Record<DocType, string[]> = {
@@ -42,9 +43,10 @@ const COLUMNS: Record<DocType, string[]> = {
   campuses: ["name", "city"],
   intakes: ["label", "start_date", "application_deadline"],
   course_timetable: ["course_name", "campus", "groups"],
+  course_details: ["course_name", "entry_requirements", "admission_test_info"],
 };
 
-const ALL_DOC_TYPES: DocType[] = ["courses", "campuses", "intakes", "timetable", "course_timetable"];
+const ALL_DOC_TYPES: DocType[] = ["courses", "campuses", "intakes", "timetable", "course_timetable", "course_details"];
 
 const ACCEPTED = ".pdf,.xlsx,.xls,.docx,.doc,.jpg,.jpeg,.png,.webp";
 
@@ -58,12 +60,12 @@ function readFileAsBase64(file: File): Promise<string> {
 }
 
 const EMPTY_ITEMS: Record<DocType, any[]> = {
-  courses: [], timetable: [], campuses: [], intakes: [], course_timetable: [],
+  courses: [], timetable: [], campuses: [], intakes: [], course_timetable: [], course_details: [],
 };
 const EMPTY_SELECTED: Record<DocType, Set<number>> = {
-  courses: new Set(), timetable: new Set(), campuses: new Set(), intakes: new Set(), course_timetable: new Set(),
+  courses: new Set(), timetable: new Set(), campuses: new Set(), intakes: new Set(), course_timetable: new Set(), course_details: new Set(),
 };
-const EMPTY_SUMMARY: Record<DocType, number> = { courses: 0, timetable: 0, campuses: 0, intakes: 0, course_timetable: 0 };
+const EMPTY_SUMMARY: Record<DocType, number> = { courses: 0, timetable: 0, campuses: 0, intakes: 0, course_timetable: 0, course_details: 0 };
 
 export function DocumentProcessorDialog({ open, onOpenChange, universities, defaultDocType }: Props) {
   const { toast } = useToast();
@@ -92,7 +94,7 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
     setFiles([]);
     setItemsByType({ ...EMPTY_ITEMS });
     setSelectedByType({
-      courses: new Set(), timetable: new Set(), campuses: new Set(), intakes: new Set(), course_timetable: new Set(),
+      courses: new Set(), timetable: new Set(), campuses: new Set(), intakes: new Set(), course_timetable: new Set(), course_details: new Set(),
     });
     setProcessing(false);
     setSaving(false);
@@ -186,7 +188,7 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
       setItemsByType(newItemsByType);
 
       const newSelected: Record<DocType, Set<number>> = {
-        courses: new Set(), timetable: new Set(), campuses: new Set(), intakes: new Set(), course_timetable: new Set(),
+        courses: new Set(), timetable: new Set(), campuses: new Set(), intakes: new Set(), course_timetable: new Set(), course_details: new Set(),
       };
       for (const t of types) {
         newSelected[t] = new Set(newItemsByType[t].map((_: any, i: number) => i));
@@ -246,7 +248,7 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
     try {
       const types = Array.from(selectedTypes);
 
-      const selectedItemsByType: Record<DocType, any[]> = { courses: [], timetable: [], campuses: [], intakes: [], course_timetable: [] };
+      const selectedItemsByType: Record<DocType, any[]> = { courses: [], timetable: [], campuses: [], intakes: [], course_timetable: [], course_details: [] };
       for (const docType of types) {
         const items = itemsByType[docType];
         const sel = selectedByType[docType];
@@ -326,6 +328,27 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
               if (error) throw error;
               qc.invalidateQueries({ queryKey: ["course-timetable-groups"] });
             }
+          } else if (docType === "course_details") {
+            // Match course names to existing course IDs, then upsert into course_details
+            const { data: existingCourses } = await supabase.from("courses").select("id, name").eq("university_id", universityId);
+            const courseMap = new Map((existingCourses || []).map((c) => [c.name.toLowerCase().trim(), c.id]));
+
+            for (const item of clean) {
+              const courseId = courseMap.get(item.course_name?.toLowerCase().trim());
+              if (!courseId) continue;
+              const row = {
+                course_id: courseId,
+                personal_statement_guidelines: item.personal_statement_guidelines || null,
+                admission_test_info: item.admission_test_info || null,
+                interview_info: item.interview_info || null,
+                entry_requirements: item.entry_requirements || null,
+                documents_required: item.documents_required || null,
+                additional_info: item.additional_info || null,
+              };
+              const { error } = await supabase.from("course_details" as any).upsert(row, { onConflict: "course_id" });
+              if (error) throw error;
+            }
+            qc.invalidateQueries({ queryKey: ["course-details"] });
           }
         }
       }
@@ -347,6 +370,8 @@ export function DocumentProcessorDialog({ open, onOpenChange, universities, defa
               content = saved.map((c) => `- ${c.label}`).join("\n");
             } else if (docType === "course_timetable") {
               content = saved.map((c) => `- ${c.course_name} @ ${c.campus}: Groups ${c.groups}`).join("\n");
+            } else if (docType === "course_details") {
+              content = saved.map((c) => `- ${c.course_name}: Entry=${c.entry_requirements || "N/A"}, Test=${c.admission_test_info || "N/A"}, PS=${c.personal_statement_guidelines || "N/A"}`).join("\n");
             }
             return { title: `${universityName} — ${DOC_TYPE_LABELS[docType]}`, content, category: docType === "course_timetable" ? "timetable" : docType };
           });

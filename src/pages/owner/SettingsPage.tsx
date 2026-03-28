@@ -1032,6 +1032,186 @@ function TimetableSection({ universities }: { universities: any[] }) {
 }
 
 /* ──────────────────────────────────────────────────────── */
+/*  Course Details Section                                 */
+/* ──────────────────────────────────────────────────────── */
+
+function CourseDetailsSection({ universities, courses }: { universities: any[]; courses: any[] }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [filterUni, setFilterUni] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editData, setEditData] = useState<any>({});
+
+  const { data: courseDetails = [] } = useQuery({
+    queryKey: ["course-details-all"],
+    queryFn: async () => {
+      const { data } = await supabase.from("course_details" as any).select("*, courses(name, university_id, universities(name))") as any;
+      return (data || []) as any[];
+    },
+  });
+
+  const filteredCourses = filterUni ? courses.filter((c: any) => c.university_id === filterUni) : courses;
+  const filteredDetails = filterUni
+    ? courseDetails.filter((d: any) => d.courses?.university_id === filterUni)
+    : courseDetails;
+
+  const coursesWithoutDetails = filteredCourses.filter(
+    (c: any) => !courseDetails.some((d: any) => d.course_id === c.id)
+  );
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const { error } = await supabase.from("course_details" as any).upsert({
+        course_id: data.course_id,
+        personal_statement_guidelines: data.personal_statement_guidelines || null,
+        admission_test_info: data.admission_test_info || null,
+        interview_info: data.interview_info || null,
+        entry_requirements: data.entry_requirements || null,
+        documents_required: data.documents_required || null,
+        additional_info: data.additional_info || null,
+      }, { onConflict: "course_id" });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["course-details-all"] });
+      qc.invalidateQueries({ queryKey: ["course-details"] });
+      toast({ title: "Course details saved" });
+      setEditingId(null);
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("course_details" as any).delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["course-details-all"] });
+      qc.invalidateQueries({ queryKey: ["course-details"] });
+      toast({ title: "Course details deleted" });
+    },
+  });
+
+  const FIELDS = [
+    { key: "personal_statement_guidelines", label: "Personal Statement Guidelines" },
+    { key: "admission_test_info", label: "Admission Test Info" },
+    { key: "interview_info", label: "Interview Info" },
+    { key: "entry_requirements", label: "Entry Requirements" },
+    { key: "documents_required", label: "Documents Required" },
+    { key: "additional_info", label: "Additional Info" },
+  ];
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-3">
+        <CardTitle className="text-base">Course Details & Requirements</CardTitle>
+        <div className="flex items-center gap-2">
+          <select
+            className="h-9 rounded-md border px-3 text-sm"
+            value={filterUni}
+            onChange={(e) => setFilterUni(e.target.value)}
+          >
+            <option value="">All Universities</option>
+            {universities.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Add for a course */}
+        {coursesWithoutDetails.length > 0 && (
+          <div className="flex items-center gap-2">
+            <select
+              className="h-9 rounded-md border px-3 text-sm flex-1"
+              value=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  setEditingId("new");
+                  setEditData({ course_id: e.target.value });
+                }
+              }}
+            >
+              <option value="">+ Add details for a course…</option>
+              {coursesWithoutDetails.map((c: any) => (
+                <option key={c.id} value={c.id}>{c.name} — {(c as any).universities?.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Edit form */}
+        {editingId && (
+          <Card className="border-accent/40">
+            <CardContent className="pt-4 space-y-3">
+              <p className="text-sm font-medium">
+                {editingId === "new"
+                  ? courses.find((c: any) => c.id === editData.course_id)?.name
+                  : courseDetails.find((d: any) => d.id === editingId)?.courses?.name}
+              </p>
+              {FIELDS.map(({ key, label }) => (
+                <div key={key} className="space-y-1">
+                  <Label className="text-xs">{label}</Label>
+                  <Textarea
+                    className="text-sm min-h-[60px]"
+                    value={editData[key] || ""}
+                    onChange={(e) => setEditData({ ...editData, [key]: e.target.value })}
+                    placeholder={label}
+                  />
+                </div>
+              ))}
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" size="sm" onClick={() => setEditingId(null)}>Cancel</Button>
+                <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90" onClick={() => saveMutation.mutate(editData)}>
+                  Save
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* List */}
+        {filteredDetails.length === 0 && !editingId && (
+          <p className="text-sm text-muted-foreground text-center py-4">No course details yet. Upload a document or add manually above.</p>
+        )}
+        {filteredDetails.map((d: any) => (
+          <Card key={d.id} className="border">
+            <CardContent className="pt-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="font-medium text-sm">{d.courses?.name} <span className="text-muted-foreground font-normal">— {d.courses?.universities?.name}</span></p>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="icon" onClick={() => {
+                    setEditingId(d.id);
+                    setEditData({
+                      course_id: d.course_id,
+                      personal_statement_guidelines: d.personal_statement_guidelines || "",
+                      admission_test_info: d.admission_test_info || "",
+                      interview_info: d.interview_info || "",
+                      entry_requirements: d.entry_requirements || "",
+                      documents_required: d.documents_required || "",
+                      additional_info: d.additional_info || "",
+                    });
+                  }}>
+                    <Pencil className="w-4 h-4 text-muted-foreground" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(d.id)}>
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                </div>
+              </div>
+              <div className="grid gap-1 text-xs text-muted-foreground">
+                {FIELDS.map(({ key, label }) => d[key] && (
+                  <p key={key}><span className="font-medium text-foreground">{label}:</span> {d[key]}</p>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ──────────────────────────────────────────────────────── */
 /*  Main Page                                              */
 /* ──────────────────────────────────────────────────────── */
 
@@ -1171,11 +1351,12 @@ export default function SettingsPage() {
         />
 
         <Tabs defaultValue="universities">
-          <TabsList>
+          <TabsList className="flex-wrap h-auto gap-1">
             <TabsTrigger value="universities">Universities</TabsTrigger>
             <TabsTrigger value="campuses">Campuses</TabsTrigger>
             <TabsTrigger value="courses">Courses</TabsTrigger>
             <TabsTrigger value="intakes">Intakes</TabsTrigger>
+            <TabsTrigger value="course-details">Course Details</TabsTrigger>
             <TabsTrigger value="commissions">Commission Tiers</TabsTrigger>
             <TabsTrigger value="promotions">Promotions</TabsTrigger>
             <TabsTrigger value="timetable">Timetable</TabsTrigger>
@@ -1188,6 +1369,10 @@ export default function SettingsPage() {
 
           <TabsContent value="timetable" className="mt-4">
             <TimetableSection universities={universities} />
+          </TabsContent>
+
+          <TabsContent value="course-details" className="mt-4">
+            <CourseDetailsSection universities={universities} courses={courses} />
           </TabsContent>
 
           <TabsContent value="campuses" className="mt-4">
