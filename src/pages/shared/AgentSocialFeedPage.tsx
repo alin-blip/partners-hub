@@ -13,16 +13,21 @@ export default function AgentSocialFeedPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
 
-  // Fetch agent's card settings for share link
+  // Fetch agent's card settings + slug for share link
   const { data: cardSettings } = useQuery({
     queryKey: ["my-card-settings", user?.id],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data: card } = await supabase
         .from("agent_card_settings")
-        .select("slug, is_public")
+        .select("is_public")
         .eq("user_id", user!.id)
         .maybeSingle();
-      return data;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("slug")
+        .eq("id", user!.id)
+        .single();
+      return { is_public: card?.is_public || false, slug: profile?.slug || null };
     },
     enabled: !!user,
   });
