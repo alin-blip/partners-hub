@@ -107,6 +107,19 @@ Deno.serve(async (req) => {
     )
   }
 
+  // If agentId is provided but no recipientEmail, resolve it server-side
+  if (!recipientEmail && agentId) {
+    const supabaseLookup = createClient(supabaseUrl, supabaseServiceKey)
+    const { data: agentProfile } = await supabaseLookup
+      .from('profiles')
+      .select('email')
+      .eq('id', agentId)
+      .single()
+    if (agentProfile?.email) {
+      recipientEmail = agentProfile.email
+    }
+  }
+
   // Resolve effective recipient: template-level `to` takes precedence over
   // the caller-provided recipientEmail. This allows notification templates
   // to always send to a fixed address (e.g., site owner from env var).
