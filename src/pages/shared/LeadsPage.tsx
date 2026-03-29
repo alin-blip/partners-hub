@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Search, UserPlus, ArrowRight, Phone, Mail, StickyNote,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 
 const STATUSES = ["new", "contacted", "qualified", "converted"] as const;
