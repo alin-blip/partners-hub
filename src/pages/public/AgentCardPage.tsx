@@ -108,8 +108,7 @@ export default function AgentCardPage() {
       `FN:${profile.full_name}`,
       settings.job_title ? `TITLE:${settings.job_title}` : "",
       settings.company_name ? `ORG:${settings.company_name}` : "",
-      profile.phone ? `TEL;TYPE=CELL:${profile.phone}` : "",
-      profile.email ? `EMAIL:${profile.email}` : "",
+      settings.whatsapp ? `TEL;TYPE=CELL:${settings.whatsapp}` : "",
       profile.avatar_url ? `PHOTO;VALUE=URI:${profile.avatar_url}` : "",
       "END:VCARD",
     ].filter(Boolean).join("\n");
