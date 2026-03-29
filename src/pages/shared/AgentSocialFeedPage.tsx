@@ -237,6 +237,14 @@ export default function AgentSocialFeedPage() {
                           </Tooltip>
                           <Tooltip>
                             <TooltipTrigger asChild>
+                              <Button size="icon" variant="outline" className="h-8 w-8" disabled={!hasCard} onClick={() => handleShareForPlatform(post, "whatsapp")}>
+                                <SiWhatsapp className="w-3.5 h-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Share on WhatsApp</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
                               <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => handleDownloadImage(post)}>
                                 <Download className="w-3.5 h-3.5" />
                               </Button>
