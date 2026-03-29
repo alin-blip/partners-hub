@@ -54,13 +54,12 @@ serve(async (req) => {
       }
     }
 
-    // Build courses context
+    // Build courses context — only course names, NO university names
     let coursesContext = "";
-    if (courses && courses.length > 0 && universities && universities.length > 0) {
-      const uniMap = new Map(universities.map((u: any) => [u.id, u.name]));
+    if (courses && courses.length > 0) {
       const courseLines = courses
-        .map((c: any) => `- ${c.name} (${c.level}, ${c.study_mode}) at ${uniMap.get(c.university_id) || "Unknown"}`)
-        .slice(0, 50); // limit to avoid prompt overflow
+        .map((c: any) => `- ${c.name} (${c.level}, ${c.study_mode})`)
+        .slice(0, 50);
       coursesContext = `\n\nAVAILABLE COURSES:\n${courseLines.join("\n")}\n`;
     }
 
@@ -90,7 +89,8 @@ Rules:
 - Write in a conversational, natural speaking tone — as if talking directly to the viewer
 - Use short sentences that are easy to read from a teleprompter
 - Start with a hook / attention grabber (first 3 seconds)
-- Reference REAL courses, universities, and admissions info from the knowledge base above when relevant
+- Reference REAL courses and admissions info from the knowledge base above when relevant
+- NEVER mention specific university names — only refer to course names or fields of study generally
 - Include a clear CTA (call-to-action) at the end — e.g. "Send us a message", "Link in bio", "Comment below", "Book your free consultation"
 - Keep it concise: 80-150 words max
 - Add [PAUSE] markers where the speaker should take a brief pause
@@ -108,7 +108,7 @@ Rules:
 - Write in a professional yet friendly and motivational tone
 - Include 3-5 relevant hashtags at the end
 - Keep the caption concise (2-4 sentences max)
-- Reference REAL courses, universities, intakes, or admissions data from the knowledge base above when relevant to the topic
+- Reference REAL courses, intakes, or admissions data from the knowledge base above when relevant to the topic — but NEVER mention specific university names, only course names or fields of study
 - ALWAYS include a clear call-to-action (CTA) — e.g. "DM us now", "Link in bio", "Apply today", "Book your free consultation", "Comment 'INFO' below"
 - The CTA should feel natural and actionable, not generic
 - Use emojis sparingly but effectively
