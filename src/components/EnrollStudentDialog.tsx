@@ -522,7 +522,9 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
                           <label key={opt.id} className="flex items-center gap-3 cursor-pointer">
                             <Checkbox
                               checked={!!marketingChecks[opt.id]}
+                              disabled={!!opt.required}
                               onCheckedChange={(checked) => {
+                                if (opt.required) return;
                                 setMarketingChecks((prev) => {
                                   const next = { ...prev, [opt.id]: !!checked };
                                   if (checked && opt.exclusive) next[opt.exclusive] = false;
