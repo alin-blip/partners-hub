@@ -25,6 +25,14 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState((profile as any)?.avatar_url || "");
   const [uploading, setUploading] = useState(false);
 
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.full_name || "");
+      setPhone(profile.phone || "");
+      setAvatarUrl(profile.avatar_url || "");
+    }
+  }, [profile]);
+
   const updateProfile = useMutation({
     mutationFn: async () => {
       const { error } = await supabase
