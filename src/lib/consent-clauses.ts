@@ -96,8 +96,12 @@ export const CONSENT_CLAUSES: ConsentClause[] = [
 ];
 
 export const MARKETING_OPTIONS: MarketingOption[] = [
-  { id: "contact_consent", label: "I consent to being contacted by EduForYou" },
-  { id: "data_sharing_consent", label: "I consent to data sharing with partner institutions" },
-  { id: "marketing_yes", label: "I consent to receiving marketing communications", exclusive: "marketing_no" },
+  { id: "contact_consent", label: "I consent to being contacted by EduForYou", required: true },
+  { id: "data_sharing_consent", label: "I consent to data sharing with partner institutions", required: true },
+  { id: "marketing_yes", label: "I consent to receiving marketing communications", exclusive: "marketing_no", required: true },
   { id: "marketing_no", label: "I do NOT consent to marketing communications", exclusive: "marketing_yes" },
 ];
+
+export const DEFAULT_MARKETING_CHECKS: Record<string, boolean> = Object.fromEntries(
+  MARKETING_OPTIONS.filter((o) => o.required).map((o) => [o.id, true])
+);
