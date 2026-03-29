@@ -29,8 +29,40 @@ serve(async (req) => {
     if (!prompt) throw new Error("Missing prompt");
     const lang = language || "English";
 
-    // Fetch brand settings for voice/DNA
+    // Fetch brand settings
     const { data: brand } = await adminClient.from("brand_settings").select("brand_prompt").limit(1).single();
+
+    // Fetch knowledge base entries
+    const { data: kbEntries } = await adminClient.from("ai_knowledge_base").select("title, content, category").order("category");
+
+    // Fetch courses with universities
+    const { data: courses } = await adminClient.from("courses").select("name, level, study_mode, university_id");
+    const { data: universities } = await adminClient.from("universities").select("id, name").eq("is_active", true);
+
+    // Build knowledge context
+    let knowledgeContext = "";
+    if (kbEntries && kbEntries.length > 0) {
+      const grouped: Record<string, string[]> = {};
+      for (const entry of kbEntries) {
+        const cat = entry.category || "general";
+        if (!grouped[cat]) grouped[cat] = [];
+        grouped[cat].push(`${entry.title}: ${entry.content}`);
+      }
+      knowledgeContext = "\n\nKNOWLEDGE BASE (use this real data in your content):\n";
+      for (const [cat, items] of Object.entries(grouped)) {
+        knowledgeContext += `\n[${cat.toUpperCase()}]\n${items.join("\n")}\n`;
+      }
+    }
+
+    // Build courses context
+    let coursesContext = "";
+    if (courses && courses.length > 0 && universities && universities.length > 0) {
+      const uniMap = new Map(universities.map((u: any) => [u.id, u.name]));
+      const courseLines = courses
+        .map((c: any) => `- ${c.name} (${c.level}, ${c.study_mode}) at ${uniMap.get(c.university_id) || "Unknown"}`)
+        .slice(0, 50); // limit to avoid prompt overflow
+      coursesContext = `\n\nAVAILABLE COURSES:\n${courseLines.join("\n")}\n`;
+    }
 
     const isScript = preset === "script";
 
@@ -43,12 +75,14 @@ serve(async (req) => {
     };
     const presetLabel = presetLabels[preset] || "social media post";
 
+    const brandSection = brand?.brand_prompt ? `Brand Voice & Guidelines:\n${brand.brand_prompt}\n` : "";
+
     let systemPrompt: string;
 
     if (isScript) {
       systemPrompt = `You are the social media manager and video content creator for EduForYou UK, an education recruitment agency that helps students find the right university courses in the UK.
 
-${brand?.brand_prompt ? `Brand Voice & Guidelines:\n${brand.brand_prompt}\n` : ""}
+${brandSection}${knowledgeContext}${coursesContext}
 Write a teleprompter-ready video script for a short-form video (30-60 seconds) about the given topic.
 IMPORTANT: Write the ENTIRE script in ${lang}.
 
@@ -56,6 +90,7 @@ Rules:
 - Write in a conversational, natural speaking tone — as if talking directly to the viewer
 - Use short sentences that are easy to read from a teleprompter
 - Start with a hook / attention grabber (first 3 seconds)
+- Reference REAL courses, universities, and admissions info from the knowledge base above when relevant
 - Include a clear CTA (call-to-action) at the end — e.g. "Send us a message", "Link in bio", "Comment below", "Book your free consultation"
 - Keep it concise: 80-150 words max
 - Add [PAUSE] markers where the speaker should take a brief pause
@@ -65,7 +100,7 @@ Rules:
     } else {
       systemPrompt = `You are the social media manager for EduForYou UK, an education recruitment agency that helps students find the right university courses in the UK.
 
-${brand?.brand_prompt ? `Brand Voice & Guidelines:\n${brand.brand_prompt}\n` : ""}
+${brandSection}${knowledgeContext}${coursesContext}
 Write an engaging social media post caption for a ${presetLabel} image.
 IMPORTANT: Write the ENTIRE caption in ${lang}.
 
@@ -73,6 +108,7 @@ Rules:
 - Write in a professional yet friendly and motivational tone
 - Include 3-5 relevant hashtags at the end
 - Keep the caption concise (2-4 sentences max)
+- Reference REAL courses, universities, intakes, or admissions data from the knowledge base above when relevant to the topic
 - ALWAYS include a clear call-to-action (CTA) — e.g. "DM us now", "Link in bio", "Apply today", "Book your free consultation", "Comment 'INFO' below"
 - The CTA should feel natural and actionable, not generic
 - Use emojis sparingly but effectively

@@ -33,7 +33,6 @@ import {
   Check,
   Download,
   Video,
-  CheckSquare,
 } from "lucide-react";
 
 const LANGUAGES = [
@@ -50,7 +49,6 @@ const PRESETS = [
   { id: "story", label: "Story", desc: "1080×1920 vertical", icon: Smartphone },
   { id: "flyer", label: "Flyer", desc: "A5 portrait", icon: FileText },
   { id: "banner", label: "Banner", desc: "1200×628 horizontal", icon: LayoutTemplate },
-  { id: "script", label: "Script", desc: "Teleprompter ready", icon: Video },
 ];
 
 type GeneratedResult = {
@@ -126,7 +124,6 @@ export default function SocialPostsPage() {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [captionLanguage, setCaptionLanguage] = useState("Romanian");
   const [aiCaption, setAiCaption] = useState<string | null>(null);
-  const [captionLoading, setCaptionLoading] = useState(false);
   const hasAvatar = !!(profile as any)?.avatar_url;
 
   // --- Manual upload state ---
@@ -212,14 +209,12 @@ export default function SocialPostsPage() {
     }
 
     const results: GeneratedResult[] = [];
-    const imagePresets = selectedPresets.filter((p) => p !== "script");
-    const hasScript = selectedPresets.includes("script");
 
     // Generate images sequentially (each costs a daily slot)
-    for (let i = 0; i < imagePresets.length; i++) {
-      const preset = imagePresets[i];
+    for (let i = 0; i < selectedPresets.length; i++) {
+      const preset = selectedPresets[i];
       const presetLabel = PRESETS.find((p) => p.id === preset)?.label || preset;
-      setGeneratingProgress(`Generating ${presetLabel}… (${i + 1}/${imagePresets.length}${hasScript ? " + script" : ""})`);
+      setGeneratingProgress(`Generating ${presetLabel}… (${i + 1}/${selectedPresets.length})`);
 
       try {
         const resp = await fetch(
@@ -254,34 +249,61 @@ export default function SocialPostsPage() {
       }
     }
 
-    // Generate script if selected
-    if (hasScript) {
-      setGeneratingProgress("Generating teleprompter script…");
-      try {
-        const resp = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-caption`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({
-              prompt,
-              preset: "script",
-              language: captionLanguage,
-            }),
-          }
-        );
-        const result = await resp.json();
-        if (!resp.ok) {
-          results.push({ preset: "script", error: result.error || "Script generation failed" });
-        } else {
-          results.push({ preset: "script", script: result.caption });
+    // Always auto-generate teleprompter script (knowledge base enriched)
+    setGeneratingProgress("Generating teleprompter script…");
+    try {
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-caption`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            prompt,
+            preset: "script",
+            language: captionLanguage,
+          }),
         }
-      } catch (e: any) {
-        results.push({ preset: "script", error: e.message });
+      );
+      const result = await resp.json();
+      if (!resp.ok) {
+        results.push({ preset: "script", error: result.error || "Script generation failed" });
+      } else {
+        results.push({ preset: "script", script: result.caption });
       }
+    } catch (e: any) {
+      results.push({ preset: "script", error: e.message });
+    }
+
+    // Always auto-generate caption (knowledge base enriched)
+    setGeneratingProgress("Generating caption…");
+    try {
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-caption`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            prompt,
+            preset: "social_post",
+            language: captionLanguage,
+          }),
+        }
+      );
+      const result = await resp.json();
+      if (!resp.ok) {
+        console.error("Caption generation failed:", result.error);
+      } else {
+        setAiCaption(result.caption);
+        setCaption(result.caption);
+      }
+    } catch (e: any) {
+      console.error("Caption generation error:", e.message);
     }
 
     setGeneratedResults(results);
@@ -294,33 +316,7 @@ export default function SocialPostsPage() {
     }
   };
 
-  // --- AI Generate Caption (with CTA always) ---
-  const handleGenerateCaption = async () => {
-    setCaptionLoading(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-      const resp = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-caption`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ prompt, preset: "social_post", language: captionLanguage }),
-        }
-      );
-      const result = await resp.json();
-      if (!resp.ok) throw new Error(result.error || "Caption generation failed");
-      setAiCaption(result.caption);
-      setCaption(result.caption);
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setCaptionLoading(false);
-    }
-  };
+  // Caption is now auto-generated after image generation
 
   // --- Manual upload ---
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -489,11 +485,11 @@ export default function SocialPostsPage() {
                       className="h-7 text-xs"
                       onClick={selectAllPresets}
                     >
-                      <CheckSquare className="w-3 h-3 mr-1" />
+                      <Check className="w-3 h-3 mr-1" />
                       {selectedPresets.length === PRESETS.length ? "Deselect all" : "Select all"}
                     </Button>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     {PRESETS.map((p) => {
                       const isSelected = selectedPresets.includes(p.id);
                       return (
@@ -591,25 +587,7 @@ export default function SocialPostsPage() {
                 {/* Generated results */}
                 {generatedResults.length > 0 && (
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium">Generated Content</Label>
-                      {imageResults.length > 0 && !aiCaption && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={handleGenerateCaption}
-                          disabled={captionLoading}
-                          className="h-8"
-                        >
-                          {captionLoading ? (
-                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                          ) : (
-                            <MessageSquare className="w-3 h-3 mr-1" />
-                          )}
-                          Generate Caption
-                        </Button>
-                      )}
-                    </div>
+                    <Label className="text-sm font-medium">Generated Content</Label>
 
                     {/* Image grid */}
                     {imageResults.length > 0 && (
