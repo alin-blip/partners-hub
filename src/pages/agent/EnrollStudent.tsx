@@ -14,7 +14,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, ArrowRight, Check, Calendar, Upload, FileText, X, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Calendar, Upload, FileText, X, ShieldCheck, Eye } from "lucide-react";
 import { CourseDetailsInfoCard } from "@/components/CourseDetailsInfoCard";
 import { SignatureCanvas } from "@/components/SignatureCanvas";
 
@@ -104,6 +104,8 @@ export default function EnrollStudent() {
   const [consentChecks, setConsentChecks] = useState<Record<string, boolean>>({});
   const [consentSignature, setConsentSignature] = useState("");
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
+  const [consentPreviewUrl, setConsentPreviewUrl] = useState<string | null>(null);
+  const [previewingConsent, setPreviewingConsent] = useState(false);
 
   const allConsentsChecked = CONSENT_CLAUSES.every((c) => consentChecks[c.id]);
   const canProceedConsent = allConsentsChecked && consentSignature.trim().length > 0 && !!signatureDataUrl;
@@ -689,10 +691,57 @@ export default function EnrollStudent() {
 
               <div className="flex justify-between pt-2">
                 <Button variant="outline" onClick={() => setStep(4)}><ArrowLeft className="w-4 h-4 mr-1" /> Back</Button>
-                <Button onClick={() => setStep(6)} disabled={!canProceedConsent} className="bg-accent text-accent-foreground hover:bg-accent/90">
-                  Review <ArrowRight className="w-4 h-4 ml-1" />
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    disabled={!canProceedConsent || previewingConsent}
+                    onClick={async () => {
+                      setPreviewingConsent(true);
+                      try {
+                        const selectedUni = universities.find((u: any) => u.id === universityId);
+                        const selectedCrs = courses.find((c: any) => c.id === courseId);
+                        const { data: pdfData, error: pdfError } = await supabase.functions.invoke("generate-consent-pdf", {
+                          body: {
+                            studentName: `${title ? title + " " : ""}${firstName} ${lastName}`,
+                            dateOfBirth: dob || null,
+                            nationality: nationality || null,
+                            address: fullAddress || null,
+                            universityName: selectedUni?.name || "",
+                            courseName: selectedCrs?.name || "",
+                            agentName: "EduForYou UK",
+                            signature: consentSignature,
+                            signatureImage: signatureDataUrl || null,
+                            consentDate: new Date().toLocaleDateString("en-GB"),
+                          },
+                        });
+                        if (pdfError) throw pdfError;
+                        const binaryString = atob(pdfData.pdf_base64);
+                        const bytes = new Uint8Array(binaryString.length);
+                        for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+                        const blob = new Blob([bytes], { type: "application/pdf" });
+                        setConsentPreviewUrl(URL.createObjectURL(blob));
+                      } catch (err: any) {
+                        toast({ title: "Preview failed", description: err.message, variant: "destructive" });
+                      } finally {
+                        setPreviewingConsent(false);
+                      }
+                    }}
+                  >
+                    <Eye className="w-4 h-4 mr-1" /> {previewingConsent ? "Loading…" : "Preview PDF"}
+                  </Button>
+                  <Button onClick={() => setStep(6)} disabled={!canProceedConsent} className="bg-accent text-accent-foreground hover:bg-accent/90">
+                    Review <ArrowRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </div>
               </div>
+
+              {consentPreviewUrl && (
+                <div className="space-y-2 pt-3">
+                  <Label className="text-sm font-semibold">PDF Preview</Label>
+                  <iframe src={consentPreviewUrl} className="w-full h-[400px] rounded-lg border" title="Consent PDF Preview" />
+                  <Button variant="outline" size="sm" onClick={() => setConsentPreviewUrl(null)}>Close Preview</Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

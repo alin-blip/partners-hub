@@ -4,8 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, User, FileText, GraduationCap, DollarSign, MessageSquare, Sparkles } from "lucide-react";
+import { ArrowLeft, User, FileText, GraduationCap, DollarSign, MessageSquare, Sparkles, ShieldCheck, ShieldAlert } from "lucide-react";
 import { StudentOverviewTab } from "@/components/student-detail/StudentOverviewTab";
 import { StudentDocumentsTab } from "@/components/student-detail/StudentDocumentsTab";
 import { StudentEnrollmentsTab } from "@/components/student-detail/StudentEnrollmentsTab";
@@ -38,6 +39,20 @@ export default function StudentDetailPage() {
     enabled: !!student?.agent_id,
   });
 
+  const { data: hasConsent } = useQuery({
+    queryKey: ["student-consent-status", id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("student_documents")
+        .select("id")
+        .eq("student_id", id!)
+        .eq("doc_type", "Consent Form")
+        .limit(1);
+      return (data && data.length > 0) || false;
+    },
+    enabled: !!id,
+  });
+
   if (isLoading) {
     return <DashboardLayout><div className="flex items-center justify-center py-20 text-muted-foreground">Loading…</div></DashboardLayout>;
   }
@@ -58,6 +73,17 @@ export default function StudentDetailPage() {
           <h1 className="text-2xl font-bold tracking-tight">
             {student.title ? `${student.title} ` : ""}{student.first_name} {student.last_name}
           </h1>
+          {hasConsent === true ? (
+            <Badge variant="secondary" className="gap-1 bg-green-100 text-green-700 border-green-200">
+              <ShieldCheck className="w-3 h-3" />
+              Consent Signed
+            </Badge>
+          ) : hasConsent === false ? (
+            <Badge variant="secondary" className="gap-1 bg-orange-100 text-orange-700 border-orange-200">
+              <ShieldAlert className="w-3 h-3" />
+              No Consent
+            </Badge>
+          ) : null}
         </div>
 
         <Tabs defaultValue="overview" className="w-full">
