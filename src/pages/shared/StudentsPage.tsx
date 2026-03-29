@@ -141,8 +141,14 @@ export default function StudentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {students.map((s: any) => {
-                const urgentCount = urgentCounts[s.id] || 0;
+              {isLoading && Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={`skel-${i}`}>
+                  {Array.from({ length: 5 }).map((_, j) => (
+                    <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                  ))}
+                </TableRow>
+              ))}
+              {!isLoading && students.map((s: any) => {
                 return (
                   <TableRow
                     key={s.id}
