@@ -16,6 +16,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, ArrowRight, Check, Calendar, Upload, FileText, X, ShieldCheck } from "lucide-react";
 import { CourseDetailsInfoCard } from "@/components/CourseDetailsInfoCard";
+import { SignatureCanvas } from "@/components/SignatureCanvas";
 
 const IMMIGRATION_OPTIONS = ["Pre-settled", "Settled", "British Citizen", "Visa Holder", "Refugee", "Other"];
 const TITLE_OPTIONS = ["Mr", "Mrs", "Ms", "Miss", "Dr", "Other"];
@@ -102,9 +103,10 @@ export default function EnrollStudent() {
   // Step 5 — Consent
   const [consentChecks, setConsentChecks] = useState<Record<string, boolean>>({});
   const [consentSignature, setConsentSignature] = useState("");
+  const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
 
   const allConsentsChecked = CONSENT_CLAUSES.every((c) => consentChecks[c.id]);
-  const canProceedConsent = allConsentsChecked && consentSignature.trim().length > 0;
+  const canProceedConsent = allConsentsChecked && consentSignature.trim().length > 0 && !!signatureDataUrl;
 
   const { data: universities = [] } = useQuery({
     queryKey: ["universities"],
@@ -221,6 +223,7 @@ export default function EnrollStudent() {
         courseName: selectedCrs?.name || "",
         agentName: agentProfile?.full_name || "EduForYou UK",
         signature: consentSignature,
+        signatureImage: signatureDataUrl || null,
         consentDate: new Date().toLocaleDateString("en-GB"),
       },
     });
@@ -665,15 +668,22 @@ export default function EnrollStudent() {
               </div>
 
               <div className="space-y-2 pt-2">
-                <Label>Digital Signature (type your full name) *</Label>
+                <Label>Full Name (typed confirmation) *</Label>
                 <Input
                   value={consentSignature}
                   onChange={(e) => setConsentSignature(e.target.value)}
                   placeholder={`e.g. ${firstName} ${lastName}`}
-                  className="font-serif italic text-base"
                 />
                 <p className="text-xs text-muted-foreground">
-                  By typing your name above, you confirm that you have read and agree to all the above declarations. Date: {new Date().toLocaleDateString("en-GB")}
+                  Type your full name to confirm your identity.
+                </p>
+              </div>
+
+              <div className="space-y-2 pt-2">
+                <Label>Signature (draw below) *</Label>
+                <SignatureCanvas onSignatureChange={setSignatureDataUrl} />
+                <p className="text-xs text-muted-foreground">
+                  Draw your signature above. Date: {new Date().toLocaleDateString("en-GB")}
                 </p>
               </div>
 
