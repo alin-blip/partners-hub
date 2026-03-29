@@ -96,7 +96,7 @@ export default function StudentsPage() {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold tracking-tight">Students</h1>
           <div className="flex items-center gap-2">
-            {role === "owner" && (
+            {(role === "owner" || role === "admin") && (
               <Button variant="outline" size="sm" onClick={handleExport}>
                 <Download className="w-4 h-4 mr-1" /> Export CSV
               </Button>
