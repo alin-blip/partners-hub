@@ -486,7 +486,7 @@ export default function SocialPostsPage() {
                       className="h-7 text-xs"
                       onClick={selectAllPresets}
                     >
-                      <CheckSquare className="w-3 h-3 mr-1" />
+                      <Check className="w-3 h-3 mr-1" />
                       {selectedPresets.length === PRESETS.length ? "Deselect all" : "Select all"}
                     </Button>
                   </div>
