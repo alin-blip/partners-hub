@@ -1,43 +1,63 @@
 
 
-## Plan: Fix Storage Upload "Failed to fetch" Error
+## Diagnostic: Google Drive Sync Failure
 
-### Root Cause
-The storage bucket `student-documents` has an RLS policy for agent uploads:
-```sql
-(storage.foldername(name))[1] IN (SELECT s.id::text FROM students s WHERE s.agent_id = auth.uid())
+### Root Cause (from Edge Function Logs)
+
+The `sync-to-drive` function crashes with:
+
 ```
-This expects the **first folder segment** to be the student ID. But the code creates paths like:
-```
-agentEmail_agentId/studentName_studentId/filename.ext
-```
-So `foldername[1]` = `agentEmail_agentId` which never matches any student ID → upload blocked by RLS.
-
-### Fix
-Update the RLS policies to use `foldername[2]` and extract just the UUID from the second folder segment (which contains `studentName_studentId`). OR simpler: change the file path structure in the code to put student ID first.
-
-**Approach: Change file paths to `{studentId}/{filename}`** — simplest, matches existing policy.
-
-### Files to Change
-
-| File | Change |
-|------|--------|
-| `src/pages/agent/EnrollStudent.tsx` | Change storage paths from `agentFolder/studentFolder/file` to `studentId/file` (lines ~255, ~309) |
-| `src/components/student-detail/StudentDocumentsTab.tsx` | Same path structure fix for document uploads |
-| `src/components/EnrollStudentDialog.tsx` | Same path structure fix if it does uploads |
-| `supabase/functions/generate-consent-pdf` | No change needed |
-
-### Path Change
-```
-// Before:
-`${agentName}_${agentId}/${studentName}_${studentId}/Consent_Form_${Date.now()}.pdf`
-
-// After:
-`${studentId}/Consent_Form_${Date.now()}.pdf`
+SyntaxError: Unexpected token 'a', "agents-edu"... is not valid JSON
 ```
 
-This makes `foldername[1]` = student ID, matching the existing RLS policy.
+This occurs at `JSON.parse(serviceAccountJson)` — the `GOOGLE_DRIVE_SERVICE_ACCOUNT` secret contains an invalid value (starts with `"agents-edu..."` instead of a valid JSON object like `{"type": "service_account", ...}`).
 
-### Note
-The existing RLS policies for SELECT, DELETE also use `foldername[1]`, so this fix aligns all operations. The consent preview "Failed to fetch" would also be fixed since both preview and submission use the same upload path.
+**The documents ARE saved correctly to the database and storage** — only the Google Drive sync fails silently (it's called non-blocking via `syncToDrive()` without `await`).
+
+### Fix Plan
+
+| Step | What | Impact |
+|------|-------|--------|
+| 1 | **Re-set the `GOOGLE_DRIVE_SERVICE_ACCOUNT` secret** with the correct JSON content from Google Cloud Console | Fixes the root cause — no code changes needed |
+| 2 | **Add error resilience** in the edge function: wrap `JSON.parse` in a try/catch with a clear error message | Better debugging in future |
+
+### Step 1: Secret Fix (requires your action)
+You need to provide the Google Drive service account JSON key file content. It should look like:
+```json
+{
+  "type": "service_account",
+  "project_id": "...",
+  "private_key_id": "...",
+  "private_key": "-----BEGIN PRIVATE KEY-----\n...",
+  "client_email": "...@...iam.gserviceaccount.com",
+  ...
+}
+```
+
+I will use the secrets tool to prompt you to re-enter it.
+
+### Step 2: Code Improvement (minimal, safe)
+In `supabase/functions/sync-to-drive/index.ts`, wrap the `JSON.parse` call to provide a clear error if the secret is malformed:
+
+```typescript
+let serviceAccount;
+try {
+  serviceAccount = JSON.parse(serviceAccountJson);
+} catch {
+  return new Response(
+    JSON.stringify({ error: "GOOGLE_DRIVE_SERVICE_ACCOUNT is not valid JSON" }),
+    { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+```
+
+### Risk Assessment
+- **Step 1**: Zero code changes, only secret update — no risk
+- **Step 2**: Only adds a try/catch around an existing JSON.parse in the edge function — no impact on any other functionality
+
+### What is NOT broken
+- Student creation works correctly
+- Document uploads to storage work correctly
+- Consent PDF generation works correctly
+- Only the Google Drive mirror/backup is affected
 
