@@ -78,7 +78,7 @@ export default function EnrollStudent() {
 
   // Step 5 — Consent
   const [consentChecks, setConsentChecks] = useState<Record<string, boolean>>({});
-  const [marketingChecks, setMarketingChecks] = useState<Record<string, boolean>>({});
+  const [marketingChecks, setMarketingChecks] = useState<Record<string, boolean>>(DEFAULT_MARKETING_CHECKS);
   const [consentSignature, setConsentSignature] = useState("");
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [consentPreviewUrl, setConsentPreviewUrl] = useState<string | null>(null);
