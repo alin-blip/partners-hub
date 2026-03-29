@@ -50,7 +50,6 @@ const PRESETS = [
   { id: "story", label: "Story", desc: "1080×1920 vertical", icon: Smartphone },
   { id: "flyer", label: "Flyer", desc: "A5 portrait", icon: FileText },
   { id: "banner", label: "Banner", desc: "1200×628 horizontal", icon: LayoutTemplate },
-  { id: "script", label: "Script", desc: "Teleprompter ready", icon: Video },
 ];
 
 type GeneratedResult = {
