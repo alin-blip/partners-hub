@@ -1,90 +1,76 @@
 
 
-## Analiza Plan — Ce s-a implementat și ce a rămas
+## Comparație: Consent Form actual vs. PDF-ul uploadat
 
-### BUGS — Status
+### Ce avem acum (5 clauze simple)
+1. Data Processing Consent
+2. Document Sharing Consent
+3. Communication Consent
+4. Student Finance Consent
+5. Declaration of Accuracy
 
-| # | Issue | Status | Detalii |
-|---|-------|--------|---------|
-| 1 | Duplicate table headers in StudentEnrollmentsTab | **REZOLVAT** | Header-ul are acum 5 coloane corecte (University, Course, Status, Date, expand) |
-| 2 | EnrollmentsPage missing statuses | **REZOLVAT** | STATUSES array are acum toate cele 11 statusuri |
-| 3 | React ref warning in AIChatPanel | **NEREZOLVAT** | `AIChatPanel` nu folosește `forwardRef` |
-| 4 | EnrollStudent route not registered | **REZOLVAT** | Rutele `/owner/enroll`, `/admin/enroll`, `/agent/enroll` sunt toate în App.tsx |
-| 5 | Enrollments page rows not clickable | **REZOLVAT** | Rândurile au `onClick={() => navigate(...)}` și `cursor-pointer` |
+### Ce cere noul PDF (13 secțiuni complete)
+1. Role and Purpose
+2. Student Responsibilities (5 bullet points)
+3. EduForYou Responsibilities (4 bullet points)
+4. Authorisation
+5. Data Protection (UK GDPR)
+6. No Guarantee Clause
+7. Commission Disclosure
+8. Limitation of Liability
+9. Document Authenticity & Liability
+10. Withdrawal & Termination
+11. Confidentiality
+12. Marketing & Third-Party Consent (4 checkboxes — including opt-out)
+13. Declaration
 
-### MISSING FEATURES — Status
+Plus: Header-ul e "EduForYou — CONSENT & AUTHORISATION AGREEMENT" cu subtitlu, secțiune PARTIES (Student Name, Representative, Date), și la final semnături pentru ambele părți (Student + EduForYou).
 
-| # | Feature | Status | Detalii |
-|---|---------|--------|---------|
-| 1 | Loading skeletons on tables | **PARȚIAL** | EnrollmentsPage are skeleton-uri. StudentsPage **NU** are (folosește doar empty state). LeadsPage — neverificat |
-| 2 | Student edit from overview | **NEREZOLVAT** | Lipsește ghidaj vizual |
-| 3 | Notification system (bell) | **NEREZOLVAT** | |
-| 4 | Bulk actions | **NEREZOLVAT** | |
-| 5 | Agent-to-student link in enrollments | **REZOLVAT** | (rezolvat prin Bug #5) |
-| 6 | Dark mode toggle | **NEREZOLVAT** | |
-| 7 | Admin CSV export | **REZOLVAT** | Condiția este `role === "owner" || role === "admin"` |
-| 8 | Password visibility toggle | **NEREZOLVAT** | |
-| 9 | Breadcrumbs | **NEREZOLVAT** | |
-| 10 | Mobile table responsiveness | **NEREZOLVAT** | |
+### Ce lipsește / trebuie schimbat
 
-### FEATURE NOU — Social Post Sharing (brainstorm)
+| Element | Status |
+|---------|--------|
+| Titlu document | Trebuie schimbat din "Student Enrollment Consent Form" → "CONSENT & AUTHORISATION AGREEMENT" |
+| Secțiunea PARTIES | **Lipsește** — trebuie adăugat EduForYou Representative + Date |
+| Secțiunile 1-11 | **Lipsesc** — avem doar 5 clauze simplificate, nu cele 13 din noul format |
+| Secțiunea 12 (Marketing checkboxes) | **Lipsește complet** — 4 opțiuni de marketing consent cu checkbox-uri |
+| Secțiunea 13 (Declaration) | Parțial — avem ceva similar dar textul diferă |
+| Semnătură EduForYou | **Lipsește** — acum avem doar semnătura studentului |
+| PDF pe 2 pagini | Actualul e doar 1 pagină — noul conținut necesită 2 pagini |
 
-**Nicio implementare** — doar discuția inițială. Funcționalitatea de creare și distribuire a postărilor către agenți nu a fost începută.
+### Plan de implementare
 
----
+**Locații de modificat** (3 fișiere cu CONSENT_CLAUSES + edge function + UI):
 
-## Plan de implementare — Etape rămase
+**1. Actualizare CONSENT_CLAUSES** în toate cele 3 fișiere:
+- `src/components/EnrollStudentDialog.tsx`
+- `src/pages/agent/EnrollStudent.tsx`
+- `src/components/student-detail/StudentDocumentsTab.tsx`
 
-### Faza 1: Bug-uri rămase (risc scăzut)
+Noile clauze vor fi cele 13 secțiuni din PDF. Secțiunea 12 (Marketing) va avea 4 sub-checkboxuri separate (consent contact, data sharing, marketing yes, marketing no — mutual exclusive pe ultimele 2).
 
-**1.1** Fix AIChatPanel ref warning — wrap component cu `forwardRef` sau restructurare Dialog usage.
+**2. Actualizare edge function `generate-consent-pdf`**:
+- Schimbare titlu și header
+- Adăugare secțiune PARTIES cu câmpurile completate
+- Înlocuire cele 5 clauze cu cele 13 secțiuni noi (cu bullet points pentru secțiunile 2 și 3)
+- Adăugare suport multi-pagină (a doua pagină PDF)
+- Adăugare checkboxuri vizuale pentru secțiunea 12
+- Adăugare loc semnătură EduForYou (cu numele agentului)
+- Adăugare a doua dată lângă semnătura EduForYou
 
-### Faza 2: UX Improvements (risc scăzut-mediu)
+**3. Actualizare UI consent step**:
+- Secțiunea 12 necesită UI special: 4 checkboxuri separate pentru marketing consent
+- Restul clauzelor rămân cu checkbox "I agree" per secțiune
+- Transmitere selecții marketing către edge function
 
-**2.1** Loading skeletons pe StudentsPage și LeadsPage (la fel ca EnrollmentsPage)
+**4. Actualizare parametri trimiși către edge function**:
+- Adăugare `marketingConsent` object (contact, dataSharing, marketingYes, marketingNo)
+- Agentul semnează automat ca "EduForYou Representative"
 
-**2.2** Mobile table scroll — wrap toate tabelele în `<div className="overflow-x-auto">`
+### Risc
+- Mediu — edge function-ul de generare PDF e custom (fără librărie), adăugarea paginii 2 necesită extinderea builder-ului `buildTextOnlyPdf` și `buildPdfWithImage` pentru multi-page
+- UI changes sunt straightforward
 
-**2.3** Password visibility toggle pe Login și ProfilePage
-
-**2.4** Breadcrumbs pe StudentDetailPage (ex: Students > John Doe)
-
-### Faza 3: Funcționalități medii
-
-**3.1** Notification bell — dropdown în sidebar/header cu ultimele schimbări de status, mesaje noi, task-uri asignate. Fără tabel nou — agregare din tabelele existente (direct_messages, tasks, enrollments).
-
-### Faza 4: Social Post Sharing (feature nou major)
-
-Conceptul: Owner/Admin creează o postare (imagine + text) și o distribuie agenților selectați. Agenții o văd în platformă cu buton de Share care atașează automat link-ul cardului lor digital.
-
-**4.1 Database** — Tabel nou `social_posts` (id, created_by, image_url, caption, target_role, created_at) + tabel `social_post_recipients` (id, post_id, agent_id, seen_at). RLS: owner vede tot, admin vede echipa, agent vede ce i s-a trimis.
-
-**4.2 UI Owner/Admin** — Pagină/secțiune nouă "Social Posts" cu:
-- Formular: upload imagine (sau selectare din galeria AI), câmp text pentru caption
-- Selector destinatari: "Toți agenții" / "Echipa mea" / selectare individuală
-- Buton "Publish"
-
-**4.3 UI Agent** — Secțiune "Social Posts" în dashboard sau pagină dedicată:
-- Feed cu postările primite (imagine + caption)
-- Buton "Share" per postare care copiază caption + link card digital (`/card/:slug`)
-- Dacă agentul nu are card digital creat, butonul arată "Create your card first" cu link spre `/agent/digital-card`
-
-**4.4 Rute noi** — `/owner/social-posts`, `/admin/social-posts`, `/agent/social-posts` + link în sidebar
-
-### Dependențe feature Social Posts
-- Agentul trebuie să aibă `agent_card_settings` cu `is_public = true` și `slug` setat pentru ca link-ul să funcționeze
-- Dacă nu are, UI-ul afișează un prompt de creare card, nu blochează vizualizarea postării
-
-### Faza 5: Nice-to-have (post-lansare)
-- Dark mode toggle
-- Bulk actions pe tabele
-- Student edit guidance (tooltips)
-
----
-
-### Ordine recomandată
-
-Fazele 1-2 sunt safe, fără risc de breaking changes. Faza 3 adaugă funcționalitate nouă dar folosește date existente. Faza 4 necesită tabel nou + UI nou — cel mai mare efort.
-
-**Estimare**: Faza 1-2 = rapid (1 sesiune). Faza 3 = 1 sesiune. Faza 4 = 2-3 sesiuni.
+### Estimare
+- 1 sesiune de implementare
 
