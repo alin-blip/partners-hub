@@ -75,7 +75,7 @@ serve(async (req) => {
     const presetText = presetInstructions[preset] || presetInstructions.social_post;
 
     // Build prompt
-    let fullPrompt = `${presetText}\n\nContent/Theme: ${prompt}`;
+    let fullPrompt = `${presetText}\n\nContent/Theme: ${prompt}\n\nIMPORTANT: Do NOT include any specific university names in the image text. Only use general course names or fields of study.`;
 
     if (brand?.brand_prompt) {
       fullPrompt += `\n\nBrand Guidelines: ${brand.brand_prompt}`;
