@@ -1,46 +1,52 @@
 
 
-## Plan: Dynamic OG share link per agent + proper social sharing
+## Plan: Fix 3 Issues — Drive Sync, Social Share, Profile Photo Persistence
 
-### Problem
-When an agent shares a post on Facebook/LinkedIn, the preview shows generic "EduForYou UK" metadata instead of the post image, caption, and agent's card link. Social media crawlers can't read client-side React meta tags.
+### Issue 1: Drive sync fails on student enrollment
+**Root cause**: The `sync-to-drive` edge function uses `supabaseAuth.auth.getClaims(token)` (line 330), which does NOT exist in `@supabase/supabase-js@2`. Other working functions use `auth.getUser()` instead.
 
-### Solution
-Create an edge function that serves dynamic HTML with OG meta tags, so social platforms show the correct preview (post image + caption + agent link). Real users get redirected to the agent's card page.
+**Fix**: In `supabase/functions/sync-to-drive/index.ts`, replace the `getClaims` authentication block with the same `getUser()` pattern used by other edge functions (e.g., `generate-image`). Redeploy the function.
 
-### Changes
+---
 
-**1. New Edge Function: `supabase/functions/og-share/index.ts`**
-- Accepts query params: `slug` (agent slug), `post` (optional post ID)
-- Fetches agent profile from `public_agent_profiles` view
-- If `post` param provided, fetches the social post's `image_url` and `caption`
-- Returns minimal HTML with dynamic OG meta tags:
-  - `og:title` = Agent name + job title
-  - `og:description` = Post caption or agent bio
-  - `og:image` = Post image or agent avatar
-  - `og:url` = Card page URL
-- Includes `<meta http-equiv="refresh">` to redirect real users to `/card/:slug`
+### Issue 2: Social share still shows generic link preview (no image/text)
+**Root cause**: The `og-share` edge function works correctly, but Facebook/LinkedIn crawlers aggressively cache OG data. Two additional issues:
+1. The `og:image` tag must point to an absolute, publicly accessible URL. The `social_posts.image_url` should already be public (stored in `generated-images` bucket which is public), but we should verify.
+2. Facebook sharer requires `og:image` to be at least 200x200px and the URL must be reachable by Facebook's crawler without authentication.
+3. The `public_agent_profiles` view may not return data when queried with service role — need to query `profiles` table directly instead since the view is designed for anon/authenticated roles.
 
-**2. Update `src/pages/shared/AgentSocialFeedPage.tsx`**
-- Change the share URL from `/card/:slug` to the edge function URL with post context:
-  `${SUPABASE_URL}/functions/v1/og-share?slug=xxx&post=POST_ID`
-- Facebook/LinkedIn sharer will use this URL so crawlers get proper OG tags
-- The clipboard copy for Instagram/TikTok keeps caption + agent card link as before
+**Fix**:
+- In `og-share/index.ts`: Query the `profiles` table directly (with service role) instead of `public_agent_profiles` view, filtering by `slug` and `is_active = true`.
+- Add `Cache-Control: no-cache` header to prevent intermediate caching.
+- Add `og:image:width` and `og:image:height` meta tags for better crawler support.
+- Redeploy and test.
 
-**3. No database changes needed**
-Uses existing `public_agent_profiles` view and `social_posts` table (anon-readable via edge function with service role).
+---
 
-### How it works
+### Issue 3: Profile photo doesn't persist across sessions
+**Root cause**: The `ProfilePage` initializes `avatarUrl` from `useState((profile as any)?.avatar_url || "")` on component mount. However, the `profile` from `AuthContext` may not be loaded yet when the component first renders (it's fetched async). The state is initialized once and never updated when `profile` changes.
 
-```text
-Agent clicks "Share on Facebook" for a post
-  → Opens facebook.com/sharer?u=EDGE_FUNCTION_URL?slug=x&post=y
-  → Facebook crawler hits edge function
-  → Edge function returns HTML with:
-      og:image = post image
-      og:description = post caption  
-      og:title = "Agent Name – EduForYou UK"
-  → Facebook shows rich preview with image + text
-  → User clicks → redirected to /card/:slug → becomes a lead
+**Fix**: Add a `useEffect` in `ProfilePage.tsx` that syncs `avatarUrl`, `fullName`, and `phone` state when the `profile` object from AuthContext updates. This ensures the saved avatar URL (which IS persisted in the database) is properly displayed.
+
+```typescript
+useEffect(() => {
+  if (profile) {
+    setFullName(profile.full_name || "");
+    setPhone(profile.phone || "");
+    setAvatarUrl(profile.avatar_url || "");
+  }
+}, [profile]);
 ```
+
+Also, after uploading the avatar, invalidate the auth context or relevant queries so the profile data refreshes across the app.
+
+---
+
+### Summary of file changes:
+1. **`supabase/functions/sync-to-drive/index.ts`** — Replace `getClaims` with `getUser()` for JWT validation
+2. **`supabase/functions/og-share/index.ts`** — Query `profiles` table instead of view; add image dimension meta tags; add cache headers
+3. **`src/pages/shared/ProfilePage.tsx`** — Add `useEffect` to sync profile state when AuthContext profile loads
+
+### Deployment:
+- Redeploy `sync-to-drive` and `og-share` edge functions
 
