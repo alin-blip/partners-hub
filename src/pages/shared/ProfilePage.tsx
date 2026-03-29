@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Lock, Upload, Camera, Loader2 } from "lucide-react";
+import { Save, Lock, Upload, Camera, Loader2, Eye, EyeOff } from "lucide-react";
 
 export default function ProfilePage() {
   const { user, profile } = useAuth();
