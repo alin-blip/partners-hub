@@ -414,6 +414,15 @@ export default function CreateImagePage() {
                         </Tooltip>
                       </div>
                     </div>
+                    <div className="p-2 flex justify-center">
+                      <SocialShareButtons
+                        imageUrl={getPublicUrl(img.image_path)}
+                        caption={captions[img.id] || ""}
+                        cardUrl={cardUrl}
+                        filenamePrefix={`eduforyou-${img.id.slice(0, 8)}`}
+                        size="sm"
+                      />
+                    </div>
                     {captions[img.id] && (
                       <div className="p-3">
                         <CaptionDisplay
