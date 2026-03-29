@@ -24,6 +24,9 @@ async function getAccessToken(serviceAccount: any): Promise<string> {
   const unsignedToken = `${header}.${claimSet}`;
 
   // Import the private key and sign the JWT
+  if (!serviceAccount.private_key) {
+    throw new Error("Service account JSON missing private_key field");
+  }
   const pemContents = serviceAccount.private_key
     .replace(/-----BEGIN PRIVATE KEY-----/, "")
     .replace(/-----END PRIVATE KEY-----/, "")
@@ -382,7 +385,7 @@ serve(async (req) => {
     const accessToken = await getAccessToken(serviceAccount);
 
     // Build folder hierarchy
-    const sanitize = (s: string) => s.replace(/[^a-zA-Z0-9 ]/g, "_").substring(0, 50);
+    const sanitize = (s: string | null | undefined) => (s || "Unknown").replace(/[^a-zA-Z0-9 ]/g, "_").substring(0, 50);
 
     // Admin folder (or "Agents_Without_Admin")
     let adminFolderId: string;
