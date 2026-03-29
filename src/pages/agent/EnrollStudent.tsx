@@ -14,7 +14,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, ArrowRight, Check, Calendar, Upload, FileText, X, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Calendar, Upload, FileText, X, ShieldCheck, Eye } from "lucide-react";
 import { CourseDetailsInfoCard } from "@/components/CourseDetailsInfoCard";
 import { SignatureCanvas } from "@/components/SignatureCanvas";
 
