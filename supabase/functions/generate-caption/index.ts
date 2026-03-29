@@ -108,7 +108,7 @@ Rules:
 - Write in a professional yet friendly and motivational tone
 - Include 3-5 relevant hashtags at the end
 - Keep the caption concise (2-4 sentences max)
-- Reference REAL courses, universities, intakes, or admissions data from the knowledge base above when relevant to the topic
+- Reference REAL courses, intakes, or admissions data from the knowledge base above when relevant to the topic — but NEVER mention specific university names, only course names or fields of study
 - ALWAYS include a clear call-to-action (CTA) — e.g. "DM us now", "Link in bio", "Apply today", "Book your free consultation", "Comment 'INFO' below"
 - The CTA should feel natural and actionable, not generic
 - Use emojis sparingly but effectively
