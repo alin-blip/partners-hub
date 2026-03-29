@@ -73,16 +73,6 @@ Deno.serve(async (req) => {
     })
   }
 
-  if (!supabaseUrl || !supabaseServiceKey) {
-    console.error('Missing required environment variables')
-    return new Response(
-      JSON.stringify({ error: 'Server configuration error' }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    )
-  }
 
   // Parse request body
   let templateName: string
