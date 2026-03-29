@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Upload, Download, Trash2, FileText, RefreshCw, ShieldCheck, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { SignatureCanvas } from "@/components/SignatureCanvas";
+import { syncToDrive } from "@/lib/drive-sync";
 
 const DOC_TYPES = ["Passport", "Transcript", "Offer Letter", "Visa", "Qualification Certificate", "Share Code", "Proof of Address", "Other"];
 
