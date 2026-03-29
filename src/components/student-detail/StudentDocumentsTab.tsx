@@ -118,6 +118,7 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
       signatureWidth: sigWidth,
       signatureHeight: sigHeight,
       consentDate: new Date().toLocaleDateString("en-GB"),
+      marketingConsent: marketingChecks,
     };
   };
 
