@@ -250,9 +250,7 @@ export default function EnrollStudent() {
     }
     const pdfBlob = new Blob([bytes], { type: "application/pdf" });
 
-    const agentName = sanitizeName(user!.email || "agent");
-    const studentName = sanitizeName(`${firstName}_${lastName}`);
-    const storagePath = `${agentName}_${user!.id}/${studentName}_${studentId}/Consent_Form_${Date.now()}.pdf`;
+    const storagePath = `${studentId}/Consent_Form_${Date.now()}.pdf`;
 
     const { error: uploadError } = await supabase.storage
       .from("student-documents")
@@ -302,11 +300,9 @@ export default function EnrollStudent() {
 
       // Upload documents
       if (docFiles.length > 0) {
-        const agentName = sanitizeName(user!.email || "agent");
-        const studentName = sanitizeName(`${firstName}_${lastName}`);
         for (const { file, docType } of docFiles) {
           const ext = file.name.split(".").pop();
-          const storagePath = `${agentName}_${user!.id}/${studentName}_${student.id}/${docType}_${Date.now()}.${ext}`;
+          const storagePath = `${student.id}/${docType}_${Date.now()}.${ext}`;
           const { error: uploadError } = await supabase.storage.from("student-documents").upload(storagePath, file);
           if (uploadError) throw uploadError;
           await supabase.from("student_documents").insert({
