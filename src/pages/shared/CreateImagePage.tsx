@@ -88,6 +88,28 @@ export default function CreateImagePage() {
 
   const hasAvatar = !!(profile as any)?.avatar_url;
 
+  // Fetch card settings for share link
+  const { data: cardSettings } = useQuery({
+    queryKey: ["my-card-settings", user?.id],
+    queryFn: async () => {
+      const { data: card } = await supabase
+        .from("agent_card_settings")
+        .select("is_public")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("slug")
+        .eq("id", user!.id)
+        .single();
+      return { is_public: card?.is_public || false, slug: prof?.slug || null };
+    },
+    enabled: !!user,
+  });
+
+  const hasCard = cardSettings?.is_public && cardSettings?.slug;
+  const cardUrl = hasCard ? `${window.location.origin}/card/${cardSettings.slug}` : null;
+
   const { data: gallery = [], isLoading: galleryLoading } = useQuery({
     queryKey: ["my-generated-images"],
     queryFn: async () => {
