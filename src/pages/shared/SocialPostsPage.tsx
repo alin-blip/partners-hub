@@ -317,33 +317,7 @@ export default function SocialPostsPage() {
     }
   };
 
-  // --- AI Generate Caption (with CTA always) ---
-  const handleGenerateCaption = async () => {
-    setCaptionLoading(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-      const resp = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-caption`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ prompt, preset: "social_post", language: captionLanguage }),
-        }
-      );
-      const result = await resp.json();
-      if (!resp.ok) throw new Error(result.error || "Caption generation failed");
-      setAiCaption(result.caption);
-      setCaption(result.caption);
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setCaptionLoading(false);
-    }
-  };
+  // Caption is now auto-generated after image generation
 
   // --- Manual upload ---
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
