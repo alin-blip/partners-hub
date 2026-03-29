@@ -1,33 +1,30 @@
 
 
-## Plan: Fix Drive Sync Error — Null Safety
+## Plan: Simplify Social Share — Download Image + Copy Caption with Agent Link
 
-### Problem
-Edge function `sync-to-drive` returns 500 with error: `Cannot read properties of undefined (reading 'replace')`. The `sanitize()` function and potentially `getAccessToken()` receive `undefined` values when fields like `student.first_name`, `student.last_name`, `adminProfile.full_name`, or `serviceAccount.private_key` are null/undefined.
+### Approach
+All share buttons (Facebook, Instagram, TikTok, LinkedIn) will do the same thing:
+1. **Download the image** to the agent's device
+2. **Copy the caption + agent's digital card link** to clipboard
+3. Show a toast telling them to paste on the platform
 
-### Fix
-Update `supabase/functions/sync-to-drive/index.ts` with null guards:
+The agent's card link (`/card/:slug`) is dynamically generated per agent and appended to every copied caption.
 
-1. **`sanitize` function** — handle undefined/null input:
-   ```typescript
-   const sanitize = (s: string | null | undefined) => 
-     (s || "Unknown").replace(/[^a-zA-Z0-9 ]/g, "_").substring(0, 50);
-   ```
+### Changes
 
-2. **`getAccessToken`** — add guard on `private_key`:
-   ```typescript
-   if (!serviceAccount.private_key) {
-     throw new Error("Service account JSON missing private_key field");
-   }
-   ```
+**File: `src/pages/shared/AgentSocialFeedPage.tsx`**
 
-3. **Student fields** — guard `first_name` and `last_name`:
-   ```typescript
-   const studentFolderName = `Student_${sanitize(student.first_name || "Unknown")}_${sanitize(student.last_name || "Unknown")}`;
-   ```
+- Remove `getOgShareUrl` function (no longer needed)
+- Simplify `copyForPlatform` — all platforms now call `handleDownloadImage(post)` which downloads the image and copies `caption + \n\n🔗 cardUrl` to clipboard
+- Update toast messages per platform: "Image saved & caption copied! Post it on Facebook/Instagram/etc."
+- Keep the existing download button as-is (same behavior)
+- Remove the `og-share` edge function URL usage entirely
 
-4. **Redeploy** the `sync-to-drive` edge function and test with a real student ID.
+### Result
+- Agent taps any platform button → image downloads → caption with their personal card link is copied
+- They open the platform, create a post, upload the downloaded image, paste the caption
+- The caption contains their unique `/card/:slug` link for lead capture
 
 ### Files changed
-- `supabase/functions/sync-to-drive/index.ts` — add null safety throughout
+- `src/pages/shared/AgentSocialFeedPage.tsx` — simplify all share buttons to download+copy flow
 
