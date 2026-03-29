@@ -6,7 +6,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Copy, ExternalLink, CreditCard } from "lucide-react";
+import { Copy, ExternalLink, CreditCard, Share2 } from "lucide-react";
+import { SiFacebook, SiInstagram, SiTiktok, SiLinkedin } from "react-icons/si";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { Link } from "react-router-dom";
 
 export default function AgentSocialFeedPage() {
