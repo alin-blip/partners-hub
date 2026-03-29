@@ -33,7 +33,6 @@ import {
   Check,
   Download,
   Video,
-  CheckSquare,
 } from "lucide-react";
 
 const LANGUAGES = [
