@@ -183,7 +183,7 @@ export default function AgentSocialFeedPage() {
                         <TooltipProvider delayDuration={300}>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button size="icon" variant="outline" className="h-8 w-8" disabled={!hasCard} onClick={() => copyForPlatform(post, "facebook")}>
+                              <Button size="icon" variant="outline" className="h-8 w-8" disabled={!hasCard} onClick={() => handleShareForPlatform(post, "facebook")}>
                                 <SiFacebook className="w-3.5 h-3.5" />
                               </Button>
                             </TooltipTrigger>
@@ -191,23 +191,23 @@ export default function AgentSocialFeedPage() {
                           </Tooltip>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button size="icon" variant="outline" className="h-8 w-8" disabled={!hasCard} onClick={() => copyForPlatform(post, "instagram")}>
+                              <Button size="icon" variant="outline" className="h-8 w-8" disabled={!hasCard} onClick={() => handleShareForPlatform(post, "instagram")}>
                                 <SiInstagram className="w-3.5 h-3.5" />
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent>Copy for Instagram</TooltipContent>
+                            <TooltipContent>Share on Instagram</TooltipContent>
                           </Tooltip>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button size="icon" variant="outline" className="h-8 w-8" disabled={!hasCard} onClick={() => copyForPlatform(post, "tiktok")}>
+                              <Button size="icon" variant="outline" className="h-8 w-8" disabled={!hasCard} onClick={() => handleShareForPlatform(post, "tiktok")}>
                                 <SiTiktok className="w-3.5 h-3.5" />
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent>Copy for TikTok</TooltipContent>
+                            <TooltipContent>Share on TikTok</TooltipContent>
                           </Tooltip>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button size="icon" variant="outline" className="h-8 w-8" disabled={!hasCard} onClick={() => copyForPlatform(post, "linkedin")}>
+                              <Button size="icon" variant="outline" className="h-8 w-8" disabled={!hasCard} onClick={() => handleShareForPlatform(post, "linkedin")}>
                                 <FaLinkedinIn className="w-3.5 h-3.5" />
                               </Button>
                             </TooltipTrigger>
