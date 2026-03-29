@@ -10,10 +10,11 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Download, Trash2, FileText, RefreshCw, ShieldCheck, Eye } from "lucide-react";
+import { Upload, Download, Trash2, FileText, RefreshCw, ShieldCheck, Eye, Archive } from "lucide-react";
 import { format } from "date-fns";
 import { SignatureCanvas } from "@/components/SignatureCanvas";
 import { syncToDrive } from "@/lib/drive-sync";
+import JSZip from "jszip";
 
 const DOC_TYPES = ["Passport", "Transcript", "Offer Letter", "Visa", "Qualification Certificate", "Share Code", "Proof of Address", "Other"];
 
@@ -166,6 +167,34 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
     else { toast({ title: "Document deleted" }); refetchDocs(); }
   };
 
+  const [downloadingAll, setDownloadingAll] = useState(false);
+
+  const handleDownloadAll = async () => {
+    if (documents.length === 0) return;
+    setDownloadingAll(true);
+    try {
+      const zip = new JSZip();
+      for (const doc of documents) {
+        const { data } = await supabase.storage.from("student-documents").download(doc.file_path);
+        if (data) {
+          zip.file(doc.file_name, data);
+        }
+      }
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${student.first_name}_${student.last_name}_Documents.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Download started", description: `${documents.length} documents zipped.` });
+    } catch (err: any) {
+      toast({ title: "Download failed", description: err.message, variant: "destructive" });
+    } finally {
+      setDownloadingAll(false);
+    }
+  };
+
   const handlePreviewConsent = async () => {
     if (!canSubmitConsent) return;
     setPreviewing(true);
@@ -248,21 +277,28 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-3">
           <CardTitle className="text-base">Documents</CardTitle>
-          {canEdit && (
-            <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" onClick={() => setConsentDialogOpen(true)}>
-                <RefreshCw className="w-3 h-3 mr-1" /> Re-generate Consent
+          <div className="flex items-center gap-2">
+            {documents.length > 0 && (
+              <Button size="sm" variant="outline" onClick={handleDownloadAll} disabled={downloadingAll}>
+                <Archive className="w-3 h-3 mr-1" /> {downloadingAll ? "Zipping…" : "Download All"}
               </Button>
-              <Select value={selectedDocType} onValueChange={setSelectedDocType}>
-                <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>{DOC_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-              </Select>
-              <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-                <Upload className="w-3 h-3 mr-1" /> {uploading ? "Uploading…" : "Upload"}
-              </Button>
-              <input ref={fileInputRef} type="file" className="hidden" onChange={handleUpload} />
-            </div>
-          )}
+            )}
+            {canEdit && (
+              <>
+                <Button size="sm" variant="outline" onClick={() => setConsentDialogOpen(true)}>
+                  <RefreshCw className="w-3 h-3 mr-1" /> Re-generate Consent
+                </Button>
+                <Select value={selectedDocType} onValueChange={setSelectedDocType}>
+                  <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>{DOC_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                </Select>
+                <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                  <Upload className="w-3 h-3 mr-1" /> {uploading ? "Uploading…" : "Upload"}
+                </Button>
+                <input ref={fileInputRef} type="file" className="hidden" onChange={handleUpload} />
+              </>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {documents.length === 0 ? (
