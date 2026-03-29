@@ -250,9 +250,7 @@ export default function EnrollStudent() {
     }
     const pdfBlob = new Blob([bytes], { type: "application/pdf" });
 
-    const agentName = sanitizeName(user!.email || "agent");
-    const studentName = sanitizeName(`${firstName}_${lastName}`);
-    const storagePath = `${agentName}_${user!.id}/${studentName}_${studentId}/Consent_Form_${Date.now()}.pdf`;
+    const storagePath = `${studentId}/Consent_Form_${Date.now()}.pdf`;
 
     const { error: uploadError } = await supabase.storage
       .from("student-documents")
