@@ -333,17 +333,16 @@ export default function CreateImagePage() {
                     </TooltipTrigger>
                     <TooltipContent>Generate caption</TooltipContent>
                   </Tooltip>
-                  <a
-                    href={generatedUrl}
-                    download
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Button size="icon" variant="secondary">
-                      <Download className="w-4 h-4" />
-                    </Button>
-                  </a>
                 </div>
+              </div>
+              <div className="mt-3 flex justify-center">
+                <SocialShareButtons
+                  imageUrl={generatedUrl}
+                  caption={captions["latest"] || ""}
+                  cardUrl={cardUrl}
+                  filenamePrefix="eduforyou-generated"
+                />
+              </div>
               </div>
               {captions["latest"] && (
                 <CaptionDisplay
