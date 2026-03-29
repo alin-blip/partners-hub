@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
+import { SocialShareButtons } from "@/components/SocialShareButtons";
 import {
   Image as ImageIcon,
   Square,
@@ -86,6 +87,28 @@ export default function CreateImagePage() {
   const [captionLanguage, setCaptionLanguage] = useState("Romanian");
 
   const hasAvatar = !!(profile as any)?.avatar_url;
+
+  // Fetch card settings for share link
+  const { data: cardSettings } = useQuery({
+    queryKey: ["my-card-settings", user?.id],
+    queryFn: async () => {
+      const { data: card } = await supabase
+        .from("agent_card_settings")
+        .select("is_public")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("slug")
+        .eq("id", user!.id)
+        .single();
+      return { is_public: card?.is_public || false, slug: prof?.slug || null };
+    },
+    enabled: !!user,
+  });
+
+  const hasCard = cardSettings?.is_public && cardSettings?.slug;
+  const cardUrl = hasCard ? `${window.location.origin}/card/${cardSettings.slug}` : null;
 
   const { data: gallery = [], isLoading: galleryLoading } = useQuery({
     queryKey: ["my-generated-images"],
@@ -310,17 +333,15 @@ export default function CreateImagePage() {
                     </TooltipTrigger>
                     <TooltipContent>Generate caption</TooltipContent>
                   </Tooltip>
-                  <a
-                    href={generatedUrl}
-                    download
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Button size="icon" variant="secondary">
-                      <Download className="w-4 h-4" />
-                    </Button>
-                  </a>
                 </div>
+              </div>
+              <div className="mt-3 flex justify-center">
+                <SocialShareButtons
+                  imageUrl={generatedUrl}
+                  caption={captions["latest"] || ""}
+                  cardUrl={cardUrl}
+                  filenamePrefix="eduforyou-generated"
+                />
               </div>
               {captions["latest"] && (
                 <CaptionDisplay
@@ -390,17 +411,16 @@ export default function CreateImagePage() {
                           </TooltipTrigger>
                           <TooltipContent>Generate caption</TooltipContent>
                         </Tooltip>
-                        <a
-                          href={getPublicUrl(img.image_path)}
-                          download
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <Button size="icon" variant="secondary" className="h-7 w-7">
-                            <Download className="w-3 h-3" />
-                          </Button>
-                        </a>
                       </div>
+                    </div>
+                    <div className="p-2 flex justify-center">
+                      <SocialShareButtons
+                        imageUrl={getPublicUrl(img.image_path)}
+                        caption={captions[img.id] || ""}
+                        cardUrl={cardUrl}
+                        filenamePrefix={`eduforyou-${img.id.slice(0, 8)}`}
+                        size="sm"
+                      />
                     </div>
                     {captions[img.id] && (
                       <div className="p-3">
