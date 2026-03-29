@@ -147,7 +147,7 @@ export default function EnrollmentsPage() {
           </Select>
         </div>
 
-        <div className="rounded-lg border bg-card">
+        <div className="rounded-lg border bg-card overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>

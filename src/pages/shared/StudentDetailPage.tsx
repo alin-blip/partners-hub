@@ -68,6 +68,18 @@ export default function StudentDetailPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-4xl">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild><Link to={`${prefix}/students`}>Students</Link></BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{student.first_name} {student.last_name}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate(`${prefix}/students`)}>
             <ArrowLeft className="w-4 h-4" />
