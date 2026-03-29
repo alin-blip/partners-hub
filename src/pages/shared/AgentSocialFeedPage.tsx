@@ -119,6 +119,29 @@ export default function AgentSocialFeedPage() {
     }
   };
 
+  const handleDownloadImage = async (post: any) => {
+    try {
+      const response = await fetch(post.image_url);
+      const blob = await response.blob();
+      const ext = blob.type.includes("png") ? "png" : "jpg";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `eduforyou-post-${post.id.slice(0, 8)}.${ext}`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      // Also copy caption + link to clipboard
+      const shareText = `${post.caption}${cardUrl ? `\n\n🔗 ${cardUrl}` : ""}`;
+      await navigator.clipboard.writeText(shareText);
+      toast.success("Image downloaded & caption copied!");
+
+      if (!post.seen_at) markSeen.mutate(post.id);
+    } catch {
+      toast.error("Failed to download image");
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-2xl">
