@@ -104,6 +104,8 @@ export default function EnrollStudent() {
   const [consentChecks, setConsentChecks] = useState<Record<string, boolean>>({});
   const [consentSignature, setConsentSignature] = useState("");
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
+  const [consentPreviewUrl, setConsentPreviewUrl] = useState<string | null>(null);
+  const [previewingConsent, setPreviewingConsent] = useState(false);
 
   const allConsentsChecked = CONSENT_CLAUSES.every((c) => consentChecks[c.id]);
   const canProceedConsent = allConsentsChecked && consentSignature.trim().length > 0 && !!signatureDataUrl;

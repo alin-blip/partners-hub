@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Download, Trash2, FileText, RefreshCw, ShieldCheck } from "lucide-react";
+import { Upload, Download, Trash2, FileText, RefreshCw, ShieldCheck, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { SignatureCanvas } from "@/components/SignatureCanvas";
 
@@ -48,6 +48,10 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
 
+  // Preview state
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+
   const allConsentsChecked = CONSENT_CLAUSES.every((c) => consentChecks[c.id]);
   const canSubmitConsent = allConsentsChecked && consentSignature.trim().length > 0 && !!signatureDataUrl;
 
@@ -81,6 +85,24 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
       return data || [];
     },
   });
+
+  const getConsentPdfBody = () => {
+    const enrollment = enrollments[0] as any;
+    const universityName = enrollment?.universities?.name || "N/A";
+    const courseName = enrollment?.courses?.name || "N/A";
+    return {
+      studentName: `${student.title ? student.title + " " : ""}${student.first_name} ${student.last_name}`,
+      dateOfBirth: student.date_of_birth || null,
+      nationality: student.nationality || null,
+      address: student.full_address || null,
+      universityName,
+      courseName,
+      agentName: agentProfile?.full_name || "EduForYou UK",
+      signature: consentSignature,
+      signatureImage: signatureDataUrl || null,
+      consentDate: new Date().toLocaleDateString("en-GB"),
+    };
+  };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -124,27 +146,37 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
     else { toast({ title: "Document deleted" }); refetchDocs(); }
   };
 
+  const handlePreviewConsent = async () => {
+    if (!canSubmitConsent) return;
+    setPreviewing(true);
+    try {
+      const { data: pdfData, error: pdfError } = await supabase.functions.invoke("generate-consent-pdf", {
+        body: getConsentPdfBody(),
+      });
+      if (pdfError) throw pdfError;
+
+      const base64 = pdfData.pdf_base64;
+      const binaryString = atob(base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const pdfBlob = new Blob([bytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(pdfBlob);
+      setPreviewUrl(url);
+    } catch (err: any) {
+      toast({ title: "Preview failed", description: err.message, variant: "destructive" });
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
   const handleReGenerateConsent = async () => {
     if (!user || !canSubmitConsent) return;
     setGenerating(true);
     try {
-      const enrollment = enrollments[0] as any;
-      const universityName = enrollment?.universities?.name || "N/A";
-      const courseName = enrollment?.courses?.name || "N/A";
-
       const { data: pdfData, error: pdfError } = await supabase.functions.invoke("generate-consent-pdf", {
-        body: {
-          studentName: `${student.title ? student.title + " " : ""}${student.first_name} ${student.last_name}`,
-          dateOfBirth: student.date_of_birth || null,
-          nationality: student.nationality || null,
-          address: student.full_address || null,
-          universityName,
-          courseName,
-          agentName: agentProfile?.full_name || "EduForYou UK",
-          signature: consentSignature,
-          signatureImage: signatureDataUrl || null,
-          consentDate: new Date().toLocaleDateString("en-GB"),
-        },
+        body: getConsentPdfBody(),
       });
 
       if (pdfError) throw pdfError;
@@ -181,7 +213,9 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
       setConsentChecks({});
       setConsentSignature("");
       setSignatureDataUrl(null);
+      setPreviewUrl(null);
       refetchDocs();
+      queryClient.invalidateQueries({ queryKey: ["student-consent-status", student.id] });
     } catch (err: any) {
       toast({ title: "Failed to generate consent form", description: err.message, variant: "destructive" });
     } finally {
@@ -241,8 +275,8 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
       </Card>
 
       {/* Re-generate Consent Form Dialog */}
-      <Dialog open={consentDialogOpen} onOpenChange={setConsentDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+      <Dialog open={consentDialogOpen} onOpenChange={(o) => { if (!o) { setPreviewUrl(null); } setConsentDialogOpen(o); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-accent" />
@@ -250,58 +284,84 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
             </DialogTitle>
           </DialogHeader>
 
-          <p className="text-sm text-muted-foreground">
-            This will create a new consent form PDF for <strong>{student.first_name} {student.last_name}</strong>. 
-            The student must agree to all declarations and sign again.
-          </p>
-
-          <div className="space-y-3">
-            {CONSENT_CLAUSES.map((clause) => (
-              <div key={clause.id} className="space-y-1 p-3 rounded-lg border bg-muted/20">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <Checkbox
-                    checked={!!consentChecks[clause.id]}
-                    onCheckedChange={(checked) =>
-                      setConsentChecks((prev) => ({ ...prev, [clause.id]: !!checked }))
-                    }
-                    className="mt-0.5"
-                  />
-                  <div>
-                    <p className="text-sm font-semibold">{clause.title}</p>
-                    <p className="text-xs text-muted-foreground leading-relaxed mt-1">{clause.text}</p>
-                  </div>
-                </label>
+          {previewUrl ? (
+            <div className="space-y-3">
+              <iframe src={previewUrl} className="w-full h-[500px] rounded-lg border" title="Consent PDF Preview" />
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setPreviewUrl(null)}>Back to Edit</Button>
+                <Button
+                  onClick={handleReGenerateConsent}
+                  disabled={generating}
+                  className="bg-accent text-accent-foreground hover:bg-accent/90"
+                >
+                  {generating ? "Saving…" : "Save Consent Form"}
+                </Button>
               </div>
-            ))}
-          </div>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground">
+                This will create a new consent form PDF for <strong>{student.first_name} {student.last_name}</strong>. 
+                The student must agree to all declarations and sign again.
+              </p>
 
-          <div className="space-y-2">
-            <Label>Full Name (typed confirmation) *</Label>
-            <Input
-              value={consentSignature}
-              onChange={(e) => setConsentSignature(e.target.value)}
-              placeholder={`e.g. ${student.first_name} ${student.last_name}`}
-            />
-          </div>
+              <div className="space-y-3">
+                {CONSENT_CLAUSES.map((clause) => (
+                  <div key={clause.id} className="space-y-1 p-3 rounded-lg border bg-muted/20">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <Checkbox
+                        checked={!!consentChecks[clause.id]}
+                        onCheckedChange={(checked) =>
+                          setConsentChecks((prev) => ({ ...prev, [clause.id]: !!checked }))
+                        }
+                        className="mt-0.5"
+                      />
+                      <div>
+                        <p className="text-sm font-semibold">{clause.title}</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed mt-1">{clause.text}</p>
+                      </div>
+                    </label>
+                  </div>
+                ))}
+              </div>
 
-          <div className="space-y-2">
-            <Label>Signature (draw below) *</Label>
-            <SignatureCanvas onSignatureChange={setSignatureDataUrl} width={400} height={120} />
-            <p className="text-xs text-muted-foreground">
-              Date: {new Date().toLocaleDateString("en-GB")}
-            </p>
-          </div>
+              <div className="space-y-2">
+                <Label>Full Name (typed confirmation) *</Label>
+                <Input
+                  value={consentSignature}
+                  onChange={(e) => setConsentSignature(e.target.value)}
+                  placeholder={`e.g. ${student.first_name} ${student.last_name}`}
+                />
+              </div>
 
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setConsentDialogOpen(false)}>Cancel</Button>
-            <Button
-              onClick={handleReGenerateConsent}
-              disabled={!canSubmitConsent || generating}
-              className="bg-accent text-accent-foreground hover:bg-accent/90"
-            >
-              {generating ? "Generating…" : "Generate & Save"}
-            </Button>
-          </div>
+              <div className="space-y-2">
+                <Label>Signature (draw below) *</Label>
+                <SignatureCanvas onSignatureChange={setSignatureDataUrl} width={400} height={120} />
+                <p className="text-xs text-muted-foreground">
+                  Date: {new Date().toLocaleDateString("en-GB")}
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setConsentDialogOpen(false)}>Cancel</Button>
+                <Button
+                  variant="outline"
+                  onClick={handlePreviewConsent}
+                  disabled={!canSubmitConsent || previewing}
+                >
+                  <Eye className="w-3.5 h-3.5 mr-1" />
+                  {previewing ? "Loading…" : "Preview PDF"}
+                </Button>
+                <Button
+                  onClick={handleReGenerateConsent}
+                  disabled={!canSubmitConsent || generating}
+                  className="bg-accent text-accent-foreground hover:bg-accent/90"
+                >
+                  {generating ? "Generating…" : "Generate & Save"}
+                </Button>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </>

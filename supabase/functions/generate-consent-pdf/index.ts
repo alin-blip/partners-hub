@@ -6,10 +6,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Simple PDF builder - creates a valid PDF with text and optional image
 function buildPdf(
-  lines: { text: string; x: number; y: number; size?: number; bold?: boolean }[],
-  signatureImage?: { base64: string; x: number; y: number; width: number; height: number }
+  lines: { text: string; x: number; y: number; size?: number; bold?: boolean }[]
 ): Uint8Array {
   const objects: string[] = [];
   let objectCount = 0;
@@ -27,7 +25,7 @@ function buildPdf(
   // Pages
   addObject("2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj");
 
-  // Build content stream
+  // Build content stream using Tm (absolute text matrix) instead of Td (relative)
   let stream = "BT\n";
   for (const line of lines) {
     const fontKey = line.bold ? "/F2" : "/F1";
@@ -37,69 +35,29 @@ function buildPdf(
       .replace(/\(/g, "\\(")
       .replace(/\)/g, "\\)");
     stream += `${fontKey} ${fontSize} Tf\n`;
-    stream += `${line.x} ${line.y} Td\n`;
+    stream += `1 0 0 1 ${line.x} ${line.y} Tm\n`;
     stream += `(${escaped}) Tj\n`;
-    stream += `0 0 Td\n`;
   }
   stream += "ET\n";
 
-  // Add signature image draw command if present
-  if (signatureImage) {
-    stream += "q\n";
-    stream += `${signatureImage.width} 0 0 ${signatureImage.height} ${signatureImage.x} ${signatureImage.y} cm\n`;
-    stream += "/Sig Do\n";
-    stream += "Q\n";
-  }
-
   const streamBytes = new TextEncoder().encode(stream);
 
-  if (signatureImage) {
-    // Decode the base64 PNG image
-    const rawBase64 = signatureImage.base64.replace(/^data:image\/\w+;base64,/, "");
-    const imgBytes = Uint8Array.from(atob(rawBase64), (c) => c.charCodeAt(0));
-
-    // Page with image XObject reference
-    addObject(
-      `3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 5 0 R /Resources << /Font << /F1 4 0 R /F2 6 0 R >> /XObject << /Sig 7 0 R >> >> >>\nendobj`
-    );
-    // Font Helvetica
-    addObject(
-      "4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj"
-    );
-    // Content stream
-    addObject(
-      `5 0 obj\n<< /Length ${streamBytes.length} >>\nstream\n${stream}endstream\nendobj`
-    );
-    // Font Helvetica-Bold
-    addObject(
-      "6 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>\nendobj"
-    );
-    // Image XObject - use raw image data as DCTDecode won't work with PNG, so embed as inline
-    // Actually for simplicity, we'll just draw the typed signature as text fallback when image can't be embedded
-    // PDF doesn't natively support PNG easily without FlateDecode. Let's use the signature as text fallback.
-    // Instead, we embed the image bytes as a raw stream with proper filters
-    const imgHex = Array.from(imgBytes).map(b => b.toString(16).padStart(2, '0')).join('');
-    addObject(
-      `7 0 obj\n<< /Type /XObject /Subtype /Image /Width ${signatureImage.width} /Height ${signatureImage.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Length ${imgHex.length} /Filter /ASCIIHexDecode >>\nstream\n${imgHex}>\nendstream\nendobj`
-    );
-  } else {
-    // Page without image
-    addObject(
-      "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 5 0 R /Resources << /Font << /F1 4 0 R /F2 6 0 R >> >> >>\nendobj"
-    );
-    // Font Helvetica
-    addObject(
-      "4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj"
-    );
-    // Content stream
-    addObject(
-      `5 0 obj\n<< /Length ${streamBytes.length} >>\nstream\n${stream}endstream\nendobj`
-    );
-    // Font Helvetica-Bold
-    addObject(
-      "6 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>\nendobj"
-    );
-  }
+  // Page
+  addObject(
+    "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 5 0 R /Resources << /Font << /F1 4 0 R /F2 6 0 R >> >> >>\nendobj"
+  );
+  // Font Helvetica
+  addObject(
+    "4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj"
+  );
+  // Content stream
+  addObject(
+    `5 0 obj\n<< /Length ${streamBytes.length} >>\nstream\n${stream}endstream\nendobj`
+  );
+  // Font Helvetica-Bold
+  addObject(
+    "6 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>\nendobj"
+  );
 
   // Build the PDF
   let pdf = "%PDF-1.4\n";
@@ -262,7 +220,6 @@ serve(async (req) => {
     lines.push({ text: "the above declarations.", x: leftMargin, y, size: 9 });
     y -= sectionGap;
 
-    // Use typed signature as text in the PDF (reliable across all PDF viewers)
     if (signature) {
       lines.push({ text: `Signature: ${signature}`, x: leftMargin, y, size: 11, bold: true });
       y -= lineHeight;
@@ -272,7 +229,6 @@ serve(async (req) => {
     }
     lines.push({ text: `Date: ${consentDate || new Date().toLocaleDateString("en-GB")}`, x: leftMargin, y, size: 10 });
 
-    // Build PDF without image embedding (text signature is more reliable)
     const pdfBytes = buildPdf(lines);
 
     // Convert to base64
