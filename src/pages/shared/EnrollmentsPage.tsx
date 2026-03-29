@@ -18,7 +18,8 @@ import { Search, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { notifyAgentOfStatusChange } from "@/lib/enrollment-emails";
 
 const STATUSES = [
-  "applied", "documents_submitted", "processing", "accepted", "enrolled", "active", "rejected",
+  "applied", "documents_pending", "documents_submitted", "processing",
+  "offer_received", "accepted", "funding", "enrolled", "active", "rejected", "withdrawn",
 ];
 const PAGE_SIZE = 20;
 
