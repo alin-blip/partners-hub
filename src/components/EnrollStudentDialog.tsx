@@ -23,7 +23,7 @@ const STUDY_PATTERNS_FALLBACK = ["Weekdays", "Weekend", "Evenings"];
 const RELATIONSHIP_OPTIONS = ["Parent", "Spouse", "Sibling", "Friend", "Other"];
 const DOC_TYPES_ENROLL = ["Passport", "Proof of Address", "Other"];
 
-import { CONSENT_CLAUSES, MARKETING_OPTIONS } from "@/lib/consent-clauses";
+import { CONSENT_CLAUSES, MARKETING_OPTIONS, DEFAULT_MARKETING_CHECKS } from "@/lib/consent-clauses";
 
 function sanitizeName(name: string) {
   return name.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 30);
@@ -77,7 +77,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
 
   // Step 5 — Consent
   const [consentChecks, setConsentChecks] = useState<Record<string, boolean>>({});
-  const [marketingChecks, setMarketingChecks] = useState<Record<string, boolean>>({});
+  const [marketingChecks, setMarketingChecks] = useState<Record<string, boolean>>(DEFAULT_MARKETING_CHECKS);
   const [consentSignature, setConsentSignature] = useState("");
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [consentPreviewUrl, setConsentPreviewUrl] = useState<string | null>(null);
@@ -96,7 +96,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
     setPreviousFundingYears(""); setCrn(""); setQualifications(""); setNotes("");
     setNokName(""); setNokPhone(""); setNokRelationship("");
     setDocFiles([]); setSelectedDocType("Passport");
-    setConsentChecks({}); setMarketingChecks({}); setConsentSignature(""); setSignatureDataUrl(null); setConsentPreviewUrl(null);
+    setConsentChecks({}); setMarketingChecks({...DEFAULT_MARKETING_CHECKS}); setConsentSignature(""); setSignatureDataUrl(null); setConsentPreviewUrl(null);
   };
 
   const { data: universities = [] } = useQuery({
@@ -522,7 +522,9 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
                           <label key={opt.id} className="flex items-center gap-3 cursor-pointer">
                             <Checkbox
                               checked={!!marketingChecks[opt.id]}
+                              disabled={!!opt.required}
                               onCheckedChange={(checked) => {
+                                if (opt.required) return;
                                 setMarketingChecks((prev) => {
                                   const next = { ...prev, [opt.id]: !!checked };
                                   if (checked && opt.exclusive) next[opt.exclusive] = false;

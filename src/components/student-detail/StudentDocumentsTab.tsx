@@ -18,7 +18,7 @@ import JSZip from "jszip";
 
 const DOC_TYPES = ["Passport", "Transcript", "Offer Letter", "Visa", "Qualification Certificate", "Share Code", "Proof of Address", "Other"];
 
-import { CONSENT_CLAUSES, MARKETING_OPTIONS } from "@/lib/consent-clauses";
+import { CONSENT_CLAUSES, MARKETING_OPTIONS, DEFAULT_MARKETING_CHECKS } from "@/lib/consent-clauses";
 
 function sanitizeName(name: string) {
   return name.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 30);
@@ -40,7 +40,7 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
   // Re-generate consent state
   const [consentDialogOpen, setConsentDialogOpen] = useState(false);
   const [consentChecks, setConsentChecks] = useState<Record<string, boolean>>({});
-  const [marketingChecks, setMarketingChecks] = useState<Record<string, boolean>>({});
+  const [marketingChecks, setMarketingChecks] = useState<Record<string, boolean>>(DEFAULT_MARKETING_CHECKS);
   const [consentSignature, setConsentSignature] = useState("");
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -370,7 +370,9 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
                             <label key={opt.id} className="flex items-center gap-3 cursor-pointer">
                               <Checkbox
                                 checked={!!marketingChecks[opt.id]}
+                                disabled={!!opt.required}
                                 onCheckedChange={(checked) => {
+                                  if (opt.required) return;
                                   setMarketingChecks((prev) => {
                                     const next = { ...prev, [opt.id]: !!checked };
                                     if (checked && opt.exclusive) next[opt.exclusive] = false;
