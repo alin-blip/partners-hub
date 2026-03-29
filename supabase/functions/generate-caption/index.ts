@@ -32,15 +32,38 @@ serve(async (req) => {
     // Fetch brand settings for voice/DNA
     const { data: brand } = await adminClient.from("brand_settings").select("brand_prompt").limit(1).single();
 
+    const isScript = preset === "script";
+
     const presetLabels: Record<string, string> = {
       social_post: "Instagram/Facebook post",
       story: "Instagram/Facebook story",
       flyer: "promotional flyer",
       banner: "web/social banner",
+      script: "video teleprompter script",
     };
     const presetLabel = presetLabels[preset] || "social media post";
 
-    const systemPrompt = `You are the social media manager for EduForYou UK, an education recruitment agency that helps students find the right university courses in the UK.
+    let systemPrompt: string;
+
+    if (isScript) {
+      systemPrompt = `You are the social media manager and video content creator for EduForYou UK, an education recruitment agency that helps students find the right university courses in the UK.
+
+${brand?.brand_prompt ? `Brand Voice & Guidelines:\n${brand.brand_prompt}\n` : ""}
+Write a teleprompter-ready video script for a short-form video (30-60 seconds) about the given topic.
+IMPORTANT: Write the ENTIRE script in ${lang}.
+
+Rules:
+- Write in a conversational, natural speaking tone — as if talking directly to the viewer
+- Use short sentences that are easy to read from a teleprompter
+- Start with a hook / attention grabber (first 3 seconds)
+- Include a clear CTA (call-to-action) at the end — e.g. "Send us a message", "Link in bio", "Comment below", "Book your free consultation"
+- Keep it concise: 80-150 words max
+- Add [PAUSE] markers where the speaker should take a brief pause
+- Do NOT include hashtags or emojis — this is spoken text
+- The script MUST be written in ${lang}
+- End with a strong, actionable CTA`;
+    } else {
+      systemPrompt = `You are the social media manager for EduForYou UK, an education recruitment agency that helps students find the right university courses in the UK.
 
 ${brand?.brand_prompt ? `Brand Voice & Guidelines:\n${brand.brand_prompt}\n` : ""}
 Write an engaging social media post caption for a ${presetLabel} image.
@@ -50,10 +73,16 @@ Rules:
 - Write in a professional yet friendly and motivational tone
 - Include 3-5 relevant hashtags at the end
 - Keep the caption concise (2-4 sentences max)
-- Include a clear call-to-action when appropriate
+- ALWAYS include a clear call-to-action (CTA) — e.g. "DM us now", "Link in bio", "Apply today", "Book your free consultation", "Comment 'INFO' below"
+- The CTA should feel natural and actionable, not generic
 - Use emojis sparingly but effectively
 - The caption should feel authentic, not generic
 - The caption MUST be written in ${lang}`;
+    }
+
+    const userMessage = isScript
+      ? `Write a teleprompter script about: ${prompt}`
+      : `Write a caption for this image. The image shows: ${prompt}`;
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -65,7 +94,7 @@ Rules:
         model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Write a caption for this image. The image shows: ${prompt}` },
+          { role: "user", content: userMessage },
         ],
       }),
     });
