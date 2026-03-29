@@ -59,11 +59,13 @@ Deno.serve(async (req) => {
   let recipientEmail: string
   let idempotencyKey: string
   let messageId: string
+  let agentId: string | null = null
   let templateData: Record<string, any> = {}
   try {
     const body = await req.json()
     templateName = body.templateName || body.template_name
     recipientEmail = body.recipientEmail || body.recipient_email
+    agentId = body.agentId || body.agent_id || null
     messageId = crypto.randomUUID()
     idempotencyKey = body.idempotencyKey || body.idempotency_key || messageId
     if (body.templateData && typeof body.templateData === 'object') {
@@ -103,6 +105,19 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     )
+  }
+
+  // If agentId is provided but no recipientEmail, resolve it server-side
+  if (!recipientEmail && agentId) {
+    const supabaseLookup = createClient(supabaseUrl, supabaseServiceKey)
+    const { data: agentProfile } = await supabaseLookup
+      .from('profiles')
+      .select('email')
+      .eq('id', agentId)
+      .single()
+    if (agentProfile?.email) {
+      recipientEmail = agentProfile.email
+    }
   }
 
   // Resolve effective recipient: template-level `to` takes precedence over

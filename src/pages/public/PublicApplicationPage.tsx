@@ -52,10 +52,10 @@ export default function PublicApplicationPage() {
     if (!slug) return;
     (async () => {
       const { data: prof } = await supabase
-        .from("profiles")
+        .from("public_agent_profiles" as any)
         .select("id, full_name, avatar_url")
         .eq("slug", slug)
-        .single();
+        .single() as { data: { id: string; full_name: string; avatar_url: string | null } | null; error: any };
 
       if (!prof) { setNotFound(true); setLoading(false); return; }
 
@@ -137,33 +137,27 @@ export default function PublicApplicationPage() {
     } as any);
 
     if (!error) {
-      // Send email notification to the agent
-      const { data: agentProfile } = await supabase
-        .from("profiles")
-        .select("email")
-        .eq("id", agent.id)
-        .single();
+      // Send email notification to the agent via edge function
+      // The edge function uses service role and can look up the agent's email
+      const leadName = `${firstName.trim()} ${lastName.trim()}`;
+      const courseInterest = parts.join(" — ") || undefined;
 
-      if (agentProfile?.email) {
-        const leadName = `${firstName.trim()} ${lastName.trim()}`;
-        const courseInterest = parts.join(" — ") || undefined;
-
-        await supabase.functions.invoke("send-transactional-email", {
-          body: {
-            templateName: "new-lead-notification",
-            recipientEmail: agentProfile.email,
-            idempotencyKey: `new-lead-${leadId}`,
-            templateData: {
-              leadName,
-              leadEmail: email.trim().toLowerCase(),
-              leadPhone: phone.trim() || undefined,
-              nationality: nationality.trim() || undefined,
-              courseInterest,
-              leadsUrl: `${window.location.origin}/agent/leads`,
-            },
+      await supabase.functions.invoke("send-transactional-email", {
+        body: {
+          templateName: "new-lead-notification",
+          recipientEmail: null,
+          agentId: agent.id,
+          idempotencyKey: `new-lead-${leadId}`,
+          templateData: {
+            leadName,
+            leadEmail: email.trim().toLowerCase(),
+            leadPhone: phone.trim() || undefined,
+            nationality: nationality.trim() || undefined,
+            courseInterest,
+            leadsUrl: `${window.location.origin}/agent/leads`,
           },
-        });
-      }
+        },
+      });
 
       setSubmitted(true);
     }

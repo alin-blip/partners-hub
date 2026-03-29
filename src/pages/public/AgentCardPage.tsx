@@ -15,8 +15,6 @@ import { FaStar } from "react-icons/fa";
 interface AgentProfile {
   id: string;
   full_name: string;
-  email: string;
-  phone: string | null;
   avatar_url: string | null;
 }
 
@@ -49,12 +47,12 @@ export default function AgentCardPage() {
   useEffect(() => {
     if (!slug) return;
     (async () => {
-      // Fetch profile by slug
+      // Fetch profile by slug using the public view (no email/phone exposed)
       const { data: prof } = await supabase
-        .from("profiles")
-        .select("id, full_name, email, phone, avatar_url")
+        .from("public_agent_profiles" as any)
+        .select("id, full_name, avatar_url, slug")
         .eq("slug", slug)
-        .single();
+        .single() as { data: { id: string; full_name: string; avatar_url: string | null; slug: string } | null; error: any };
 
       if (!prof) {
         setNotFound(true);
@@ -76,7 +74,7 @@ export default function AgentCardPage() {
         return;
       }
 
-      setProfile(prof);
+      setProfile(prof as AgentProfile);
       setSettings(card as unknown as CardSettings);
       setLoading(false);
     })();
@@ -110,8 +108,7 @@ export default function AgentCardPage() {
       `FN:${profile.full_name}`,
       settings.job_title ? `TITLE:${settings.job_title}` : "",
       settings.company_name ? `ORG:${settings.company_name}` : "",
-      profile.phone ? `TEL;TYPE=CELL:${profile.phone}` : "",
-      profile.email ? `EMAIL:${profile.email}` : "",
+      settings.whatsapp ? `TEL;TYPE=CELL:${settings.whatsapp}` : "",
       profile.avatar_url ? `PHOTO;VALUE=URI:${profile.avatar_url}` : "",
       "END:VCARD",
     ].filter(Boolean).join("\n");
@@ -194,10 +191,10 @@ export default function AgentCardPage() {
             </TabsList>
 
             <TabsContent value="personal" className="mt-4 space-y-3">
-              {profile.phone && (
-                <a href={`tel:${profile.phone}`} className="flex items-center gap-3 text-sm text-foreground hover:text-accent transition-colors">
+              {settings.whatsapp && (
+                <a href={`tel:${settings.whatsapp}`} className="flex items-center gap-3 text-sm text-foreground hover:text-accent transition-colors">
                   <Phone className="w-4 h-4 text-accent" />
-                  {profile.phone}
+                  {settings.whatsapp}
                 </a>
               )}
               {whatsappUrl && (
@@ -206,10 +203,6 @@ export default function AgentCardPage() {
                   WhatsApp
                 </a>
               )}
-              <a href={`mailto:${profile.email}`} className="flex items-center gap-3 text-sm text-foreground hover:text-accent transition-colors">
-                <Mail className="w-4 h-4 text-accent" />
-                {profile.email}
-              </a>
               {settings.bio && (
                 <p className="text-sm text-muted-foreground pt-2 border-t">{settings.bio}</p>
               )}
