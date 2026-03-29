@@ -412,16 +412,6 @@ export default function CreateImagePage() {
                           </TooltipTrigger>
                           <TooltipContent>Generate caption</TooltipContent>
                         </Tooltip>
-                        <a
-                          href={getPublicUrl(img.image_path)}
-                          download
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <Button size="icon" variant="secondary" className="h-7 w-7">
-                            <Download className="w-3 h-3" />
-                          </Button>
-                        </a>
                       </div>
                     </div>
                     {captions[img.id] && (
