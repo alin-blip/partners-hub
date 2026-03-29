@@ -6,10 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Download, Upload, UserCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-const LOGO_URL = "/images/eduforyou-logo.png";
+const LOGO_URL = "/images/eduforyou-icon.jpg";
 const CANVAS_SIZE = 1080;
-const BORDER_WIDTH = 80;
-const LOGO_HEIGHT = 100;
+const BORDER_WIDTH = 140;
+const LOGO_ICON_SIZE = 70;
 
 export function BrandedProfilePicture() {
   const { profile } = useAuth();
