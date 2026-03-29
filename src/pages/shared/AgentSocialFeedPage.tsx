@@ -100,6 +100,33 @@ export default function AgentSocialFeedPage() {
     }
     const shareText = `${post.caption}\n\n🔗 ${cardUrl}`;
 
+    // For Facebook/LinkedIn: open URL synchronously to avoid popup blocking
+    if (skipNativeSharePlatforms.includes(platform)) {
+      const fallbackUrl = platformFallbackUrls[platform]?.(shareText, cardUrl!);
+      if (fallbackUrl) window.open(fallbackUrl, "_blank");
+
+      try {
+        const response = await fetch(post.image_url);
+        const blob = await response.blob();
+        const ext = blob.type.includes("png") ? "png" : "jpg";
+        const dlUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = dlUrl;
+        a.download = `eduforyou-post-${post.id.slice(0, 8)}.${ext}`;
+        a.click();
+        URL.revokeObjectURL(dlUrl);
+
+        try { await navigator.clipboard.writeText(shareText); } catch {}
+
+        if (!post.seen_at) markSeen.mutate(post.id);
+        const name = platformNames[platform] || platform;
+        toast.success(`Imagine salvată și text copiat! Postează pe ${name} și lipește textul.`);
+      } catch {
+        toast.error("Eroare la descărcare");
+      }
+      return;
+    }
+
     try {
       const response = await fetch(post.image_url);
       const blob = await response.blob();
@@ -109,16 +136,12 @@ export default function AgentSocialFeedPage() {
 
       const shareData: ShareData = { files: [imageFile], text: shareText };
 
-      const useNativeShare = !skipNativeSharePlatforms.includes(platform) &&
-        navigator.canShare && navigator.canShare(shareData);
-
-      if (useNativeShare) {
+      if (navigator.canShare && navigator.canShare(shareData)) {
         await navigator.share(shareData);
         if (!post.seen_at) markSeen.mutate(post.id);
         return;
       }
 
-      // Fallback: download + copy + open platform URL
       const dlUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = dlUrl;
@@ -126,10 +149,7 @@ export default function AgentSocialFeedPage() {
       a.click();
       URL.revokeObjectURL(dlUrl);
 
-      await navigator.clipboard.writeText(shareText);
-
-      const fallbackUrl = platformFallbackUrls[platform]?.(shareText, cardUrl!);
-      if (fallbackUrl) window.open(fallbackUrl, "_blank");
+      try { await navigator.clipboard.writeText(shareText); } catch {}
 
       if (!post.seen_at) markSeen.mutate(post.id);
       const name = platformNames[platform] || platform;
