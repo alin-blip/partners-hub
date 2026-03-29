@@ -667,15 +667,22 @@ export default function EnrollStudent() {
               </div>
 
               <div className="space-y-2 pt-2">
-                <Label>Digital Signature (type your full name) *</Label>
+                <Label>Full Name (typed confirmation) *</Label>
                 <Input
                   value={consentSignature}
                   onChange={(e) => setConsentSignature(e.target.value)}
                   placeholder={`e.g. ${firstName} ${lastName}`}
-                  className="font-serif italic text-base"
                 />
                 <p className="text-xs text-muted-foreground">
-                  By typing your name above, you confirm that you have read and agree to all the above declarations. Date: {new Date().toLocaleDateString("en-GB")}
+                  Type your full name to confirm your identity.
+                </p>
+              </div>
+
+              <div className="space-y-2 pt-2">
+                <Label>Signature (draw below) *</Label>
+                <SignatureCanvas onSignatureChange={setSignatureDataUrl} />
+                <p className="text-xs text-muted-foreground">
+                  Draw your signature above. Date: {new Date().toLocaleDateString("en-GB")}
                 </p>
               </div>
 
