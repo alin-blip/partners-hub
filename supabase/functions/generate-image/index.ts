@@ -85,30 +85,39 @@ serve(async (req) => {
       fullPrompt += `\n\nInclude a professional headshot placeholder for ${profile.full_name || "the agent"} — show a friendly, professional person as a recruitment consultant.`;
     }
 
-    // Fetch the brand logo and convert to base64 for multimodal input
-    let logoBase64Url: string | null = null;
-    const logoStorageUrl = `${SUPABASE_URL}/storage/v1/object/public/brand-assets/eduforyou-logo.png`;
-    const logoSourceUrl = brand?.logo_url || logoStorageUrl;
+    // Fetch the brand icon (pen+graduation cap) to embed in the generated image
+    let iconBase64Url: string | null = null;
+    const iconUrl = `${SUPABASE_URL}/storage/v1/object/public/brand-assets/eduforyou-icon.jpg`;
 
     try {
-      const logoRes = await fetch(logoSourceUrl);
-      if (logoRes.ok) {
-        const logoBytes = new Uint8Array(await logoRes.arrayBuffer());
-        const logoB64 = btoa(String.fromCharCode(...logoBytes));
-        const contentType = logoRes.headers.get("content-type") || "image/png";
-        logoBase64Url = `data:${contentType};base64,${logoB64}`;
-        fullPrompt += "\n\nIncorporate this exact company logo into the design. Place it clearly and visually in a visible corner. Do NOT invent or create a different logo — use ONLY the provided logo image exactly as it is:";
+      const iconRes = await fetch(iconUrl);
+      if (iconRes.ok) {
+        const iconBytes = new Uint8Array(await iconRes.arrayBuffer());
+        const iconB64 = btoa(String.fromCharCode(...iconBytes));
+        const contentType = iconRes.headers.get("content-type") || "image/jpeg";
+        iconBase64Url = `data:${contentType};base64,${iconB64}`;
       }
     } catch (e) {
-      console.error("Failed to fetch logo:", e);
+      console.error("Failed to fetch icon:", e);
     }
 
-    // Build messages — multimodal if logo available, text-only otherwise
+    // Add strict logo placement instructions
+    fullPrompt += `\n\n=== MANDATORY LOGO PLACEMENT ===
+The image MUST include the EduForYou branding in the bottom-right corner or top-right corner:
+- Place the PROVIDED orange pen-with-graduation-cap icon (attached image) on the LEFT side
+- Place the text "EduForYou" on the RIGHT side of the icon
+- The icon and text must appear together as a logo lockup
+- Do NOT invent, generate, or create any other logo — use ONLY the exact icon image provided
+- Do NOT modify the icon shape or color — reproduce it exactly as given
+- The logo area should have a subtle background (white pill or semi-transparent) for readability
+- This is NON-NEGOTIABLE — every generated image MUST have this exact branding`;
+
+    // Build messages — multimodal if icon available, text-only otherwise
     let messageContent: any;
-    if (logoBase64Url) {
+    if (iconBase64Url) {
       messageContent = [
         { type: "text", text: fullPrompt },
-        { type: "image_url", image_url: { url: logoBase64Url } },
+        { type: "image_url", image_url: { url: iconBase64Url } },
       ];
     } else {
       messageContent = fullPrompt;
