@@ -124,7 +124,6 @@ export default function SocialPostsPage() {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [captionLanguage, setCaptionLanguage] = useState("Romanian");
   const [aiCaption, setAiCaption] = useState<string | null>(null);
-  const [captionLoading, setCaptionLoading] = useState(false);
   const hasAvatar = !!(profile as any)?.avatar_url;
 
   // --- Manual upload state ---
