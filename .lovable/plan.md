@@ -1,51 +1,49 @@
 
 
-## Audit: "Import from Document" — Issues Found
+## Plan: Remove Ask33 References + Add Consent Form to Enrollment
 
-### Critical Issues
+### Part 1: Remove "Ask33" from Database
 
-**1. XLSX/DOCX files produce garbage data**
-The edge function (`process-settings-document`) handles XLSX and DOCX by decoding base64 to bytes and running `TextDecoder` on them. But XLSX and DOCX are ZIP-based binary formats — decoding them as UTF-8 text produces unreadable garbage that the AI model cannot parse. Only PDF and image formats will work correctly.
+Replace all occurrences of "Ask33 Consent Form" with "EduForYou Consent Form" in:
 
-**Fix:** Either:
-- (A) Parse XLSX/DOCX server-side using a Deno library (e.g. `xlsx` for spreadsheets, or a DOCX parser), then send the extracted text to the AI model.
-- (B) Remove XLSX/DOCX from accepted file types and inform the user to convert to PDF first. This is simpler and more reliable.
+1. **`ai_knowledge_base`** — 3 rows (Ulster, Solent, Northumbria overviews) contain "Ask33 Consent Form" in `content`
+2. **`course_details`** — ~90 rows have "Ask33 Consent Form" in `documents_required` field
 
-**Recommendation:** Option B (remove XLSX/DOCX support, keep PDF + images). This avoids adding heavy dependencies to the edge function and PDF is universally supported.
+Use UPDATE statements via the data insert tool to do text replacement.
 
-**2. Course Details review table shows only 3 of 7 fields**
-In `DocumentProcessorDialog.tsx` line 46, the COLUMNS for `course_details` are:
-```
-["course_name", "entry_requirements", "admission_test_info"]
-```
-The remaining 4 fields (`interview_info`, `documents_required`, `personal_statement_guidelines`, `additional_info`) are extracted by the AI but invisible during review. Users can't verify or edit them before saving.
+### Part 2: Add Consent Form Step to Enrollment
 
-**Fix:** Add the missing columns to the review table, or show a more compact expandable view per row since 7 columns would be wide.
+Add a consent form step between the current Step 4 (Documents) and Step 5 (Review), making it a 6-step wizard. The consent form will be generated as a PDF and saved to the student's documents.
 
-**3. No duplicate prevention on re-import**
-Courses, timetable options, campuses, and intakes all use plain `.insert()` without checking for existing records. Re-importing the same document creates duplicate rows.
+**Consent Form Content** (UK university enrollment, GDPR-compliant):
+- Student full name, date of birth, nationality, address
+- Selected university and course
+- Agent/company name (EduForYou UK)
+- Consent clauses:
+  1. Data processing consent — personal data shared with university for enrollment
+  2. Document sharing consent — uploaded documents forwarded to university
+  3. Communication consent — contact by EduForYou and university regarding application
+  4. Student finance consent — data shared with SFE if applicable
+  5. Declaration of accuracy — all information provided is true and correct
+- Checkbox for each clause (all required)
+- Digital signature field (typed name as signature)
+- Date auto-filled
 
-**Fix:** Before inserting, check for existing records by name+university_id (for courses/campuses/timetable) or label+university_id (for intakes). Skip or upsert duplicates.
+**Technical Implementation:**
 
-### Minor Issues
+1. **New edge function `generate-consent-pdf`** — uses jsPDF (or similar Deno-compatible library) to create a branded PDF with all student details and consent declarations, returns the PDF as base64
+2. **New Step 5 in `EnrollStudent.tsx`** — displays consent form with checkboxes for each clause and a typed signature field. All checkboxes + signature required to proceed.
+3. **On submit** — the consent PDF is generated via the edge function, uploaded to `student-documents` storage, and a `student_documents` record is created with `doc_type: "Consent Form"`
+4. **Same changes in `EnrollStudentDialog.tsx`** — mirror the consent step in the dialog version
+5. **Step count increases from 5 to 6** in both enrollment flows
 
-**4. `course_details` upsert uses `as any` cast**
-Line 348: `supabase.from("course_details" as any).upsert(...)` — this works at runtime since the table exists, but the `as any` indicates the types file doesn't include `course_details`. This is cosmetic (auto-generated types may not have synced yet) but worth noting.
+### Files Changed
 
-**5. Knowledge Base category mismatch**
-When saving `course_details` to KB, the category is set to `"course_details"` — but the KB categories defined in `KnowledgeBasePage.tsx` may not include this value, making the entry hard to find.
-
-**6. `processProgress` initialization resets `course_details`**
-Line 157: `newItemsByType` is rebuilt by spreading `EMPTY_ITEMS` then overwriting specific keys — `course_details` is inherited from the spread correctly, but the explicit list is inconsistent (missing `course_details`). Not a bug, but confusing.
-
----
-
-### Proposed Changes
-
-| # | File | Change |
-|---|------|--------|
-| 1 | `src/components/DocumentProcessorDialog.tsx` | Remove XLSX/DOCX from `ACCEPTED` types, update help text to "PDF, JPG, PNG" |
-| 2 | `src/components/DocumentProcessorDialog.tsx` | Add missing `course_details` columns to review table (use expandable rows or show all 7 fields) |
-| 3 | `src/components/DocumentProcessorDialog.tsx` | Add duplicate checking before insert for courses, campuses, timetable, intakes (skip existing by name+university_id) |
-| 4 | `src/components/DocumentProcessorDialog.tsx` | Fix `newItemsByType` initialization to explicitly include `course_details: []` |
+| File | Change |
+|------|--------|
+| `ai_knowledge_base` (DB data) | Replace "Ask33" with "EduForYou" in 3 rows |
+| `course_details` (DB data) | Replace "Ask33" with "EduForYou" in ~90 rows |
+| `supabase/functions/generate-consent-pdf/index.ts` | New edge function to generate consent PDF |
+| `src/pages/agent/EnrollStudent.tsx` | Add consent step (Step 5), shift Review to Step 6 |
+| `src/components/EnrollStudentDialog.tsx` | Same consent step addition |
 
