@@ -727,6 +727,7 @@ export default function EnrollStudent() {
                             signature: consentSignature,
                             signatureImage: signatureDataUrl || null,
                             consentDate: new Date().toLocaleDateString("en-GB"),
+                            marketingConsent: marketingChecks,
                           },
                         });
                         if (pdfError) throw pdfError;

@@ -602,6 +602,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
                           signature: consentSignature,
                           signatureImage: signatureDataUrl || null,
                           consentDate: new Date().toLocaleDateString("en-GB"),
+                          marketingConsent: marketingChecks,
                         },
                       });
                       if (pdfError) throw pdfError;
