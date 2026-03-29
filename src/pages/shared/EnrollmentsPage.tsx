@@ -15,6 +15,7 @@ import {
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Search, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { notifyAgentOfStatusChange } from "@/lib/enrollment-emails";
 
 const STATUSES = [

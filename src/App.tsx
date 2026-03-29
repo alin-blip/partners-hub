@@ -18,6 +18,7 @@ import AIMonitoringPage from "./pages/owner/AIMonitoringPage";
 import CommissionsPage from "./pages/owner/CommissionsPage";
 import StudentsPage from "./pages/shared/StudentsPage";
 import EnrollmentsPage from "./pages/shared/EnrollmentsPage";
+import EnrollStudent from "./pages/agent/EnrollStudent";
 import StudentDetailPage from "./pages/shared/StudentDetailPage";
 import ProfilePage from "./pages/shared/ProfilePage";
 import ResourcesPage from "./pages/shared/ResourcesPage";
