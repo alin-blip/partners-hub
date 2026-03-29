@@ -32,6 +32,8 @@ import {
   Copy,
   Check,
   Download,
+  Video,
+  CheckSquare,
 } from "lucide-react";
 
 const LANGUAGES = [
@@ -44,11 +46,19 @@ const LANGUAGES = [
 ];
 
 const PRESETS = [
-  { id: "social_post", label: "Social Media Post", desc: "1080×1080 square", icon: Square },
+  { id: "social_post", label: "Social Post", desc: "1080×1080 square", icon: Square },
   { id: "story", label: "Story", desc: "1080×1920 vertical", icon: Smartphone },
   { id: "flyer", label: "Flyer", desc: "A5 portrait", icon: FileText },
   { id: "banner", label: "Banner", desc: "1200×628 horizontal", icon: LayoutTemplate },
+  { id: "script", label: "Script", desc: "Teleprompter ready", icon: Video },
 ];
+
+type GeneratedResult = {
+  preset: string;
+  url?: string;
+  script?: string;
+  error?: string;
+};
 
 function CaptionDisplay({ caption }: { caption: string }) {
   const [copied, setCopied] = useState(false);
@@ -74,6 +84,32 @@ function CaptionDisplay({ caption }: { caption: string }) {
   );
 }
 
+function ScriptDisplay({ script }: { script: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(script);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-medium flex items-center gap-1">
+          <Video className="w-4 h-4" />
+          Teleprompter Script
+        </Label>
+        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={handleCopy}>
+          {copied ? <Check className="w-3 h-3 mr-1" /> : <Copy className="w-3 h-3 mr-1" />}
+          {copied ? "Copied!" : "Copy"}
+        </Button>
+      </div>
+      <div className="p-4 rounded-lg bg-card border-2 text-base leading-relaxed whitespace-pre-wrap font-medium">
+        {script}
+      </div>
+    </div>
+  );
+}
+
 export default function SocialPostsPage() {
   const { user, role, profile } = useAuth();
   const qc = useQueryClient();
@@ -82,11 +118,11 @@ export default function SocialPostsPage() {
   // --- Image source tab ---
   const [imageSource, setImageSource] = useState<"ai" | "upload">("ai");
 
-  // --- AI generation state ---
-  const [selectedPreset, setSelectedPreset] = useState("social_post");
+  // --- AI generation state (multi-select presets) ---
+  const [selectedPresets, setSelectedPresets] = useState<string[]>(["social_post"]);
   const [prompt, setPrompt] = useState("");
   const [includePhoto, setIncludePhoto] = useState(false);
-  const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
+  const [generatedResults, setGeneratedResults] = useState<GeneratedResult[]>([]);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [captionLanguage, setCaptionLanguage] = useState("Romanian");
   const [aiCaption, setAiCaption] = useState<string | null>(null);
@@ -103,9 +139,29 @@ export default function SocialPostsPage() {
   const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
   const [publishing, setPublishing] = useState(false);
 
-  // Determine which image URL we have
-  const hasImage = imageSource === "ai" ? !!generatedUrl : !!imageFile;
-  const previewImage = imageSource === "ai" ? generatedUrl : imagePreview;
+  // Determine which images we have
+  const imageResults = generatedResults.filter((r) => r.url);
+  const hasImage = imageSource === "ai" ? imageResults.length > 0 : !!imageFile;
+  const firstImageUrl = imageResults[0]?.url || null;
+  const previewImage = imageSource === "ai" ? firstImageUrl : imagePreview;
+
+  // Toggle preset selection
+  const togglePreset = (presetId: string) => {
+    setSelectedPresets((prev) =>
+      prev.includes(presetId)
+        ? prev.filter((p) => p !== presetId)
+        : [...prev, presetId]
+    );
+  };
+
+  // Select all presets
+  const selectAllPresets = () => {
+    if (selectedPresets.length === PRESETS.length) {
+      setSelectedPresets(["social_post"]);
+    } else {
+      setSelectedPresets(PRESETS.map((p) => p.id));
+    }
+  };
 
   // --- Queries ---
   const { data: agents = [] } = useQuery({
@@ -135,42 +191,110 @@ export default function SocialPostsPage() {
     },
   });
 
-  // --- AI Generate Image ---
+  // --- AI Generate (batch for selected presets) ---
   const [generating, setGenerating] = useState(false);
+  const [generatingProgress, setGeneratingProgress] = useState("");
+
   const handleGenerate = async () => {
+    if (selectedPresets.length === 0) {
+      toast.error("Select at least one format");
+      return;
+    }
     setGenerating(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-      const resp = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            prompt,
-            preset: selectedPreset,
-            includePhoto,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          }),
-        }
-      );
-      const result = await resp.json();
-      if (!resp.ok) throw new Error(result.error || "Generation failed");
-      setGeneratedUrl(result.url);
-      setRemaining(result.remaining);
-      toast.success("Image generated!");
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
+    setGeneratedResults([]);
+    setAiCaption(null);
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast.error("Not authenticated");
       setGenerating(false);
+      return;
+    }
+
+    const results: GeneratedResult[] = [];
+    const imagePresets = selectedPresets.filter((p) => p !== "script");
+    const hasScript = selectedPresets.includes("script");
+
+    // Generate images sequentially (each costs a daily slot)
+    for (let i = 0; i < imagePresets.length; i++) {
+      const preset = imagePresets[i];
+      const presetLabel = PRESETS.find((p) => p.id === preset)?.label || preset;
+      setGeneratingProgress(`Generating ${presetLabel}… (${i + 1}/${imagePresets.length}${hasScript ? " + script" : ""})`);
+
+      try {
+        const resp = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              prompt,
+              preset,
+              includePhoto,
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            }),
+          }
+        );
+        const result = await resp.json();
+        if (!resp.ok) {
+          results.push({ preset, error: result.error || "Generation failed" });
+          if (resp.status === 429) {
+            toast.error("Daily limit reached");
+            break;
+          }
+        } else {
+          results.push({ preset, url: result.url });
+          setRemaining(result.remaining);
+        }
+      } catch (e: any) {
+        results.push({ preset, error: e.message });
+      }
+    }
+
+    // Generate script if selected
+    if (hasScript) {
+      setGeneratingProgress("Generating teleprompter script…");
+      try {
+        const resp = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-caption`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              prompt,
+              preset: "script",
+              language: captionLanguage,
+            }),
+          }
+        );
+        const result = await resp.json();
+        if (!resp.ok) {
+          results.push({ preset: "script", error: result.error || "Script generation failed" });
+        } else {
+          results.push({ preset: "script", script: result.caption });
+        }
+      } catch (e: any) {
+        results.push({ preset: "script", error: e.message });
+      }
+    }
+
+    setGeneratedResults(results);
+    setGeneratingProgress("");
+    setGenerating(false);
+
+    const successCount = results.filter((r) => r.url || r.script).length;
+    if (successCount > 0) {
+      toast.success(`${successCount} format(s) generated!`);
     }
   };
 
-  // --- AI Generate Caption ---
+  // --- AI Generate Caption (with CTA always) ---
   const handleGenerateCaption = async () => {
     setCaptionLoading(true);
     try {
@@ -184,7 +308,7 @@ export default function SocialPostsPage() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ prompt, preset: selectedPreset, language: captionLanguage }),
+          body: JSON.stringify({ prompt, preset: "social_post", language: captionLanguage }),
         }
       );
       const result = await resp.json();
@@ -210,7 +334,7 @@ export default function SocialPostsPage() {
     setImagePreview(URL.createObjectURL(file));
   };
 
-  // --- Publish ---
+  // --- Publish (publishes each generated image as a separate post with same caption) ---
   const handlePublish = async () => {
     if (!hasImage || !caption.trim()) {
       toast.error("Please add an image and caption");
@@ -218,10 +342,11 @@ export default function SocialPostsPage() {
     }
     setPublishing(true);
     try {
-      let finalImageUrl: string;
+      // Collect all image URLs to publish
+      let imageUrls: string[] = [];
 
-      if (imageSource === "ai" && generatedUrl) {
-        finalImageUrl = generatedUrl;
+      if (imageSource === "ai") {
+        imageUrls = imageResults.map((r) => r.url!);
       } else if (imageFile) {
         const ext = imageFile.name.split(".").pop();
         const filePath = `social-posts/${Date.now()}.${ext}`;
@@ -232,23 +357,12 @@ export default function SocialPostsPage() {
         const { data: urlData } = supabase.storage
           .from("generated-images")
           .getPublicUrl(filePath);
-        finalImageUrl = urlData.publicUrl;
-      } else {
-        throw new Error("No image available");
+        imageUrls = [urlData.publicUrl];
       }
 
-      const { data: post, error: postErr } = await supabase
-        .from("social_posts")
-        .insert({
-          created_by: user!.id,
-          image_url: finalImageUrl,
-          caption: caption.trim(),
-          target_role: targetMode,
-        })
-        .select()
-        .single();
-      if (postErr) throw postErr;
+      if (imageUrls.length === 0) throw new Error("No image available");
 
+      // Determine recipients
       let recipientIds: string[] = [];
       if (targetMode === "all") {
         recipientIds = agents.map((a: any) => a.id);
@@ -258,26 +372,42 @@ export default function SocialPostsPage() {
         recipientIds = selectedAgents;
       }
 
-      if (recipientIds.length > 0) {
-        const recipientRows = recipientIds.map((agentId) => ({
-          post_id: post.id,
-          agent_id: agentId,
-        }));
-        const { error: recErr } = await supabase
-          .from("social_post_recipients")
-          .insert(recipientRows);
-        if (recErr) throw recErr;
+      // Create a post for each image URL (same caption)
+      for (const imageUrl of imageUrls) {
+        const { data: post, error: postErr } = await supabase
+          .from("social_posts")
+          .insert({
+            created_by: user!.id,
+            image_url: imageUrl,
+            caption: caption.trim(),
+            target_role: targetMode,
+          })
+          .select()
+          .single();
+        if (postErr) throw postErr;
+
+        if (recipientIds.length > 0) {
+          const recipientRows = recipientIds.map((agentId) => ({
+            post_id: post.id,
+            agent_id: agentId,
+          }));
+          const { error: recErr } = await supabase
+            .from("social_post_recipients")
+            .insert(recipientRows);
+          if (recErr) throw recErr;
+        }
       }
 
-      toast.success(`Post published to ${recipientIds.length} recipient(s)`);
+      toast.success(`${imageUrls.length} post(s) published to ${recipientIds.length} recipient(s)`);
       // Reset
       setCaption("");
       setImageFile(null);
       setImagePreview(null);
-      setGeneratedUrl(null);
+      setGeneratedResults([]);
       setAiCaption(null);
       setPrompt("");
       setSelectedAgents([]);
+      setSelectedPresets(["social_post"]);
       qc.invalidateQueries({ queryKey: ["social-posts"] });
     } catch (err: any) {
       toast.error(err.message || "Failed to publish");
@@ -331,8 +461,8 @@ export default function SocialPostsPage() {
         {/* Step 1: Image Source */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Step 1 — Create Image</CardTitle>
-            <CardDescription>Generate with AI or upload manually</CardDescription>
+            <CardTitle className="text-base">Step 1 — Create Content</CardTitle>
+            <CardDescription>Generate with AI or upload manually. Select multiple formats!</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Tabs value={imageSource} onValueChange={(v) => setImageSource(v as "ai" | "upload")}>
@@ -349,30 +479,57 @@ export default function SocialPostsPage() {
 
               {/* AI Tab */}
               <TabsContent value="ai" className="space-y-4 mt-4">
-                {/* Preset selector */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {PRESETS.map((p) => (
-                    <Card
-                      key={p.id}
-                      className={`cursor-pointer transition-all hover:shadow-md ${
-                        selectedPreset === p.id
-                          ? "ring-2 ring-accent border-accent"
-                          : "hover:border-accent/50"
-                      }`}
-                      onClick={() => setSelectedPreset(p.id)}
+                {/* Preset multi-selector */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Select formats (multiple allowed)</Label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={selectAllPresets}
                     >
-                      <CardContent className="p-3 text-center">
-                        <p.icon className={`w-6 h-6 mx-auto mb-1 ${selectedPreset === p.id ? "text-accent" : "text-muted-foreground"}`} />
-                        <p className="font-medium text-xs">{p.label}</p>
-                        <p className="text-[10px] text-muted-foreground">{p.desc}</p>
-                      </CardContent>
-                    </Card>
-                  ))}
+                      <CheckSquare className="w-3 h-3 mr-1" />
+                      {selectedPresets.length === PRESETS.length ? "Deselect all" : "Select all"}
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                    {PRESETS.map((p) => {
+                      const isSelected = selectedPresets.includes(p.id);
+                      return (
+                        <Card
+                          key={p.id}
+                          className={`cursor-pointer transition-all hover:shadow-md relative ${
+                            isSelected
+                              ? "ring-2 ring-accent border-accent"
+                              : "hover:border-accent/50"
+                          }`}
+                          onClick={() => togglePreset(p.id)}
+                        >
+                          <CardContent className="p-3 text-center">
+                            {isSelected && (
+                              <div className="absolute top-1.5 right-1.5">
+                                <Check className="w-3.5 h-3.5 text-accent" />
+                              </div>
+                            )}
+                            <p.icon className={`w-5 h-5 mx-auto mb-1 ${isSelected ? "text-accent" : "text-muted-foreground"}`} />
+                            <p className="font-medium text-xs">{p.label}</p>
+                            <p className="text-[10px] text-muted-foreground">{p.desc}</p>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                  {selectedPresets.length > 1 && (
+                    <p className="text-xs text-muted-foreground">
+                      {selectedPresets.length} formats selected — each image format uses 1 daily credit
+                    </p>
+                  )}
                 </div>
 
                 {/* Prompt */}
                 <div className="space-y-2">
-                  <Label>What should the image show?</Label>
+                  <Label>What should the content show?</Label>
                   <Textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
@@ -404,7 +561,7 @@ export default function SocialPostsPage() {
                     </Tooltip>
 
                     <div className="flex items-center gap-2">
-                      <Label className="text-sm whitespace-nowrap">Caption language:</Label>
+                      <Label className="text-sm whitespace-nowrap">Language:</Label>
                       <Select value={captionLanguage} onValueChange={setCaptionLanguage}>
                         <SelectTrigger className="w-[140px] h-9">
                           <SelectValue />
@@ -420,51 +577,87 @@ export default function SocialPostsPage() {
 
                   <Button
                     onClick={handleGenerate}
-                    disabled={generating || !prompt.trim()}
+                    disabled={generating || !prompt.trim() || selectedPresets.length === 0}
                     className="bg-accent text-accent-foreground hover:bg-accent/90"
                   >
                     {generating ? (
-                      <><Loader2 className="w-4 h-4 mr-1 animate-spin" />Generating...</>
+                      <><Loader2 className="w-4 h-4 mr-1 animate-spin" />{generatingProgress || "Generating..."}</>
                     ) : (
-                      <><Sparkles className="w-4 h-4 mr-1" />Generate Image</>
+                      <><Sparkles className="w-4 h-4 mr-1" />Generate {selectedPresets.length > 1 ? `(${selectedPresets.length})` : ""}</>
                     )}
                   </Button>
                 </div>
 
-                {/* Generated result */}
-                {generatedUrl && (
-                  <div className="space-y-3">
-                    <div className="relative group">
-                      <img
-                        src={generatedUrl}
-                        alt="Generated"
-                        className="w-full max-w-lg mx-auto rounded-lg shadow-md"
-                      />
-                      <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              size="icon"
-                              variant="secondary"
-                              onClick={handleGenerateCaption}
-                              disabled={captionLoading}
-                            >
-                              {captionLoading ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <MessageSquare className="w-4 h-4" />
-                              )}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Generate caption</TooltipContent>
-                        </Tooltip>
-                        <a href={generatedUrl} download target="_blank" rel="noopener noreferrer">
-                          <Button size="icon" variant="secondary">
-                            <Download className="w-4 h-4" />
-                          </Button>
-                        </a>
-                      </div>
+                {/* Generated results */}
+                {generatedResults.length > 0 && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium">Generated Content</Label>
+                      {imageResults.length > 0 && !aiCaption && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleGenerateCaption}
+                          disabled={captionLoading}
+                          className="h-8"
+                        >
+                          {captionLoading ? (
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          ) : (
+                            <MessageSquare className="w-3 h-3 mr-1" />
+                          )}
+                          Generate Caption
+                        </Button>
+                      )}
                     </div>
+
+                    {/* Image grid */}
+                    {imageResults.length > 0 && (
+                      <div className={`grid gap-3 ${imageResults.length === 1 ? "grid-cols-1 max-w-lg mx-auto" : "grid-cols-1 md:grid-cols-2"}`}>
+                        {imageResults.map((result) => {
+                          const presetInfo = PRESETS.find((p) => p.id === result.preset);
+                          return (
+                            <div key={result.preset} className="relative group rounded-lg overflow-hidden border">
+                              <img
+                                src={result.url}
+                                alt={`Generated ${presetInfo?.label}`}
+                                className="w-full rounded-lg"
+                              />
+                              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+                                <Badge variant="secondary" className="text-[10px]">
+                                  {presetInfo?.label}
+                                </Badge>
+                              </div>
+                              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <a href={result.url} download target="_blank" rel="noopener noreferrer">
+                                  <Button size="icon" variant="secondary" className="h-7 w-7">
+                                    <Download className="w-3 h-3" />
+                                  </Button>
+                                </a>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Script results */}
+                    {generatedResults
+                      .filter((r) => r.script)
+                      .map((r) => (
+                        <ScriptDisplay key="script" script={r.script!} />
+                      ))}
+
+                    {/* Error results */}
+                    {generatedResults
+                      .filter((r) => r.error)
+                      .map((r) => (
+                        <div key={r.preset} className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+                          <span className="font-medium">{PRESETS.find((p) => p.id === r.preset)?.label}:</span>{" "}
+                          {r.error}
+                        </div>
+                      ))}
+
                     {aiCaption && <CaptionDisplay caption={aiCaption} />}
                   </div>
                 )}
@@ -506,13 +699,25 @@ export default function SocialPostsPage() {
             <CardTitle className="text-base">Step 2 — Caption & Publish</CardTitle>
             <CardDescription>
               {hasImage
-                ? "Add a caption and choose recipients"
+                ? `${imageResults.length > 1 ? `${imageResults.length} images ready — ` : ""}Same caption will be used for all posts`
                 : "Generate or upload an image first"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Preview thumbnail */}
-            {previewImage && (
+            {/* Preview thumbnails */}
+            {imageSource === "ai" && imageResults.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {imageResults.map((r) => (
+                  <img
+                    key={r.preset}
+                    src={r.url}
+                    alt={r.preset}
+                    className="w-20 h-20 object-cover rounded-lg border shrink-0"
+                  />
+                ))}
+              </div>
+            )}
+            {imageSource === "upload" && previewImage && (
               <img
                 src={previewImage}
                 alt="Selected"
@@ -522,11 +727,11 @@ export default function SocialPostsPage() {
 
             {/* Caption */}
             <div className="space-y-2">
-              <Label>Caption</Label>
+              <Label>Caption (with CTA)</Label>
               <Textarea
                 value={caption}
                 onChange={(e) => setCaption(e.target.value)}
-                placeholder="Write a caption for your post…"
+                placeholder="Write a caption for your post… (AI captions always include a call-to-action)"
                 rows={3}
               />
             </div>
@@ -577,7 +782,9 @@ export default function SocialPostsPage() {
               className="bg-accent text-accent-foreground hover:bg-accent/90"
             >
               {publishing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Send className="w-4 h-4 mr-1" />}
-              {publishing ? "Publishing…" : "Publish Post"}
+              {publishing
+                ? "Publishing…"
+                : `Publish ${imageResults.length > 1 ? `${imageResults.length} Posts` : "Post"}`}
             </Button>
           </CardContent>
         </Card>
