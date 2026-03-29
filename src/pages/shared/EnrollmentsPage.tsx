@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,10 +16,12 @@ import {
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Search, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { notifyAgentOfStatusChange } from "@/lib/enrollment-emails";
 
 const STATUSES = [
-  "applied", "documents_submitted", "processing", "accepted", "enrolled", "active", "rejected",
+  "applied", "documents_pending", "documents_submitted", "processing",
+  "offer_received", "accepted", "funding", "enrolled", "active", "rejected", "withdrawn",
 ];
 const PAGE_SIZE = 20;
 
@@ -26,7 +29,9 @@ export default function EnrollmentsPage() {
   const { role, user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const canEdit = role === "owner" || role === "admin";
+  const prefix = role === "owner" ? "/owner" : role === "admin" ? "/admin" : "/agent";
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [page, setPage] = useState(0);
@@ -47,7 +52,7 @@ export default function EnrollmentsPage() {
       let query = supabase
         .from("enrollments")
         .select(`
-          id, status, created_at, updated_at, notes,
+          id, status, created_at, updated_at, notes, student_id,
           students!inner(first_name, last_name),
           universities!inner(name),
           courses!inner(name)
@@ -154,12 +159,23 @@ export default function EnrollmentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {enrollments.map((e: any) => (
-                <TableRow key={e.id}>
+              {isLoading && Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={`skel-${i}`}>
+                  {Array.from({ length: 5 }).map((_, j) => (
+                    <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                  ))}
+                </TableRow>
+              ))}
+              {!isLoading && enrollments.map((e: any) => (
+                <TableRow
+                  key={e.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => navigate(`${prefix}/students/${e.student_id}`)}
+                >
                   <TableCell className="font-medium">{e.students?.first_name} {e.students?.last_name}</TableCell>
                   <TableCell>{e.universities?.name}</TableCell>
                   <TableCell>{e.courses?.name}</TableCell>
-                  <TableCell>
+                  <TableCell onClick={(ev) => ev.stopPropagation()}>
                     {canEdit ? (
                       <Select
                         value={e.status}
@@ -183,7 +199,7 @@ export default function EnrollmentsPage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {enrollments.length === 0 && !isLoading && (
+              {!isLoading && enrollments.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                     No enrollments found

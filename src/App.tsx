@@ -18,6 +18,7 @@ import AIMonitoringPage from "./pages/owner/AIMonitoringPage";
 import CommissionsPage from "./pages/owner/CommissionsPage";
 import StudentsPage from "./pages/shared/StudentsPage";
 import EnrollmentsPage from "./pages/shared/EnrollmentsPage";
+import EnrollStudent from "./pages/agent/EnrollStudent";
 import StudentDetailPage from "./pages/shared/StudentDetailPage";
 import ProfilePage from "./pages/shared/ProfilePage";
 import ResourcesPage from "./pages/shared/ResourcesPage";
@@ -64,6 +65,7 @@ const App = () => (
             <Route path="/owner/profile" element={<ProfilePage />} />
             <Route path="/owner/resources" element={<ResourcesPage />} />
             <Route path="/owner/create-image" element={<CreateImagePage />} />
+            <Route path="/owner/enroll" element={<EnrollStudent />} />
             <Route path="/owner/digital-card" element={<DigitalCardPage />} />
             
             <Route path="/owner/feedback" element={<FeedbackPage />} />
@@ -79,6 +81,7 @@ const App = () => (
             <Route path="/admin/profile" element={<ProfilePage />} />
             <Route path="/admin/resources" element={<ResourcesPage />} />
             <Route path="/admin/create-image" element={<CreateImagePage />} />
+            <Route path="/admin/enroll" element={<EnrollStudent />} />
             <Route path="/admin/digital-card" element={<DigitalCardPage />} />
             <Route path="/admin/leads" element={<LeadsPage />} />
             <Route path="/admin/tasks" element={<TasksPage />} />
@@ -93,6 +96,7 @@ const App = () => (
             <Route path="/agent/profile" element={<ProfilePage />} />
             <Route path="/agent/resources" element={<ResourcesPage />} />
             <Route path="/agent/create-image" element={<CreateImagePage />} />
+            <Route path="/agent/enroll" element={<EnrollStudent />} />
             <Route path="/agent/digital-card" element={<DigitalCardPage />} />
             <Route path="/agent/leads" element={<LeadsPage />} />
             <Route path="/agent/tasks" element={<TasksPage />} />

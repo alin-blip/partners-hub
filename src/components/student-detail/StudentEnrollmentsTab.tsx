@@ -76,8 +76,6 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
               <TableHead>Status</TableHead>
               <TableHead>Date</TableHead>
               <TableHead className="w-10" />
-              <TableHead>Status</TableHead>
-              <TableHead>Date</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
