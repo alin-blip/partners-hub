@@ -103,9 +103,10 @@ export default function EnrollStudent() {
   // Step 5 — Consent
   const [consentChecks, setConsentChecks] = useState<Record<string, boolean>>({});
   const [consentSignature, setConsentSignature] = useState("");
+  const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
 
   const allConsentsChecked = CONSENT_CLAUSES.every((c) => consentChecks[c.id]);
-  const canProceedConsent = allConsentsChecked && consentSignature.trim().length > 0;
+  const canProceedConsent = allConsentsChecked && consentSignature.trim().length > 0 && !!signatureDataUrl;
 
   const { data: universities = [] } = useQuery({
     queryKey: ["universities"],
