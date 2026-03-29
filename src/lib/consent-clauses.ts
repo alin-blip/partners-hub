@@ -10,6 +10,7 @@ export interface MarketingOption {
   id: string;
   label: string;
   exclusive?: string; // id of the option this is mutually exclusive with
+  required?: boolean; // pre-selected and locked
 }
 
 export const CONSENT_CLAUSES: ConsentClause[] = [
