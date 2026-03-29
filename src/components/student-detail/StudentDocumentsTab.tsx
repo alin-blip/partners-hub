@@ -40,6 +40,7 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
   // Re-generate consent state
   const [consentDialogOpen, setConsentDialogOpen] = useState(false);
   const [consentChecks, setConsentChecks] = useState<Record<string, boolean>>({});
+  const [marketingChecks, setMarketingChecks] = useState<Record<string, boolean>>({});
   const [consentSignature, setConsentSignature] = useState("");
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -48,7 +49,8 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
 
-  const allConsentsChecked = CONSENT_CLAUSES.every((c) => consentChecks[c.id]);
+  const nonMarketingClauses = CONSENT_CLAUSES.filter((c) => !c.isMarketing);
+  const allConsentsChecked = nonMarketingClauses.every((c) => consentChecks[c.id]);
   const canSubmitConsent = allConsentsChecked && consentSignature.trim().length > 0 && !!signatureDataUrl;
 
   const { data: documents = [], refetch: refetchDocs } = useQuery({
