@@ -52,7 +52,7 @@ export default function AgentCardPage() {
         .from("public_agent_profiles" as any)
         .select("id, full_name, avatar_url, slug")
         .eq("slug", slug)
-        .single();
+        .single() as { data: { id: string; full_name: string; avatar_url: string | null; slug: string } | null; error: any };
 
       if (!prof) {
         setNotFound(true);
@@ -74,7 +74,7 @@ export default function AgentCardPage() {
         return;
       }
 
-      setProfile(prof);
+      setProfile(prof as AgentProfile);
       setSettings(card as unknown as CardSettings);
       setLoading(false);
     })();

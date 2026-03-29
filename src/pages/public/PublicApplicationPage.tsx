@@ -52,10 +52,10 @@ export default function PublicApplicationPage() {
     if (!slug) return;
     (async () => {
       const { data: prof } = await supabase
-        .from("profiles")
+        .from("public_agent_profiles" as any)
         .select("id, full_name, avatar_url")
         .eq("slug", slug)
-        .single();
+        .single() as { data: { id: string; full_name: string; avatar_url: string | null } | null; error: any };
 
       if (!prof) { setNotFound(true); setLoading(false); return; }
 
