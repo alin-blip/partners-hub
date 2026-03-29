@@ -211,14 +211,12 @@ export default function SocialPostsPage() {
     }
 
     const results: GeneratedResult[] = [];
-    const imagePresets = selectedPresets.filter((p) => p !== "script");
-    const hasScript = selectedPresets.includes("script");
 
     // Generate images sequentially (each costs a daily slot)
-    for (let i = 0; i < imagePresets.length; i++) {
-      const preset = imagePresets[i];
+    for (let i = 0; i < selectedPresets.length; i++) {
+      const preset = selectedPresets[i];
       const presetLabel = PRESETS.find((p) => p.id === preset)?.label || preset;
-      setGeneratingProgress(`Generating ${presetLabel}… (${i + 1}/${imagePresets.length}${hasScript ? " + script" : ""})`);
+      setGeneratingProgress(`Generating ${presetLabel}… (${i + 1}/${selectedPresets.length})`);
 
       try {
         const resp = await fetch(
@@ -253,34 +251,61 @@ export default function SocialPostsPage() {
       }
     }
 
-    // Generate script if selected
-    if (hasScript) {
-      setGeneratingProgress("Generating teleprompter script…");
-      try {
-        const resp = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-caption`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({
-              prompt,
-              preset: "script",
-              language: captionLanguage,
-            }),
-          }
-        );
-        const result = await resp.json();
-        if (!resp.ok) {
-          results.push({ preset: "script", error: result.error || "Script generation failed" });
-        } else {
-          results.push({ preset: "script", script: result.caption });
+    // Always auto-generate teleprompter script (knowledge base enriched)
+    setGeneratingProgress("Generating teleprompter script…");
+    try {
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-caption`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            prompt,
+            preset: "script",
+            language: captionLanguage,
+          }),
         }
-      } catch (e: any) {
-        results.push({ preset: "script", error: e.message });
+      );
+      const result = await resp.json();
+      if (!resp.ok) {
+        results.push({ preset: "script", error: result.error || "Script generation failed" });
+      } else {
+        results.push({ preset: "script", script: result.caption });
       }
+    } catch (e: any) {
+      results.push({ preset: "script", error: e.message });
+    }
+
+    // Always auto-generate caption (knowledge base enriched)
+    setGeneratingProgress("Generating caption…");
+    try {
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-caption`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            prompt,
+            preset: "social_post",
+            language: captionLanguage,
+          }),
+        }
+      );
+      const result = await resp.json();
+      if (!resp.ok) {
+        console.error("Caption generation failed:", result.error);
+      } else {
+        setAiCaption(result.caption);
+        setCaption(result.caption);
+      }
+    } catch (e: any) {
+      console.error("Caption generation error:", e.message);
     }
 
     setGeneratedResults(results);
