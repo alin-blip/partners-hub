@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Check, Calendar, Upload, FileText, X, ShieldCheck, Eye } from "lucide-react";
 import { CourseDetailsInfoCard } from "@/components/CourseDetailsInfoCard";
 import { SignatureCanvas } from "@/components/SignatureCanvas";
+import { syncToDrive } from "@/lib/drive-sync";
 
 const IMMIGRATION_OPTIONS = ["Pre-settled", "Settled", "British Citizen", "Visa Holder", "Refugee", "Other"];
 const TITLE_OPTIONS = ["Mr", "Mrs", "Ms", "Miss", "Dr", "Other"];
@@ -313,6 +314,9 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
 
       // Generate and upload consent PDF
       await generateAndUploadConsentPdf(student.id);
+
+      // Sync to Google Drive (non-blocking)
+      syncToDrive("student_created", student.id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["all-students"] });

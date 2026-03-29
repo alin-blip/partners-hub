@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Upload, Download, Trash2, FileText, RefreshCw, ShieldCheck, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { SignatureCanvas } from "@/components/SignatureCanvas";
+import { syncToDrive } from "@/lib/drive-sync";
 
 const DOC_TYPES = ["Passport", "Transcript", "Offer Letter", "Visa", "Qualification Certificate", "Share Code", "Proof of Address", "Other"];
 
@@ -122,6 +123,8 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
       if (dbError) throw dbError;
       toast({ title: "Document uploaded" });
       refetchDocs();
+      // Sync to Google Drive
+      syncToDrive("document_uploaded", student.id, undefined);
     } catch (err: any) {
       toast({ title: "Upload failed", description: err.message, variant: "destructive" });
     } finally {
@@ -216,6 +219,8 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
       setPreviewUrl(null);
       refetchDocs();
       queryClient.invalidateQueries({ queryKey: ["student-consent-status", student.id] });
+      // Sync to Google Drive
+      syncToDrive("consent_generated", student.id);
     } catch (err: any) {
       toast({ title: "Failed to generate consent form", description: err.message, variant: "destructive" });
     } finally {
