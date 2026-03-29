@@ -360,19 +360,48 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
               <div className="space-y-3">
                 {CONSENT_CLAUSES.map((clause) => (
                   <div key={clause.id} className="space-y-1 p-3 rounded-lg border bg-muted/20">
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <Checkbox
-                        checked={!!consentChecks[clause.id]}
-                        onCheckedChange={(checked) =>
-                          setConsentChecks((prev) => ({ ...prev, [clause.id]: !!checked }))
-                        }
-                        className="mt-0.5"
-                      />
+                    {clause.isMarketing ? (
                       <div>
                         <p className="text-sm font-semibold">{clause.title}</p>
-                        <p className="text-xs text-muted-foreground leading-relaxed mt-1">{clause.text}</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed mt-1 mb-2">{clause.text}</p>
+                        <div className="space-y-2 ml-1">
+                          {MARKETING_OPTIONS.map((opt) => (
+                            <label key={opt.id} className="flex items-center gap-3 cursor-pointer">
+                              <Checkbox
+                                checked={!!marketingChecks[opt.id]}
+                                onCheckedChange={(checked) => {
+                                  setMarketingChecks((prev) => {
+                                    const next = { ...prev, [opt.id]: !!checked };
+                                    if (checked && opt.exclusive) next[opt.exclusive] = false;
+                                    return next;
+                                  });
+                                }}
+                              />
+                              <span className="text-xs text-foreground">{opt.label}</span>
+                            </label>
+                          ))}
+                        </div>
                       </div>
-                    </label>
+                    ) : (
+                      <label className="flex items-start gap-3 cursor-pointer">
+                        <Checkbox
+                          checked={!!consentChecks[clause.id]}
+                          onCheckedChange={(checked) =>
+                            setConsentChecks((prev) => ({ ...prev, [clause.id]: !!checked }))
+                          }
+                          className="mt-0.5"
+                        />
+                        <div>
+                          <p className="text-sm font-semibold">{clause.title}</p>
+                          <p className="text-xs text-muted-foreground leading-relaxed mt-1">{clause.text}</p>
+                          {clause.bullets && (
+                            <ul className="list-disc list-inside text-xs text-muted-foreground mt-1 space-y-0.5">
+                              {clause.bullets.map((b, i) => <li key={i}>{b}</li>)}
+                            </ul>
+                          )}
+                        </div>
+                      </label>
+                    )}
                   </div>
                 ))}
               </div>
