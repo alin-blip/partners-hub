@@ -73,10 +73,7 @@ serve(async (req) => {
 
     const presetText = presetInstructions[preset] || presetInstructions.social_post;
 
-    // Build content array for multimodal request
-    const contentParts: any[] = [];
-
-    // Main text prompt
+    // Build prompt (text-only — image URLs from Supabase storage aren't accessible to the AI model)
     let fullPrompt = `${presetText}\n\nContent/Theme: ${prompt}`;
 
     if (brand?.brand_prompt) {
@@ -84,29 +81,11 @@ serve(async (req) => {
     }
 
     if (brand?.logo_url) {
-      fullPrompt += "\n\nIMPORTANT: Include the provided company logo in a corner of the design. Make it visible but not overpowering.";
+      fullPrompt += "\n\nInclude a professional company logo placeholder area in a corner of the design.";
     }
 
     if (includePhoto && profile?.avatar_url) {
-      fullPrompt += `\n\nIMPORTANT: Place the provided person's photo (${profile.full_name}) prominently in the design. This is a marketing image featuring this person as a recruitment agent.`;
-    }
-
-    contentParts.push({ type: "text", text: fullPrompt });
-
-    // Add logo image if exists
-    if (brand?.logo_url) {
-      contentParts.push({
-        type: "image_url",
-        image_url: { url: brand.logo_url },
-      });
-    }
-
-    // Add agent photo if requested
-    if (includePhoto && profile?.avatar_url) {
-      contentParts.push({
-        type: "image_url",
-        image_url: { url: profile.avatar_url },
-      });
+      fullPrompt += `\n\nInclude a professional headshot placeholder for ${profile.full_name || "the agent"} — show a friendly, professional person as a recruitment consultant.`;
     }
 
     // Call AI
@@ -118,7 +97,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: "google/gemini-3.1-flash-image-preview",
-        messages: [{ role: "user", content: contentParts }],
+        messages: [{ role: "user", content: fullPrompt }],
         modalities: ["image", "text"],
       }),
     });
