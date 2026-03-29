@@ -87,10 +87,26 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
     },
   });
 
-  const getConsentPdfBody = () => {
+  const getConsentPdfBody = async () => {
     const enrollment = enrollments[0] as any;
     const universityName = enrollment?.universities?.name || "N/A";
     const courseName = enrollment?.courses?.name || "N/A";
+    
+    // Extract raw RGB from signature canvas for PDF embedding
+    let signatureRgb: string | null = null;
+    let sigWidth: number | null = null;
+    let sigHeight: number | null = null;
+    
+    if (signatureDataUrl) {
+      const { extractSignatureRgb } = await import("@/lib/signature-utils");
+      const result = await extractSignatureRgb(signatureDataUrl, 400, 120);
+      if (result) {
+        signatureRgb = result.rgb;
+        sigWidth = result.width;
+        sigHeight = result.height;
+      }
+    }
+    
     return {
       studentName: `${student.title ? student.title + " " : ""}${student.first_name} ${student.last_name}`,
       dateOfBirth: student.date_of_birth || null,
@@ -101,6 +117,9 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
       agentName: agentProfile?.full_name || "EduForYou UK",
       signature: consentSignature,
       signatureImage: signatureDataUrl || null,
+      signatureRgb,
+      signatureWidth: sigWidth,
+      signatureHeight: sigHeight,
       consentDate: new Date().toLocaleDateString("en-GB"),
     };
   };
