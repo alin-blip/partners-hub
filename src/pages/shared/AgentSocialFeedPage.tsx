@@ -77,6 +77,11 @@ export default function AgentSocialFeedPage() {
   const hasCard = cardSettings?.is_public && cardSettings?.slug;
   const cardUrl = hasCard ? `${window.location.origin}/card/${cardSettings.slug}` : null;
 
+  const getOgShareUrl = (postId: string) => {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    return `${supabaseUrl}/functions/v1/og-share?slug=${cardSettings?.slug}&post=${postId}`;
+  };
+
   const copyForPlatform = async (post: any, platform: string) => {
     if (!hasCard) {
       toast.error("Create your digital card first to share posts");
@@ -84,20 +89,19 @@ export default function AgentSocialFeedPage() {
     }
     if (!post.seen_at) markSeen.mutate(post.id);
 
+    const ogUrl = getOgShareUrl(post.id);
     const shareText = `${post.caption}\n\n🔗 ${cardUrl}`;
-    const encodedUrl = encodeURIComponent(cardUrl!);
-    const encodedText = encodeURIComponent(shareText);
+    const encodedOgUrl = encodeURIComponent(ogUrl);
 
     switch (platform) {
       case "facebook":
-        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodeURIComponent(post.caption)}`, "_blank");
+        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodedOgUrl}&quote=${encodeURIComponent(post.caption)}`, "_blank");
         break;
       case "linkedin":
-        window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`, "_blank");
+        window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodedOgUrl}`, "_blank");
         break;
       case "instagram":
       case "tiktok":
-        // No web share API — copy caption + link
         try {
           await navigator.clipboard.writeText(shareText);
           toast.success(`Caption + link copied! Paste it in ${platform === "instagram" ? "Instagram" : "TikTok"}.`);
