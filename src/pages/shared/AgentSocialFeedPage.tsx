@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Copy, ExternalLink, CreditCard, Share2 } from "lucide-react";
+import { Copy, ExternalLink, CreditCard, Share2, Download } from "lucide-react";
 import { SiFacebook, SiInstagram, SiTiktok } from "react-icons/si";
 import { FaLinkedinIn } from "react-icons/fa";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -119,6 +119,29 @@ export default function AgentSocialFeedPage() {
     }
   };
 
+  const handleDownloadImage = async (post: any) => {
+    try {
+      const response = await fetch(post.image_url);
+      const blob = await response.blob();
+      const ext = blob.type.includes("png") ? "png" : "jpg";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `eduforyou-post-${post.id.slice(0, 8)}.${ext}`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      // Also copy caption + link to clipboard
+      const shareText = `${post.caption}${cardUrl ? `\n\n🔗 ${cardUrl}` : ""}`;
+      await navigator.clipboard.writeText(shareText);
+      toast.success("Image downloaded & caption copied!");
+
+      if (!post.seen_at) markSeen.mutate(post.id);
+    } catch {
+      toast.error("Failed to download image");
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-2xl">
@@ -196,6 +219,14 @@ export default function AgentSocialFeedPage() {
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent>Share on LinkedIn</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => handleDownloadImage(post)}>
+                                <Download className="w-3.5 h-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Download image + copy caption</TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
                         {hasCard && (
