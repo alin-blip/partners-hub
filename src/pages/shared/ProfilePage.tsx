@@ -18,6 +18,8 @@ export default function ProfilePage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [fullName, setFullName] = useState(profile?.full_name || "");
   const [phone, setPhone] = useState(profile?.phone || "");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [avatarUrl, setAvatarUrl] = useState((profile as any)?.avatar_url || "");
