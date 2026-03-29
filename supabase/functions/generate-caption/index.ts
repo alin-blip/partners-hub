@@ -54,13 +54,12 @@ serve(async (req) => {
       }
     }
 
-    // Build courses context
+    // Build courses context — only course names, NO university names
     let coursesContext = "";
-    if (courses && courses.length > 0 && universities && universities.length > 0) {
-      const uniMap = new Map(universities.map((u: any) => [u.id, u.name]));
+    if (courses && courses.length > 0) {
       const courseLines = courses
-        .map((c: any) => `- ${c.name} (${c.level}, ${c.study_mode}) at ${uniMap.get(c.university_id) || "Unknown"}`)
-        .slice(0, 50); // limit to avoid prompt overflow
+        .map((c: any) => `- ${c.name} (${c.level}, ${c.study_mode})`)
+        .slice(0, 50);
       coursesContext = `\n\nAVAILABLE COURSES:\n${courseLines.join("\n")}\n`;
     }
 
