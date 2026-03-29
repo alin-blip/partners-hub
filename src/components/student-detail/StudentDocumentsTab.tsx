@@ -167,6 +167,34 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
     else { toast({ title: "Document deleted" }); refetchDocs(); }
   };
 
+  const [downloadingAll, setDownloadingAll] = useState(false);
+
+  const handleDownloadAll = async () => {
+    if (documents.length === 0) return;
+    setDownloadingAll(true);
+    try {
+      const zip = new JSZip();
+      for (const doc of documents) {
+        const { data } = await supabase.storage.from("student-documents").download(doc.file_path);
+        if (data) {
+          zip.file(doc.file_name, data);
+        }
+      }
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${student.first_name}_${student.last_name}_Documents.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "Download started", description: `${documents.length} documents zipped.` });
+    } catch (err: any) {
+      toast({ title: "Download failed", description: err.message, variant: "destructive" });
+    } finally {
+      setDownloadingAll(false);
+    }
+  };
+
   const handlePreviewConsent = async () => {
     if (!canSubmitConsent) return;
     setPreviewing(true);
