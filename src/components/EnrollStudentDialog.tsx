@@ -224,6 +224,14 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
       .eq("id", user!.id)
       .single();
 
+    let sigBody: Record<string, any> = {};
+    if (signatureDataUrl) {
+      const sigData = await extractSignatureRgb(signatureDataUrl, 340, 150);
+      if (sigData) {
+        sigBody = { signatureRgb: sigData.rgb, signatureWidth: sigData.width, signatureHeight: sigData.height };
+      }
+    }
+
     const { data: pdfData, error: pdfError } = await supabase.functions.invoke("generate-consent-pdf", {
       body: {
         studentName: `${title ? title + " " : ""}${firstName} ${lastName}`,
@@ -234,8 +242,8 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
         courseName: selectedCrs?.name || "",
         agentName: agentProfile?.full_name || "EduForYou UK",
         signature: consentSignature,
-        signatureImage: signatureDataUrl || null,
         consentDate: new Date().toLocaleDateString("en-GB"),
+        ...sigBody,
       },
     });
 

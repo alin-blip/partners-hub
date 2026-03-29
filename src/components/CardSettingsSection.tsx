@@ -92,6 +92,15 @@ export default function CardSettingsSection() {
     mutationFn: async () => {
       // Update slug on profile
       if (slug) {
+        // Check slug uniqueness
+        const { data: existing } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("slug", slug)
+          .neq("id", user!.id)
+          .maybeSingle();
+        if (existing) throw new Error("Acest slug este deja folosit. Alege altul.");
+
         const { error: slugErr } = await supabase
           .from("profiles")
           .update({ slug } as any)
