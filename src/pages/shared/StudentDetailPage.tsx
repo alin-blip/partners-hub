@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, User, FileText, GraduationCap, DollarSign, MessageSquare, Sparkles, ShieldCheck, ShieldAlert } from "lucide-react";
+import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbSeparator, BreadcrumbPage } from "@/components/ui/breadcrumb";
+import { Link } from "react-router-dom";
 import { StudentOverviewTab } from "@/components/student-detail/StudentOverviewTab";
 import { StudentDocumentsTab } from "@/components/student-detail/StudentDocumentsTab";
 import { StudentEnrollmentsTab } from "@/components/student-detail/StudentEnrollmentsTab";
@@ -66,6 +68,18 @@ export default function StudentDetailPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-4xl">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild><Link to={`${prefix}/students`}>Students</Link></BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{student.first_name} {student.last_name}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate(`${prefix}/students`)}>
             <ArrowLeft className="w-4 h-4" />
