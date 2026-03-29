@@ -1,28 +1,44 @@
 
 
-## Plan: Fix Facebook Share — Skip Web Share API for Facebook
+## Plan: Fix Facebook Share Error in Both Components
 
-### Problem
-Facebook's mobile app doesn't properly handle the `text` field from the Web Share API when files are included. It strips most of the caption and only shows fragments (hashtags, `.co.uk` parts). Instagram and WhatsApp handle it correctly because their apps properly read both `files` and `text` from the share intent.
+### Root Cause
+On mobile, `window.open()` is blocked as a popup when called after async operations (fetch, clipboard write). Facebook share goes through the fallback path (download + copy + open URL), but by the time `window.open` executes after the async `fetch` and `clipboard.writeText`, the browser no longer considers it a direct user gesture — so it blocks the popup, which throws an error caught by the generic `catch` block showing "Eroare la partajare".
 
 ### Fix
-For Facebook specifically, bypass `navigator.share()` and use a **download + copy + open Facebook** flow:
+For platforms that need a fallback URL (Facebook, LinkedIn), open the window **before** the async work:
 
-1. Download the image to the device
-2. Copy the full caption + agent link to clipboard
-3. Open Facebook app/website (via `fb://` deep link on mobile, or `facebook.com` fallback)
-4. Show a toast: "Imagine salvată și text copiat! Creează o postare pe Facebook și lipește textul."
-
-Same approach for LinkedIn (which has similar limitations).
+1. Open the platform URL immediately (synchronously) using `window.open` at the start
+2. Then fetch the image, download it, and copy the caption asynchronously
+3. This ensures the popup isn't blocked
 
 ### Changes
 
-**File: `src/pages/shared/AgentSocialFeedPage.tsx`**
+**File: `src/components/SocialShareButtons.tsx`** (used by CreateImagePage)
+- In `handleShare`, for platforms in `skipNativeSharePlatforms`: open the fallback URL **first** (synchronously), then do the async fetch/download/copy
+- Wrap the async clipboard call in a try-catch so clipboard failures don't kill the whole flow
 
-- Add a set of platforms that should skip Web Share API: `["facebook", "linkedin"]`
-- In `handleShareForPlatform`, check if platform is in the skip list — if so, go directly to the download+copy+open fallback flow
-- Keep `navigator.share` for Instagram, TikTok, WhatsApp (where it works)
+**File: `src/pages/shared/AgentSocialFeedPage.tsx`** (Social Posts)
+- Same fix in `handleShareForPlatform`: open the platform URL synchronously before async work
+- Wrap clipboard in try-catch
+
+### Technical Detail
+```
+// Before (broken on mobile):
+const response = await fetch(imageUrl);  // async
+// ... download logic ...
+await navigator.clipboard.writeText(shareText);  // async
+window.open(fallbackUrl, "_blank");  // ❌ blocked as popup
+
+// After (fixed):
+if (skipNativeSharePlatforms.includes(platform)) {
+  const fallbackUrl = platformFallbackUrls[platform]?.(...);
+  if (fallbackUrl) window.open(fallbackUrl, "_blank");  // ✅ sync, user gesture
+  // Then do async download + copy
+}
+```
 
 ### Files changed
+- `src/components/SocialShareButtons.tsx`
 - `src/pages/shared/AgentSocialFeedPage.tsx`
 
