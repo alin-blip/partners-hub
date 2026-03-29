@@ -14,7 +14,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, ArrowRight, Check, Calendar, Upload, FileText, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Calendar, Upload, FileText, X, ShieldCheck } from "lucide-react";
 import { CourseDetailsInfoCard } from "@/components/CourseDetailsInfoCard";
 
 const IMMIGRATION_OPTIONS = ["Pre-settled", "Settled", "British Citizen", "Visa Holder", "Refugee", "Other"];
@@ -23,6 +23,34 @@ const GENDER_OPTIONS = ["Male", "Female", "Other", "Prefer not to say"];
 const STUDY_PATTERNS_FALLBACK = ["Weekdays", "Weekend", "Evenings"];
 const RELATIONSHIP_OPTIONS = ["Parent", "Spouse", "Sibling", "Friend", "Other"];
 const DOC_TYPES_ENROLL = ["Passport", "Proof of Address", "Other"];
+
+const CONSENT_CLAUSES = [
+  {
+    id: "data_processing",
+    title: "Data Processing Consent",
+    text: "I consent to EduForYou UK collecting, processing, and storing my personal data for the purpose of facilitating my enrollment at the selected university. This includes sharing my personal information with the university's admissions team as required under the UK General Data Protection Regulation (UK GDPR).",
+  },
+  {
+    id: "document_sharing",
+    title: "Document Sharing Consent",
+    text: "I authorise EduForYou UK to share all documents I have provided (including identification documents, proof of address, qualifications, and any other supporting materials) with the university and relevant regulatory bodies as part of the enrollment and admissions process.",
+  },
+  {
+    id: "communication",
+    title: "Communication Consent",
+    text: "I consent to being contacted by EduForYou UK and the university regarding my application, enrollment status, and any related matters via email, telephone, SMS, or postal correspondence.",
+  },
+  {
+    id: "student_finance",
+    title: "Student Finance Consent",
+    text: "Where applicable, I consent to EduForYou UK sharing my data with Student Finance England (SFE) or other relevant funding bodies to facilitate my student finance application and funding arrangements.",
+  },
+  {
+    id: "accuracy",
+    title: "Declaration of Accuracy",
+    text: "I declare that all information I have provided is true, complete, and accurate to the best of my knowledge. I understand that providing false or misleading information may result in the withdrawal of any offer of admission or termination of enrollment.",
+  },
+];
 
 function sanitizeName(name: string) {
   return name.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 30);
@@ -71,6 +99,13 @@ export default function EnrollStudent() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedDocType, setSelectedDocType] = useState("Passport");
 
+  // Step 5 — Consent
+  const [consentChecks, setConsentChecks] = useState<Record<string, boolean>>({});
+  const [consentSignature, setConsentSignature] = useState("");
+
+  const allConsentsChecked = CONSENT_CLAUSES.every((c) => consentChecks[c.id]);
+  const canProceedConsent = allConsentsChecked && consentSignature.trim().length > 0;
+
   const { data: universities = [] } = useQuery({
     queryKey: ["universities"],
     queryFn: async () => {
@@ -106,7 +141,6 @@ export default function EnrollStudent() {
     enabled: !!universityId,
   });
 
-  // Query distinct course IDs available at this campus
   const { data: campusCourseIds = [] } = useQuery({
     queryKey: ["campus-courses", campusId],
     queryFn: async () => {
@@ -123,7 +157,6 @@ export default function EnrollStudent() {
     ? courses.filter((c: any) => campusCourseIds.includes(c.id))
     : courses;
 
-  // Fetch dynamic timetable groups for selected course + campus
   const { data: courseTimetableGroups = [] } = useQuery({
     queryKey: ["course-timetable-groups", courseId, campusId],
     queryFn: async () => {
@@ -152,7 +185,6 @@ export default function EnrollStudent() {
     enabled: !!universityId,
   });
 
-  // Show course-specific groups only when a course is selected; fall back to university-wide only when NO course is selected
   const displayTimetableOptions = courseId
     ? (courseTimetableGroups.length > 0 ? courseTimetableGroups : null)
     : (universityTimetableOptions.length > 0 ? universityTimetableOptions : null);
@@ -169,9 +201,62 @@ export default function EnrollStudent() {
     setDocFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const generateAndUploadConsentPdf = async (studentId: string) => {
+    const selectedUni = universities.find((u: any) => u.id === universityId);
+    const selectedCrs = courses.find((c: any) => c.id === courseId);
+
+    const { data: agentProfile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user!.id)
+      .single();
+
+    const { data: pdfData, error: pdfError } = await supabase.functions.invoke("generate-consent-pdf", {
+      body: {
+        studentName: `${title ? title + " " : ""}${firstName} ${lastName}`,
+        dateOfBirth: dob || null,
+        nationality: nationality || null,
+        address: fullAddress || null,
+        universityName: selectedUni?.name || "",
+        courseName: selectedCrs?.name || "",
+        agentName: agentProfile?.full_name || "EduForYou UK",
+        signature: consentSignature,
+        consentDate: new Date().toLocaleDateString("en-GB"),
+      },
+    });
+
+    if (pdfError) throw pdfError;
+
+    const base64 = pdfData.pdf_base64;
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    const pdfBlob = new Blob([bytes], { type: "application/pdf" });
+
+    const agentName = sanitizeName(user!.email || "agent");
+    const studentName = sanitizeName(`${firstName}_${lastName}`);
+    const storagePath = `${agentName}_${user!.id}/${studentName}_${studentId}/Consent_Form_${Date.now()}.pdf`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("student-documents")
+      .upload(storagePath, pdfBlob, { contentType: "application/pdf" });
+    if (uploadError) throw uploadError;
+
+    await supabase.from("student_documents").insert({
+      student_id: studentId,
+      agent_id: user!.id,
+      doc_type: "Consent Form",
+      file_name: `EduForYou_Consent_Form_${firstName}_${lastName}.pdf`,
+      file_path: storagePath,
+      file_size: pdfBlob.size,
+      uploaded_by: user!.id,
+    });
+  };
+
   const submitMutation = useMutation({
     mutationFn: async () => {
-      // 1. Create student
       const { data: student, error: studentError } = await supabase
         .from("students")
         .insert({
@@ -193,7 +278,6 @@ export default function EnrollStudent() {
         .single();
       if (studentError) throw studentError;
 
-      // 2. Create enrollment
       const { error: enrollError } = await supabase.from("enrollments").insert({
         student_id: student.id, university_id: universityId,
         campus_id: campusId || null, course_id: courseId, intake_id: intakeId || null,
@@ -201,7 +285,7 @@ export default function EnrollStudent() {
       });
       if (enrollError) throw enrollError;
 
-      // 3. Upload documents
+      // Upload documents
       if (docFiles.length > 0) {
         const agentName = sanitizeName(user!.email || "agent");
         const studentName = sanitizeName(`${firstName}_${lastName}`);
@@ -217,6 +301,9 @@ export default function EnrollStudent() {
         }
       }
 
+      // Generate and upload consent PDF
+      await generateAndUploadConsentPdf(student.id);
+
       return student.id;
     },
     onSuccess: async (studentId) => {
@@ -225,7 +312,6 @@ export default function EnrollStudent() {
       queryClient.invalidateQueries({ queryKey: ["enrollments"] });
       toast({ title: "Student enrolled!", description: "The application has been submitted." });
 
-      // Send notification email to admin/owner
       const selectedUni = universities.find((u: any) => u.id === universityId);
       const selectedCrs = courses.find((c: any) => c.id === courseId);
       const studentName = `${firstName} ${lastName}`;
@@ -233,19 +319,13 @@ export default function EnrollStudent() {
       const studentUrl = `${window.location.origin}/owner/students/${studentId}`;
 
       try {
-        // Fetch agent's admin (if any) and owner to notify
         const recipients: string[] = [];
-
-        // Get agent's profile to find admin_id
         const { data: agentProfile } = await supabase
           .from("profiles")
           .select("full_name, admin_id")
           .eq("id", user!.id)
           .single();
-
         const agentName = agentProfile?.full_name || user!.email || "Agent";
-
-        // If agent has an admin, notify them
         if (agentProfile?.admin_id) {
           const { data: adminProfile } = await supabase
             .from("profiles")
@@ -254,8 +334,6 @@ export default function EnrollStudent() {
             .single();
           if (adminProfile?.email) recipients.push(adminProfile.email);
         }
-
-        // Notify owner(s)
         const { data: ownerRoles } = await supabase
           .from("user_roles")
           .select("user_id")
@@ -272,7 +350,6 @@ export default function EnrollStudent() {
             }
           }
         }
-
         for (const recipientEmail of recipients) {
           await supabase.functions.invoke("send-transactional-email", {
             body: {
@@ -309,7 +386,7 @@ export default function EnrollStudent() {
   const selectedIntake = intakes.find((i: any) => i.id === intakeId);
 
   const prefix = role === "owner" ? "/owner" : role === "admin" ? "/admin" : "/agent";
-  const totalSteps = 5;
+  const totalSteps = 6;
 
   return (
     <DashboardLayout allowedRoles={["agent", "admin", "owner"]}>
@@ -323,7 +400,7 @@ export default function EnrollStudent() {
 
         {/* Step indicator */}
         <div className="flex items-center gap-2">
-          {[1, 2, 3, 4, 5].map((s) => (
+          {[1, 2, 3, 4, 5, 6].map((s) => (
             <div key={s} className="flex items-center gap-2">
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
@@ -547,14 +624,71 @@ export default function EnrollStudent() {
               )}
               <div className="flex justify-between pt-2">
                 <Button variant="outline" onClick={() => setStep(3)}><ArrowLeft className="w-4 h-4 mr-1" /> Back</Button>
-                <Button onClick={() => setStep(5)} className="bg-accent text-accent-foreground hover:bg-accent/90">Review <ArrowRight className="w-4 h-4 ml-1" /></Button>
+                <Button onClick={() => setStep(5)} className="bg-accent text-accent-foreground hover:bg-accent/90">Next <ArrowRight className="w-4 h-4 ml-1" /></Button>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Step 5 — Review & Submit */}
+        {/* Step 5 — Consent Form */}
         {step === 5 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-accent" />
+                EduForYou Consent Form
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <p className="text-sm text-muted-foreground">
+                Please read each declaration carefully and tick to confirm your agreement. All consents are required to proceed with the enrollment.
+              </p>
+
+              <div className="space-y-4">
+                {CONSENT_CLAUSES.map((clause) => (
+                  <div key={clause.id} className="space-y-2 p-3 rounded-lg border bg-muted/20">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <Checkbox
+                        checked={!!consentChecks[clause.id]}
+                        onCheckedChange={(checked) =>
+                          setConsentChecks((prev) => ({ ...prev, [clause.id]: !!checked }))
+                        }
+                        className="mt-0.5"
+                      />
+                      <div>
+                        <p className="text-sm font-semibold">{clause.title}</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed mt-1">{clause.text}</p>
+                      </div>
+                    </label>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-2 pt-2">
+                <Label>Digital Signature (type your full name) *</Label>
+                <Input
+                  value={consentSignature}
+                  onChange={(e) => setConsentSignature(e.target.value)}
+                  placeholder={`e.g. ${firstName} ${lastName}`}
+                  className="font-serif italic text-base"
+                />
+                <p className="text-xs text-muted-foreground">
+                  By typing your name above, you confirm that you have read and agree to all the above declarations. Date: {new Date().toLocaleDateString("en-GB")}
+                </p>
+              </div>
+
+              <div className="flex justify-between pt-2">
+                <Button variant="outline" onClick={() => setStep(4)}><ArrowLeft className="w-4 h-4 mr-1" /> Back</Button>
+                <Button onClick={() => setStep(6)} disabled={!canProceedConsent} className="bg-accent text-accent-foreground hover:bg-accent/90">
+                  Review <ArrowRight className="w-4 h-4 ml-1" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 6 — Review & Submit */}
+        {step === 6 && (
           <Card>
             <CardHeader><CardTitle className="text-lg">Review & Submit</CardTitle></CardHeader>
             <CardContent className="space-y-4">
@@ -605,8 +739,13 @@ export default function EnrollStudent() {
                 </>
               )}
 
+              <div className="flex items-center gap-2 p-3 rounded-lg border bg-accent/10 text-sm">
+                <ShieldCheck className="w-4 h-4 text-accent flex-shrink-0" />
+                <span>Consent form signed by: <strong className="font-serif italic">{consentSignature}</strong></span>
+              </div>
+
               <div className="flex justify-between pt-4">
-                <Button variant="outline" onClick={() => setStep(4)}><ArrowLeft className="w-4 h-4 mr-1" /> Back</Button>
+                <Button variant="outline" onClick={() => setStep(5)}><ArrowLeft className="w-4 h-4 mr-1" /> Back</Button>
                 <Button
                   onClick={() => submitMutation.mutate()}
                   disabled={submitMutation.isPending}
