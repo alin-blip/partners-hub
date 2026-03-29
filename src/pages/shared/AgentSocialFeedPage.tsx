@@ -99,12 +99,12 @@ export default function AgentSocialFeedPage() {
         <h1 className="text-2xl font-bold tracking-tight">Social Posts</h1>
 
         {!hasCard && (
-          <Card className="border-orange-200 bg-orange-50">
+          <Card className="border-dashed">
             <CardContent className="p-4 flex items-center gap-3">
-              <CreditCard className="w-5 h-5 text-orange-600 shrink-0" />
+              <CreditCard className="w-5 h-5 text-muted-foreground shrink-0" />
               <div className="flex-1">
-                <p className="text-sm font-medium text-orange-800">Set up your digital card first</p>
-                <p className="text-xs text-orange-600">You need a public digital card to share posts with your personal link.</p>
+                <p className="text-sm font-medium">Set up your digital card first</p>
+                <p className="text-xs text-muted-foreground">You need a public digital card to share posts with your personal link.</p>
               </div>
               <Button asChild size="sm" variant="outline">
                 <Link to="/agent/digital-card">Create Card</Link>
