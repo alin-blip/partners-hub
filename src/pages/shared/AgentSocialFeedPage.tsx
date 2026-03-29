@@ -91,6 +91,8 @@ export default function AgentSocialFeedPage() {
     tiktok: () => null,
   };
 
+  const skipNativeSharePlatforms = ["facebook", "linkedin"];
+
   const handleShareForPlatform = async (post: any, platform: string) => {
     if (!hasCard) {
       toast.error("Creează-ți cardul digital pentru a distribui postări");
@@ -107,7 +109,10 @@ export default function AgentSocialFeedPage() {
 
       const shareData: ShareData = { files: [imageFile], text: shareText };
 
-      if (navigator.canShare && navigator.canShare(shareData)) {
+      const useNativeShare = !skipNativeSharePlatforms.includes(platform) &&
+        navigator.canShare && navigator.canShare(shareData);
+
+      if (useNativeShare) {
         await navigator.share(shareData);
         if (!post.seen_at) markSeen.mutate(post.id);
         return;
@@ -128,7 +133,7 @@ export default function AgentSocialFeedPage() {
 
       if (!post.seen_at) markSeen.mutate(post.id);
       const name = platformNames[platform] || platform;
-      toast.success(`Imagine salvată și descriere copiată! Postează pe ${name}.`);
+      toast.success(`Imagine salvată și text copiat! Postează pe ${name} și lipește textul.`);
     } catch (err: any) {
       if (err?.name === "AbortError") return;
       toast.error("Eroare la partajare");
