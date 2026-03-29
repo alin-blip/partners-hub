@@ -1,49 +1,107 @@
 
 
-## Plan: Remove Ask33 References + Add Consent Form to Enrollment
+## General Platform Audit — EduForYou UK Agent Management
 
-### Part 1: Remove "Ask33" from Database
+### Summary
 
-Replace all occurrences of "Ask33 Consent Form" with "EduForYou Consent Form" in:
+After reviewing all routes, components, database schema, RLS policies, and console logs, here is a comprehensive audit organized by category.
 
-1. **`ai_knowledge_base`** — 3 rows (Ulster, Solent, Northumbria overviews) contain "Ask33 Consent Form" in `content`
-2. **`course_details`** — ~90 rows have "Ask33 Consent Form" in `documents_required` field
+---
 
-Use UPDATE statements via the data insert tool to do text replacement.
+### BUGS (Things that are broken)
 
-### Part 2: Add Consent Form Step to Enrollment
+| # | Issue | Location | Severity |
+|---|-------|----------|----------|
+| 1 | **Duplicate table headers in StudentEnrollmentsTab** — The `<TableHeader>` has 7 columns (University, Course, Status, Date, expand button, **Status**, **Date**) but only 5 data columns. "Status" and "Date" appear twice in the header. | `StudentEnrollmentsTab.tsx` line 73-81 | Medium |
+| 2 | **EnrollmentsPage missing statuses** — The STATUSES array is missing `documents_pending`, `offer_received`, `funding`, `withdrawn` which exist in StudentEnrollmentsTab. Status filter won't find those enrollments. | `EnrollmentsPage.tsx` line 20-22 | High |
+| 3 | **React ref warning in AIChatPanel** — Console shows "Function components cannot be given refs" for `AIChatPanel` Dialog. Causes warning spam. | `AIChatPanel.tsx` | Low |
+| 4 | **EnrollStudent full-page route not registered** — `src/pages/agent/EnrollStudent.tsx` exists but has no route in `App.tsx`. The agent dashboard button links to `/agent/enroll` which would hit 404. | `App.tsx` | High |
+| 5 | **Enrollments page rows not clickable** — Unlike StudentsPage, enrollment rows don't navigate to the student detail page. No way to jump from enrollment to student. | `EnrollmentsPage.tsx` | Medium |
 
-Add a consent form step between the current Step 4 (Documents) and Step 5 (Review), making it a 6-step wizard. The consent form will be generated as a PDF and saved to the student's documents.
+---
 
-**Consent Form Content** (UK university enrollment, GDPR-compliant):
-- Student full name, date of birth, nationality, address
-- Selected university and course
-- Agent/company name (EduForYou UK)
-- Consent clauses:
-  1. Data processing consent — personal data shared with university for enrollment
-  2. Document sharing consent — uploaded documents forwarded to university
-  3. Communication consent — contact by EduForYou and university regarding application
-  4. Student finance consent — data shared with SFE if applicable
-  5. Declaration of accuracy — all information provided is true and correct
-- Checkbox for each clause (all required)
-- Digital signature field (typed name as signature)
-- Date auto-filled
+### MISSING FEATURES (For a user-friendly platform)
 
-**Technical Implementation:**
+| # | Feature | Impact | Notes |
+|---|---------|--------|-------|
+| 1 | **No loading skeleton/spinner on tables** — All list pages show nothing while loading, then suddenly appear. No visual feedback. | UX | Add skeleton rows or a spinner |
+| 2 | **No student edit from overview** — Agent can't update student details (phone, address, etc.) after creation unless canEdit is true, but there's no indicator of what's editable. | UX | StudentOverviewTab has edit mode but no guidance |
+| 3 | **No notification system** — No in-app notifications. Status changes, new tasks, and new messages only appear as badge counts. No notification dropdown/bell. | Medium | Would improve awareness |
+| 4 | **No bulk actions** — Can't bulk update enrollment statuses, bulk assign students, or bulk export selected rows. | Medium | Common in CRM platforms |
+| 5 | **No agent-to-student link in enrollments list** — EnrollmentsPage shows student name but clicking doesn't navigate to student profile. | UX | Easy fix |
+| 6 | **No dark mode toggle** — Platform only has light mode. | Low | Nice-to-have |
+| 7 | **Admin can't export CSV** — Only owner can export students CSV. Admin should be able to export their team's data. | Medium | `StudentsPage.tsx` line 99 |
+| 8 | **No password visibility toggle** — Login and profile password fields have no show/hide toggle. | Low | UX improvement |
+| 9 | **No breadcrumbs** — Navigating to student detail has a back button but no breadcrumb trail. | Low | Helpful for orientation |
+| 10 | **Mobile responsiveness** — Tables are not responsive on small screens. No horizontal scroll wrapper. | Medium | Would break on mobile |
 
-1. **New edge function `generate-consent-pdf`** — uses jsPDF (or similar Deno-compatible library) to create a branded PDF with all student details and consent declarations, returns the PDF as base64
-2. **New Step 5 in `EnrollStudent.tsx`** — displays consent form with checkboxes for each clause and a typed signature field. All checkboxes + signature required to proceed.
-3. **On submit** — the consent PDF is generated via the edge function, uploaded to `student-documents` storage, and a `student_documents` record is created with `doc_type: "Consent Form"`
-4. **Same changes in `EnrollStudentDialog.tsx`** — mirror the consent step in the dialog version
-5. **Step count increases from 5 to 6** in both enrollment flows
+---
 
-### Files Changed
+### WORKING CORRECTLY
 
-| File | Change |
-|------|--------|
-| `ai_knowledge_base` (DB data) | Replace "Ask33" with "EduForYou" in 3 rows |
-| `course_details` (DB data) | Replace "Ask33" with "EduForYou" in ~90 rows |
-| `supabase/functions/generate-consent-pdf/index.ts` | New edge function to generate consent PDF |
-| `src/pages/agent/EnrollStudent.tsx` | Add consent step (Step 5), shift Review to Step 6 |
-| `src/components/EnrollStudentDialog.tsx` | Same consent step addition |
+| Feature | Status |
+|---------|--------|
+| Authentication (login, logout, password reset) | Working |
+| Role-based access control (Owner/Admin/Agent) | Working |
+| RLS policies on all tables | Properly configured |
+| Student CRUD (create via enrollment, view, edit) | Working |
+| Enrollment wizard (6-step with consent form) | Working |
+| Document upload/download/delete | Working |
+| Consent form PDF generation | Working |
+| AI Chat with knowledge base | Working |
+| AI Image Generator | Working |
+| Direct messaging with realtime | Working |
+| Task management (Kanban board) | Working |
+| Leads management with conversion | Working |
+| Commission calculation | Working |
+| Agent digital card (public page) | Working |
+| Email notifications (transactional) | Working |
+| CSV export (owner) | Working |
+| Knowledge base management | Working |
+| Settings (universities, courses, campuses, intakes) | Working |
+| Brand settings | Working |
+| Feedback system | Working |
+| Profile management with avatar | Working |
+
+---
+
+### RECOMMENDED FIXES (Priority Order)
+
+1. **Fix EnrollStudent route** — Register `/agent/enroll` (and admin/owner equivalents) in App.tsx, or remove the dead file and ensure the dialog version is the only entry point.
+
+2. **Sync enrollment statuses** — Make EnrollmentsPage use the same 11-status array as StudentEnrollmentsTab.
+
+3. **Fix duplicate table headers** — Remove the extra "Status" and "Date" columns from StudentEnrollmentsTab header.
+
+4. **Make enrollment rows clickable** — Navigate to student detail on row click in EnrollmentsPage.
+
+5. **Add loading states** — Add skeleton loaders to all table pages (Students, Enrollments, Leads).
+
+6. **Allow admin CSV export** — Extend export permission to admin role.
+
+7. **Fix AIChatPanel ref warning** — Wrap the component with `forwardRef`.
+
+8. **Add mobile table scroll** — Wrap all tables in a horizontal scroll container.
+
+9. **Add notification bell** — Simple dropdown showing recent status changes, new messages, and assigned tasks.
+
+10. **Add breadcrumbs** — At least on student detail and nested pages.
+
+---
+
+### SECURITY ASSESSMENT
+
+- All tables have proper RLS policies
+- Roles stored in separate `user_roles` table (correct)
+- `has_role()` security definer function prevents recursive RLS
+- No public signup (correct — owner creates users)
+- Edge functions use service role key appropriately
+- No client-side admin checks (correct)
+- **One concern**: The `create-owner` edge function name is misleading — it creates any user role. Should be renamed for clarity but not a security issue.
+
+---
+
+### RECOMMENDATION
+
+I suggest we start by fixing the **5 bugs** listed above, then proceed with the top UX improvements. Want me to proceed with the fixes?
 
