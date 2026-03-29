@@ -18,13 +18,7 @@ import JSZip from "jszip";
 
 const DOC_TYPES = ["Passport", "Transcript", "Offer Letter", "Visa", "Qualification Certificate", "Share Code", "Proof of Address", "Other"];
 
-const CONSENT_CLAUSES = [
-  { id: "data_processing", title: "Data Processing Consent", text: "I consent to EduForYou UK collecting, processing, and storing my personal data for the purpose of facilitating my enrollment at the selected university." },
-  { id: "document_sharing", title: "Document Sharing Consent", text: "I authorise EduForYou UK to share all documents I have provided with the university and relevant regulatory bodies." },
-  { id: "communication", title: "Communication Consent", text: "I consent to being contacted by EduForYou UK and the university regarding my application." },
-  { id: "student_finance", title: "Student Finance Consent", text: "Where applicable, I consent to EduForYou UK sharing my data with Student Finance England (SFE)." },
-  { id: "accuracy", title: "Declaration of Accuracy", text: "I declare that all information I have provided is true, complete, and accurate to the best of my knowledge." },
-];
+import { CONSENT_CLAUSES, MARKETING_OPTIONS } from "@/lib/consent-clauses";
 
 function sanitizeName(name: string) {
   return name.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 30);
@@ -46,6 +40,7 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
   // Re-generate consent state
   const [consentDialogOpen, setConsentDialogOpen] = useState(false);
   const [consentChecks, setConsentChecks] = useState<Record<string, boolean>>({});
+  const [marketingChecks, setMarketingChecks] = useState<Record<string, boolean>>({});
   const [consentSignature, setConsentSignature] = useState("");
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -54,7 +49,8 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
 
-  const allConsentsChecked = CONSENT_CLAUSES.every((c) => consentChecks[c.id]);
+  const nonMarketingClauses = CONSENT_CLAUSES.filter((c) => !c.isMarketing);
+  const allConsentsChecked = nonMarketingClauses.every((c) => consentChecks[c.id]);
   const canSubmitConsent = allConsentsChecked && consentSignature.trim().length > 0 && !!signatureDataUrl;
 
   const { data: documents = [], refetch: refetchDocs } = useQuery({
@@ -122,6 +118,7 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
       signatureWidth: sigWidth,
       signatureHeight: sigHeight,
       consentDate: new Date().toLocaleDateString("en-GB"),
+      marketingConsent: marketingChecks,
     };
   };
 
@@ -364,19 +361,48 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
               <div className="space-y-3">
                 {CONSENT_CLAUSES.map((clause) => (
                   <div key={clause.id} className="space-y-1 p-3 rounded-lg border bg-muted/20">
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <Checkbox
-                        checked={!!consentChecks[clause.id]}
-                        onCheckedChange={(checked) =>
-                          setConsentChecks((prev) => ({ ...prev, [clause.id]: !!checked }))
-                        }
-                        className="mt-0.5"
-                      />
+                    {clause.isMarketing ? (
                       <div>
                         <p className="text-sm font-semibold">{clause.title}</p>
-                        <p className="text-xs text-muted-foreground leading-relaxed mt-1">{clause.text}</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed mt-1 mb-2">{clause.text}</p>
+                        <div className="space-y-2 ml-1">
+                          {MARKETING_OPTIONS.map((opt) => (
+                            <label key={opt.id} className="flex items-center gap-3 cursor-pointer">
+                              <Checkbox
+                                checked={!!marketingChecks[opt.id]}
+                                onCheckedChange={(checked) => {
+                                  setMarketingChecks((prev) => {
+                                    const next = { ...prev, [opt.id]: !!checked };
+                                    if (checked && opt.exclusive) next[opt.exclusive] = false;
+                                    return next;
+                                  });
+                                }}
+                              />
+                              <span className="text-xs text-foreground">{opt.label}</span>
+                            </label>
+                          ))}
+                        </div>
                       </div>
-                    </label>
+                    ) : (
+                      <label className="flex items-start gap-3 cursor-pointer">
+                        <Checkbox
+                          checked={!!consentChecks[clause.id]}
+                          onCheckedChange={(checked) =>
+                            setConsentChecks((prev) => ({ ...prev, [clause.id]: !!checked }))
+                          }
+                          className="mt-0.5"
+                        />
+                        <div>
+                          <p className="text-sm font-semibold">{clause.title}</p>
+                          <p className="text-xs text-muted-foreground leading-relaxed mt-1">{clause.text}</p>
+                          {clause.bullets && (
+                            <ul className="list-disc list-inside text-xs text-muted-foreground mt-1 space-y-0.5">
+                              {clause.bullets.map((b, i) => <li key={i}>{b}</li>)}
+                            </ul>
+                          )}
+                        </div>
+                      </label>
+                    )}
                   </div>
                 ))}
               </div>

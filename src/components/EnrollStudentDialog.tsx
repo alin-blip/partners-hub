@@ -23,33 +23,7 @@ const STUDY_PATTERNS_FALLBACK = ["Weekdays", "Weekend", "Evenings"];
 const RELATIONSHIP_OPTIONS = ["Parent", "Spouse", "Sibling", "Friend", "Other"];
 const DOC_TYPES_ENROLL = ["Passport", "Proof of Address", "Other"];
 
-const CONSENT_CLAUSES = [
-  {
-    id: "data_processing",
-    title: "Data Processing Consent",
-    text: "I consent to EduForYou UK collecting, processing, and storing my personal data for the purpose of facilitating my enrollment at the selected university. This includes sharing my personal information with the university's admissions team as required under the UK General Data Protection Regulation (UK GDPR).",
-  },
-  {
-    id: "document_sharing",
-    title: "Document Sharing Consent",
-    text: "I authorise EduForYou UK to share all documents I have provided (including identification documents, proof of address, qualifications, and any other supporting materials) with the university and relevant regulatory bodies as part of the enrollment and admissions process.",
-  },
-  {
-    id: "communication",
-    title: "Communication Consent",
-    text: "I consent to being contacted by EduForYou UK and the university regarding my application, enrollment status, and any related matters via email, telephone, SMS, or postal correspondence.",
-  },
-  {
-    id: "student_finance",
-    title: "Student Finance Consent",
-    text: "Where applicable, I consent to EduForYou UK sharing my data with Student Finance England (SFE) or other relevant funding bodies to facilitate my student finance application and funding arrangements.",
-  },
-  {
-    id: "accuracy",
-    title: "Declaration of Accuracy",
-    text: "I declare that all information I have provided is true, complete, and accurate to the best of my knowledge. I understand that providing false or misleading information may result in the withdrawal of any offer of admission or termination of enrollment.",
-  },
-];
+import { CONSENT_CLAUSES, MARKETING_OPTIONS } from "@/lib/consent-clauses";
 
 function sanitizeName(name: string) {
   return name.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 30);
@@ -103,12 +77,14 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
 
   // Step 5 — Consent
   const [consentChecks, setConsentChecks] = useState<Record<string, boolean>>({});
+  const [marketingChecks, setMarketingChecks] = useState<Record<string, boolean>>({});
   const [consentSignature, setConsentSignature] = useState("");
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [consentPreviewUrl, setConsentPreviewUrl] = useState<string | null>(null);
   const [previewingConsent, setPreviewingConsent] = useState(false);
 
-  const allConsentsChecked = CONSENT_CLAUSES.every((c) => consentChecks[c.id]);
+  const nonMarketingClauses = CONSENT_CLAUSES.filter((c) => !c.isMarketing);
+  const allConsentsChecked = nonMarketingClauses.every((c) => consentChecks[c.id]);
   const canProceedConsent = allConsentsChecked && consentSignature.trim().length > 0 && !!signatureDataUrl;
 
   const resetForm = () => {
@@ -120,7 +96,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
     setPreviousFundingYears(""); setCrn(""); setQualifications(""); setNotes("");
     setNokName(""); setNokPhone(""); setNokRelationship("");
     setDocFiles([]); setSelectedDocType("Passport");
-    setConsentChecks({}); setConsentSignature(""); setSignatureDataUrl(null); setConsentPreviewUrl(null);
+    setConsentChecks({}); setMarketingChecks({}); setConsentSignature(""); setSignatureDataUrl(null); setConsentPreviewUrl(null);
   };
 
   const { data: universities = [] } = useQuery({
@@ -243,6 +219,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
         agentName: agentProfile?.full_name || "EduForYou UK",
         signature: consentSignature,
         consentDate: new Date().toLocaleDateString("en-GB"),
+        marketingConsent: marketingChecks,
         ...sigBody,
       },
     });
@@ -536,19 +513,48 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
             <div className="space-y-3">
               {CONSENT_CLAUSES.map((clause) => (
                 <div key={clause.id} className="space-y-2 p-3 rounded-lg border bg-muted/20">
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <Checkbox
-                      checked={!!consentChecks[clause.id]}
-                      onCheckedChange={(checked) =>
-                        setConsentChecks((prev) => ({ ...prev, [clause.id]: !!checked }))
-                      }
-                      className="mt-0.5"
-                    />
+                  {clause.isMarketing ? (
                     <div>
                       <p className="text-sm font-semibold">{clause.title}</p>
-                      <p className="text-xs text-muted-foreground leading-relaxed mt-1">{clause.text}</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed mt-1 mb-2">{clause.text}</p>
+                      <div className="space-y-2 ml-1">
+                        {MARKETING_OPTIONS.map((opt) => (
+                          <label key={opt.id} className="flex items-center gap-3 cursor-pointer">
+                            <Checkbox
+                              checked={!!marketingChecks[opt.id]}
+                              onCheckedChange={(checked) => {
+                                setMarketingChecks((prev) => {
+                                  const next = { ...prev, [opt.id]: !!checked };
+                                  if (checked && opt.exclusive) next[opt.exclusive] = false;
+                                  return next;
+                                });
+                              }}
+                            />
+                            <span className="text-xs text-foreground">{opt.label}</span>
+                          </label>
+                        ))}
+                      </div>
                     </div>
-                  </label>
+                  ) : (
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <Checkbox
+                        checked={!!consentChecks[clause.id]}
+                        onCheckedChange={(checked) =>
+                          setConsentChecks((prev) => ({ ...prev, [clause.id]: !!checked }))
+                        }
+                        className="mt-0.5"
+                      />
+                      <div>
+                        <p className="text-sm font-semibold">{clause.title}</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed mt-1">{clause.text}</p>
+                        {clause.bullets && (
+                          <ul className="list-disc list-inside text-xs text-muted-foreground mt-1 space-y-0.5">
+                            {clause.bullets.map((b, i) => <li key={i}>{b}</li>)}
+                          </ul>
+                        )}
+                      </div>
+                    </label>
+                  )}
                 </div>
               ))}
             </div>
@@ -596,6 +602,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
                           signature: consentSignature,
                           signatureImage: signatureDataUrl || null,
                           consentDate: new Date().toLocaleDateString("en-GB"),
+                          marketingConsent: marketingChecks,
                         },
                       });
                       if (pdfError) throw pdfError;
