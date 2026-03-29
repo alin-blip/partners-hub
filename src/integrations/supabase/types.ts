@@ -1036,6 +1036,62 @@ export type Database = {
           },
         ]
       }
+      social_post_recipients: {
+        Row: {
+          agent_id: string
+          id: string
+          post_id: string
+          seen_at: string | null
+        }
+        Insert: {
+          agent_id: string
+          id?: string
+          post_id: string
+          seen_at?: string | null
+        }
+        Update: {
+          agent_id?: string
+          id?: string
+          post_id?: string
+          seen_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_post_recipients_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "social_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_posts: {
+        Row: {
+          caption: string
+          created_at: string
+          created_by: string
+          id: string
+          image_url: string
+          target_role: string
+        }
+        Insert: {
+          caption?: string
+          created_at?: string
+          created_by: string
+          id?: string
+          image_url: string
+          target_role?: string
+        }
+        Update: {
+          caption?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          image_url?: string
+          target_role?: string
+        }
+        Relationships: []
+      }
       student_documents: {
         Row: {
           agent_id: string

@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AIChatPanel } from "@/components/AIChatPanel";
+import { NotificationBell } from "@/components/NotificationBell";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 
@@ -42,6 +43,7 @@ export function DashboardLayout({ children, allowedRoles }: DashboardLayoutProps
               <SidebarTrigger />
             </div>
             <div className="flex items-center gap-3">
+              <NotificationBell />
               <Badge variant="outline" className="text-xs capitalize font-normal">
                 {role}
               </Badge>
