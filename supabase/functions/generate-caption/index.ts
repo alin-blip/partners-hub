@@ -89,7 +89,8 @@ Rules:
 - Write in a conversational, natural speaking tone — as if talking directly to the viewer
 - Use short sentences that are easy to read from a teleprompter
 - Start with a hook / attention grabber (first 3 seconds)
-- Reference REAL courses, universities, and admissions info from the knowledge base above when relevant
+- Reference REAL courses and admissions info from the knowledge base above when relevant
+- NEVER mention specific university names — only refer to course names or fields of study generally
 - Include a clear CTA (call-to-action) at the end — e.g. "Send us a message", "Link in bio", "Comment below", "Book your free consultation"
 - Keep it concise: 80-150 words max
 - Add [PAUSE] markers where the speaker should take a brief pause
