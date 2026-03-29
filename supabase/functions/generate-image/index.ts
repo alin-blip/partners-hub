@@ -74,19 +74,44 @@ serve(async (req) => {
 
     const presetText = presetInstructions[preset] || presetInstructions.social_post;
 
-    // Build prompt (text-only — image URLs from Supabase storage aren't accessible to the AI model)
+    // Build prompt
     let fullPrompt = `${presetText}\n\nContent/Theme: ${prompt}`;
 
     if (brand?.brand_prompt) {
       fullPrompt += `\n\nBrand Guidelines: ${brand.brand_prompt}`;
     }
 
-    if (brand?.logo_url) {
-      fullPrompt += "\n\nInclude a professional company logo placeholder area in a corner of the design.";
-    }
-
     if (includePhoto && profile?.avatar_url) {
       fullPrompt += `\n\nInclude a professional headshot placeholder for ${profile.full_name || "the agent"} — show a friendly, professional person as a recruitment consultant.`;
+    }
+
+    // Fetch the brand logo and convert to base64 for multimodal input
+    let logoBase64Url: string | null = null;
+    const logoStorageUrl = `${SUPABASE_URL}/storage/v1/object/public/brand-assets/eduforyou-logo.png`;
+    const logoSourceUrl = brand?.logo_url || logoStorageUrl;
+
+    try {
+      const logoRes = await fetch(logoSourceUrl);
+      if (logoRes.ok) {
+        const logoBytes = new Uint8Array(await logoRes.arrayBuffer());
+        const logoB64 = btoa(String.fromCharCode(...logoBytes));
+        const contentType = logoRes.headers.get("content-type") || "image/png";
+        logoBase64Url = `data:${contentType};base64,${logoB64}`;
+        fullPrompt += "\n\nIncorporate this exact company logo into the design. Place it clearly and visually in a visible corner. Do NOT invent or create a different logo — use ONLY the provided logo image exactly as it is:";
+      }
+    } catch (e) {
+      console.error("Failed to fetch logo:", e);
+    }
+
+    // Build messages — multimodal if logo available, text-only otherwise
+    let messageContent: any;
+    if (logoBase64Url) {
+      messageContent = [
+        { type: "text", text: fullPrompt },
+        { type: "image_url", image_url: { url: logoBase64Url } },
+      ];
+    } else {
+      messageContent = fullPrompt;
     }
 
     // Call AI
@@ -98,7 +123,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: "google/gemini-3.1-flash-image-preview",
-        messages: [{ role: "user", content: fullPrompt }],
+        messages: [{ role: "user", content: messageContent }],
         modalities: ["image", "text"],
       }),
     });
