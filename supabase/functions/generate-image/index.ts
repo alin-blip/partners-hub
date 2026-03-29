@@ -50,9 +50,10 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .gte("created_at", todayUtc.toISOString());
 
-    if ((count ?? 0) >= 5) {
+    const DAILY_LIMIT = 20;
+    if ((count ?? 0) >= DAILY_LIMIT) {
       return new Response(
-        JSON.stringify({ error: "Daily limit reached (5/5). Try again tomorrow." }),
+        JSON.stringify({ error: `Daily limit reached (${DAILY_LIMIT}/${DAILY_LIMIT}). Try again tomorrow.` }),
         { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -155,7 +156,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         url: publicUrl.publicUrl,
-        remaining: 5 - ((count ?? 0) + 1),
+        remaining: DAILY_LIMIT - ((count ?? 0) + 1),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
