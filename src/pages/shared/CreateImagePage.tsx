@@ -343,7 +343,6 @@ export default function CreateImagePage() {
                   filenamePrefix="eduforyou-generated"
                 />
               </div>
-              </div>
               {captions["latest"] && (
                 <CaptionDisplay
                   caption={captions["latest"]}
