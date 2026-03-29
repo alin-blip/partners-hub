@@ -230,6 +230,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
         courseName: selectedCrs?.name || "",
         agentName: agentProfile?.full_name || "EduForYou UK",
         signature: consentSignature,
+        signatureImage: signatureDataUrl || null,
         consentDate: new Date().toLocaleDateString("en-GB"),
       },
     });
