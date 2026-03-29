@@ -43,6 +43,7 @@ export function DashboardLayout({ children, allowedRoles }: DashboardLayoutProps
               <SidebarTrigger />
             </div>
             <div className="flex items-center gap-3">
+              <NotificationBell />
               <Badge variant="outline" className="text-xs capitalize font-normal">
                 {role}
               </Badge>
