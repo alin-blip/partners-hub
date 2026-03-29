@@ -6,7 +6,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Copy, ExternalLink, CreditCard } from "lucide-react";
+import { Copy, ExternalLink, CreditCard, Share2 } from "lucide-react";
+import { SiFacebook, SiInstagram, SiTiktok } from "react-icons/si";
+import { FaLinkedinIn } from "react-icons/fa";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { Link } from "react-router-dom";
 
 export default function AgentSocialFeedPage() {
@@ -73,23 +77,41 @@ export default function AgentSocialFeedPage() {
   const hasCard = cardSettings?.is_public && cardSettings?.slug;
   const cardUrl = hasCard ? `${window.location.origin}/card/${cardSettings.slug}` : null;
 
-  const handleShare = async (post: any) => {
+  const copyForPlatform = async (post: any, platform: string) => {
     if (!hasCard) {
       toast.error("Create your digital card first to share posts");
       return;
     }
-
-    // Mark as seen if not already
-    if (!post.seen_at) {
-      markSeen.mutate(post.id);
-    }
+    if (!post.seen_at) markSeen.mutate(post.id);
 
     const shareText = `${post.caption}\n\n🔗 ${cardUrl}`;
-    try {
-      await navigator.clipboard.writeText(shareText);
-      toast.success("Caption + your card link copied to clipboard!");
-    } catch {
-      toast.error("Failed to copy to clipboard");
+    const encodedUrl = encodeURIComponent(cardUrl!);
+    const encodedText = encodeURIComponent(shareText);
+
+    switch (platform) {
+      case "facebook":
+        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodeURIComponent(post.caption)}`, "_blank");
+        break;
+      case "linkedin":
+        window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`, "_blank");
+        break;
+      case "instagram":
+      case "tiktok":
+        // No web share API — copy caption + link
+        try {
+          await navigator.clipboard.writeText(shareText);
+          toast.success(`Caption + link copied! Paste it in ${platform === "instagram" ? "Instagram" : "TikTok"}.`);
+        } catch {
+          toast.error("Failed to copy to clipboard");
+        }
+        break;
+      default:
+        try {
+          await navigator.clipboard.writeText(shareText);
+          toast.success("Caption + your card link copied!");
+        } catch {
+          toast.error("Failed to copy to clipboard");
+        }
     }
   };
 
@@ -137,23 +159,45 @@ export default function AgentSocialFeedPage() {
                           <span className="ml-2 text-accent font-medium">● New</span>
                         )}
                       </span>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleShare(post)}
-                          disabled={!hasCard}
-                        >
-                          <Copy className="w-3 h-3 mr-1" /> Share
-                        </Button>
+                      <div className="flex gap-1.5 items-center">
+                        <TooltipProvider delayDuration={300}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button size="icon" variant="outline" className="h-8 w-8" disabled={!hasCard} onClick={() => copyForPlatform(post, "facebook")}>
+                                <SiFacebook className="w-3.5 h-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Share on Facebook</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button size="icon" variant="outline" className="h-8 w-8" disabled={!hasCard} onClick={() => copyForPlatform(post, "instagram")}>
+                                <SiInstagram className="w-3.5 h-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Copy for Instagram</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button size="icon" variant="outline" className="h-8 w-8" disabled={!hasCard} onClick={() => copyForPlatform(post, "tiktok")}>
+                                <SiTiktok className="w-3.5 h-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Copy for TikTok</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button size="icon" variant="outline" className="h-8 w-8" disabled={!hasCard} onClick={() => copyForPlatform(post, "linkedin")}>
+                                <FaLinkedinIn className="w-3.5 h-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Share on LinkedIn</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                         {hasCard && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            asChild
-                          >
+                          <Button size="icon" variant="ghost" className="h-8 w-8" asChild>
                             <a href={cardUrl!} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="w-3 h-3 mr-1" /> My Card
+                              <ExternalLink className="w-3.5 h-3.5" />
                             </a>
                           </Button>
                         )}
