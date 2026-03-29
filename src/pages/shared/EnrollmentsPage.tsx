@@ -159,12 +159,23 @@ export default function EnrollmentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {enrollments.map((e: any) => (
-                <TableRow key={e.id}>
+              {isLoading && Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={`skel-${i}`}>
+                  {Array.from({ length: 5 }).map((_, j) => (
+                    <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                  ))}
+                </TableRow>
+              ))}
+              {!isLoading && enrollments.map((e: any) => (
+                <TableRow
+                  key={e.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => navigate(`${prefix}/students/${e.student_id}`)}
+                >
                   <TableCell className="font-medium">{e.students?.first_name} {e.students?.last_name}</TableCell>
                   <TableCell>{e.universities?.name}</TableCell>
                   <TableCell>{e.courses?.name}</TableCell>
-                  <TableCell>
+                  <TableCell onClick={(ev) => ev.stopPropagation()}>
                     {canEdit ? (
                       <Select
                         value={e.status}
@@ -188,7 +199,7 @@ export default function EnrollmentsPage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {enrollments.length === 0 && !isLoading && (
+              {!isLoading && enrollments.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                     No enrollments found
