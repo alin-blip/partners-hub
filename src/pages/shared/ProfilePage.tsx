@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -24,6 +24,14 @@ export default function ProfilePage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [avatarUrl, setAvatarUrl] = useState((profile as any)?.avatar_url || "");
   const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.full_name || "");
+      setPhone(profile.phone || "");
+      setAvatarUrl(profile.avatar_url || "");
+    }
+  }, [profile]);
 
   const updateProfile = useMutation({
     mutationFn: async () => {

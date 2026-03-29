@@ -24,11 +24,12 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
-  // Fetch agent profile
+  // Fetch agent profile (use profiles table directly — view may not work with service role)
   const { data: profile } = await supabase
-    .from("public_agent_profiles")
+    .from("profiles")
     .select("id, full_name, avatar_url, slug")
     .eq("slug", slug)
+    .eq("is_active", true)
     .single();
 
   if (!profile) {
@@ -78,6 +79,8 @@ Deno.serve(async (req) => {
   <meta property="og:title" content="${esc(ogTitle)}" />
   <meta property="og:description" content="${esc(ogDescription.slice(0, 300))}" />
   <meta property="og:image" content="${esc(ogImage)}" />
+  <meta property="og:image:width" content="1080" />
+  <meta property="og:image:height" content="1080" />
   <meta property="og:url" content="${esc(cardPageUrl)}" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${esc(ogTitle)}" />
@@ -93,6 +96,7 @@ Deno.serve(async (req) => {
   return new Response(html, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-cache, no-store, must-revalidate",
       ...corsHeaders,
     },
   });
