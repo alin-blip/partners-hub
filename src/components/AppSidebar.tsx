@@ -12,6 +12,7 @@ import {
   Brain,
   MessageSquare,
   Image as ImageIcon,
+  Share2,
   Mail,
   MessageSquareHeart,
   CreditCard,
