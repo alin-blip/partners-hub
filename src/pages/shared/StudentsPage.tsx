@@ -149,6 +149,7 @@ export default function StudentsPage() {
                 </TableRow>
               ))}
               {!isLoading && students.map((s: any) => {
+                const urgentCount = urgentCounts[s.id] || 0;
                 return (
                   <TableRow
                     key={s.id}
