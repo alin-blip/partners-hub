@@ -220,6 +220,14 @@ export default function AgentSocialFeedPage() {
                             </TooltipTrigger>
                             <TooltipContent>Share on LinkedIn</TooltipContent>
                           </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => handleDownloadImage(post)}>
+                                <Download className="w-3.5 h-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Download image + copy caption</TooltipContent>
+                          </Tooltip>
                         </TooltipProvider>
                         {hasCard && (
                           <Button size="icon" variant="ghost" className="h-8 w-8" asChild>
