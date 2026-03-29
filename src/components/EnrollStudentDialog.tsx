@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, Check, Calendar, Upload, FileText, X, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Calendar, Upload, FileText, X, ShieldCheck, Eye } from "lucide-react";
 import { CourseDetailsInfoCard } from "@/components/CourseDetailsInfoCard";
 import { SignatureCanvas } from "@/components/SignatureCanvas";
 
