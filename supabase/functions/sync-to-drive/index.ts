@@ -24,6 +24,9 @@ async function getAccessToken(serviceAccount: any): Promise<string> {
   const unsignedToken = `${header}.${claimSet}`;
 
   // Import the private key and sign the JWT
+  if (!serviceAccount.private_key) {
+    throw new Error("Service account JSON missing private_key field");
+  }
   const pemContents = serviceAccount.private_key
     .replace(/-----BEGIN PRIVATE KEY-----/, "")
     .replace(/-----END PRIVATE KEY-----/, "")
