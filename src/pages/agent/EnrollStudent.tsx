@@ -27,7 +27,7 @@ const STUDY_PATTERNS_FALLBACK = ["Weekdays", "Weekend", "Evenings"];
 const RELATIONSHIP_OPTIONS = ["Parent", "Spouse", "Sibling", "Friend", "Other"];
 const DOC_TYPES_ENROLL = ["Passport", "Proof of Address", "Other"];
 
-import { CONSENT_CLAUSES, MARKETING_OPTIONS } from "@/lib/consent-clauses";
+import { CONSENT_CLAUSES, MARKETING_OPTIONS, DEFAULT_MARKETING_CHECKS } from "@/lib/consent-clauses";
 
 function sanitizeName(name: string) {
   return name.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 30);
