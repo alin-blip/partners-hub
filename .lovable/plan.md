@@ -1,44 +1,37 @@
 
 
-## Plan: Fix Facebook Share Error in Both Components
+## Plan: Always Include EduForYou Logo in Generated Images
 
-### Root Cause
-On mobile, `window.open()` is blocked as a popup when called after async operations (fetch, clipboard write). Facebook share goes through the fallback path (download + copy + open URL), but by the time `window.open` executes after the async `fetch` and `clipboard.writeText`, the browser no longer considers it a direct user gesture — so it blocks the popup, which throws an error caught by the generic `catch` block showing "Eroare la partajare".
+### Problem
+Currently the edge function only adds a text instruction "Include a professional company logo placeholder area" — it doesn't pass the actual logo to the AI model. The AI invents a random logo each time.
 
-### Fix
-For platforms that need a fallback URL (Facebook, LinkedIn), open the window **before** the async work:
+### Solution
+Upload the EduForYou logo to Supabase storage, then pass it as an **image input** to the AI model alongside the text prompt. The Gemini image generation model supports multimodal input (text + image reference), so we can instruct it: "Include this exact logo in the design."
 
-1. Open the platform URL immediately (synchronously) using `window.open` at the start
-2. Then fetch the image, download it, and copy the caption asynchronously
-3. This ensures the popup isn't blocked
+Both Social Posts and Create Image use the **same edge function** (`generate-image`), so fixing it once covers both pages.
 
 ### Changes
 
-**File: `src/components/SocialShareButtons.tsx`** (used by CreateImagePage)
-- In `handleShare`, for platforms in `skipNativeSharePlatforms`: open the fallback URL **first** (synchronously), then do the async fetch/download/copy
-- Wrap the async clipboard call in a try-catch so clipboard failures don't kill the whole flow
+**Step 1: Upload logo to storage**
+- Copy `logo_side_bigtext_src.png` to `public/images/eduforyou-logo.png` in the project
+- Upload it to the `generated-images` Supabase storage bucket under a `_brand/logo.png` path (or use the existing `brand_settings.logo_url` if already set)
 
-**File: `src/pages/shared/AgentSocialFeedPage.tsx`** (Social Posts)
-- Same fix in `handleShareForPlatform`: open the platform URL synchronously before async work
-- Wrap clipboard in try-catch
-
-### Technical Detail
-```
-// Before (broken on mobile):
-const response = await fetch(imageUrl);  // async
-// ... download logic ...
-await navigator.clipboard.writeText(shareText);  // async
-window.open(fallbackUrl, "_blank");  // ❌ blocked as popup
-
-// After (fixed):
-if (skipNativeSharePlatforms.includes(platform)) {
-  const fallbackUrl = platformFallbackUrls[platform]?.(...);
-  if (fallbackUrl) window.open(fallbackUrl, "_blank");  // ✅ sync, user gesture
-  // Then do async download + copy
-}
-```
+**Step 2: Update `supabase/functions/generate-image/index.ts`**
+- Instead of just adding text about a logo, fetch the actual logo image (from `brand_settings.logo_url` or the known storage path)
+- Convert it to base64
+- Pass it as a multimodal message to the AI model:
+  ```typescript
+  messages: [{
+    role: "user",
+    content: [
+      { type: "text", text: fullPrompt + "\n\nIncorporate this exact logo into the design, placing it in a visible corner:" },
+      { type: "image_url", image_url: { url: logoBase64DataUrl } }
+    ]
+  }]
+  ```
+- If no logo is available, fall back to text-only prompt (current behavior)
 
 ### Files changed
-- `src/components/SocialShareButtons.tsx`
-- `src/pages/shared/AgentSocialFeedPage.tsx`
+- `public/images/eduforyou-logo.png` (new — copy uploaded logo)
+- `supabase/functions/generate-image/index.ts` (fetch logo, pass as image input to AI)
 
