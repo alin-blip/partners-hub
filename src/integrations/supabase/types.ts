@@ -508,6 +508,36 @@ export type Database = {
           },
         ]
       }
+      drive_folder_mappings: {
+        Row: {
+          created_at: string
+          drive_folder_id: string
+          entity_id: string
+          entity_type: string
+          folder_name: string | null
+          id: string
+          parent_drive_folder_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          drive_folder_id: string
+          entity_id: string
+          entity_type: string
+          folder_name?: string | null
+          id?: string
+          parent_drive_folder_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          drive_folder_id?: string
+          entity_id?: string
+          entity_type?: string
+          folder_name?: string | null
+          id?: string
+          parent_drive_folder_id?: string | null
+        }
+        Relationships: []
+      }
       email_send_log: {
         Row: {
           created_at: string
