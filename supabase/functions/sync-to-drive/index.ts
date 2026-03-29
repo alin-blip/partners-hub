@@ -385,7 +385,7 @@ serve(async (req) => {
     const accessToken = await getAccessToken(serviceAccount);
 
     // Build folder hierarchy
-    const sanitize = (s: string) => s.replace(/[^a-zA-Z0-9 ]/g, "_").substring(0, 50);
+    const sanitize = (s: string | null | undefined) => (s || "Unknown").replace(/[^a-zA-Z0-9 ]/g, "_").substring(0, 50);
 
     // Admin folder (or "Agents_Without_Admin")
     let adminFolderId: string;
