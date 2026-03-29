@@ -1,41 +1,46 @@
 
 
-## Plan: Auto-generate script with knowledge base context
+## Plan: Dynamic OG share link per agent + proper social sharing
 
-### What changes
+### Problem
+When an agent shares a post on Facebook/LinkedIn, the preview shows generic "EduForYou UK" metadata instead of the post image, caption, and agent's card link. Social media crawlers can't read client-side React meta tags.
 
-When generating content on Social Posts page, **always** auto-generate a teleprompter script alongside the images — without needing to select "Script" as a preset. The script generation will be enriched with knowledge base data (courses, universities, brand DNA).
+### Solution
+Create an edge function that serves dynamic HTML with OG meta tags, so social platforms show the correct preview (post image + caption + agent link). Real users get redirected to the agent's card page.
 
 ### Changes
 
-**1. Edge Function: `supabase/functions/generate-caption/index.ts`**
-- Fetch `ai_knowledge_base` entries (courses, admissions, general info) from Supabase
-- Fetch `courses` with `universities` for real course/university names
-- Inject this context into the system prompt for both captions and scripts
-- The AI will reference real courses, deadlines, campuses, and brand voice when writing scripts and captions
+**1. New Edge Function: `supabase/functions/og-share/index.ts`**
+- Accepts query params: `slug` (agent slug), `post` (optional post ID)
+- Fetches agent profile from `public_agent_profiles` view
+- If `post` param provided, fetches the social post's `image_url` and `caption`
+- Returns minimal HTML with dynamic OG meta tags:
+  - `og:title` = Agent name + job title
+  - `og:description` = Post caption or agent bio
+  - `og:image` = Post image or agent avatar
+  - `og:url` = Card page URL
+- Includes `<meta http-equiv="refresh">` to redirect real users to `/card/:slug`
 
-**2. Frontend: `src/pages/shared/SocialPostsPage.tsx`**
-- After generating images, **always** auto-generate a script (call `generate-caption` with `preset: "script"`) regardless of whether "Script" preset was selected
-- Always auto-generate a caption too (same call with `preset: "social_post"`)
-- Display the script result alongside the generated images automatically
-- Remove "Script" from the selectable presets (since it's always included)
-- Pre-fill the caption field with the AI-generated caption
+**2. Update `src/pages/shared/AgentSocialFeedPage.tsx`**
+- Change the share URL from `/card/:slug` to the edge function URL with post context:
+  `${SUPABASE_URL}/functions/v1/og-share?slug=xxx&post=POST_ID`
+- Facebook/LinkedIn sharer will use this URL so crawlers get proper OG tags
+- The clipboard copy for Instagram/TikTok keeps caption + agent card link as before
 
-### How knowledge base enrichment works in the edge function
+**3. No database changes needed**
+Uses existing `public_agent_profiles` view and `social_posts` table (anon-readable via edge function with service role).
+
+### How it works
 
 ```text
-System prompt structure:
-├── Brand identity (from brand_settings.brand_prompt)
-├── Knowledge base context (from ai_knowledge_base - grouped by category)
-│   ├── Courses & admissions info
-│   ├── University details
-│   └── General knowledge
-├── Available courses list (from courses + universities tables)
-└── Generation rules (CTA, language, format)
+Agent clicks "Share on Facebook" for a post
+  → Opens facebook.com/sharer?u=EDGE_FUNCTION_URL?slug=x&post=y
+  → Facebook crawler hits edge function
+  → Edge function returns HTML with:
+      og:image = post image
+      og:description = post caption  
+      og:title = "Agent Name – EduForYou UK"
+  → Facebook shows rich preview with image + text
+  → User clicks → redirected to /card/:slug → becomes a lead
 ```
-
-The AI will use real data like "BSc Business Management at University of Suffolk" or "January 2026 intake" instead of generic placeholders.
-
-### No database changes needed
-Reuses existing tables: `ai_knowledge_base`, `courses`, `universities`, `brand_settings`.
 
