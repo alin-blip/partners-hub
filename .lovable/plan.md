@@ -1,39 +1,36 @@
 
 
-## Plan
+## Plan: Integrate AI Image Wizard into Social Posts Page
 
-### Part 1: Consent Form — Already Complete
+### What changes
+Replace the current manual image upload in `SocialPostsPage.tsx` with the full AI image generation wizard from `CreateImagePage.tsx`, followed by the recipient selection and publish step.
 
-The consent form changes were **fully applied** before you hit stop. All three files have:
-- `DEFAULT_MARKETING_CHECKS` as initial state for `marketingChecks`
-- `disabled={!!opt.required}` on the checkboxes
-- Guard `if (opt.required) return;` in `onCheckedChange`
-- `consent-clauses.ts` has `required: true` on the three mandatory options
+### Flow
+1. **Step 1 — Generate Image** (same as CreateImagePage wizard):
+   - Preset selector (Social Post, Story, Flyer, Banner)
+   - Prompt textarea
+   - "Include my photo" toggle
+   - Caption language selector
+   - Generate button → shows generated image
+   - Generate caption button on the result
+   - Option to also upload a manual image as alternative
 
-No further changes needed here.
+2. **Step 2 — Publish to Agents**:
+   - Caption textarea (pre-filled with AI caption if generated, or manual)
+   - Target selector (All agents / My team / Select individually)
+   - Agent checkboxes when "Select individually"
+   - Publish button
 
-### Part 2: Google Drive Sync via Connector
+### Technical details
 
-No Google Drive connector exists in the workspace. We need to connect one.
+**File: `src/pages/shared/SocialPostsPage.tsx`** — Rewrite to combine both flows:
+- Add all state from CreateImagePage (selectedPreset, prompt, includePhoto, captionLanguage, generatedUrl, remaining, captions, captionLoading)
+- Add the generate image mutation (calls `generate-image` edge function)
+- Add the generate caption function (calls `generate-caption` edge function)
+- Keep existing: agents query, posts query, target mode, publish logic
+- Modify publish: if image was AI-generated, use `generatedUrl` directly instead of uploading a file; if manually uploaded, keep current upload flow
+- Keep the "Published Posts" section at the bottom with delete functionality
+- Add a tab or toggle to switch between "AI Generate" and "Upload manually" for the image source
 
-**Step 1: Connect Google Drive connector**
-- Use the Google Drive connector integration
-- This will provide `GOOGLE_DRIVE_API_KEY` and use `LOVABLE_API_KEY` for gateway auth
-
-**Step 2: Rewrite `supabase/functions/sync-to-drive/index.ts`**
-- Remove the `getAccessToken()` service account JWT logic entirely
-- Remove dependency on `GOOGLE_DRIVE_SERVICE_ACCOUNT` secret
-- Replace all direct `googleapis.com/drive/v3/...` calls with connector gateway calls: `https://connector-gateway.lovable.dev/google_drive/drive/v3/...`
-- Use headers: `Authorization: Bearer ${LOVABLE_API_KEY}` and `X-Connection-Api-Key: ${GOOGLE_DRIVE_API_KEY}`
-- Keep all existing business logic (folder hierarchy, PDF generation, uploads) unchanged
-
-**Step 3: Set root folder ID**
-- Keep `GOOGLE_DRIVE_ROOT_FOLDER_ID` secret set to `1witaIRQ2JsWQM5_JAsjEbJEYJ-MXecvP`
-
-### What stays the same
-- Folder structure (Admin > Agent > Student)
-- `drive_folder_mappings` table
-- Student summary PDF generation
-- Document upload logic
-- Client-side `src/lib/drive-sync.ts`
+**No backend changes needed** — reuses existing `generate-image` and `generate-caption` edge functions, same `social_posts` and `social_post_recipients` tables.
 
