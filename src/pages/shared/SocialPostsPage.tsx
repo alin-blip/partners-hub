@@ -588,25 +588,7 @@ export default function SocialPostsPage() {
                 {/* Generated results */}
                 {generatedResults.length > 0 && (
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium">Generated Content</Label>
-                      {imageResults.length > 0 && !aiCaption && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={handleGenerateCaption}
-                          disabled={captionLoading}
-                          className="h-8"
-                        >
-                          {captionLoading ? (
-                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                          ) : (
-                            <MessageSquare className="w-3 h-3 mr-1" />
-                          )}
-                          Generate Caption
-                        </Button>
-                      )}
-                    </div>
+                    <Label className="text-sm font-medium">Generated Content</Label>
 
                     {/* Image grid */}
                     {imageResults.length > 0 && (
