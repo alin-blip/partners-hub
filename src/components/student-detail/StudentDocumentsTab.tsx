@@ -10,10 +10,11 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Download, Trash2, FileText, RefreshCw, ShieldCheck, Eye } from "lucide-react";
+import { Upload, Download, Trash2, FileText, RefreshCw, ShieldCheck, Eye, Archive } from "lucide-react";
 import { format } from "date-fns";
 import { SignatureCanvas } from "@/components/SignatureCanvas";
 import { syncToDrive } from "@/lib/drive-sync";
+import JSZip from "jszip";
 
 const DOC_TYPES = ["Passport", "Transcript", "Offer Letter", "Visa", "Qualification Certificate", "Share Code", "Proof of Address", "Other"];
 
