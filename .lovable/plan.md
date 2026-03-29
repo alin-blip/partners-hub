@@ -1,60 +1,76 @@
 
 
-## Plan: Fix Consent PDF + Add Preview + Add Consent Indicator
+## Plan: Backup automat pe Google Drive
 
-### Problem Analysis
+### Structura folderelor in Drive
 
-The PDF generator has a **critical bug**: the PDF `Td` operator uses **relative** positioning (offset from last text position), but the code treats coordinates as absolute. After the first `Td` sets position, subsequent `Td` calls move by the *difference* rather than jumping to absolute coordinates. This is why only "EDUFORYOU UK" appears — all other text lands off-page or at wrong positions.
-
-Additionally, the code resets position with `0 0 Td` after each line, which doesn't help because Td is cumulative within BT/ET blocks.
-
-### Changes
-
-#### 1. Fix PDF Generator (Critical Bug)
-
-**File**: `supabase/functions/generate-consent-pdf/index.ts`
-
-Replace the `buildPdf` content stream logic to use absolute positioning correctly. Instead of `Td` (relative), track the last position and compute deltas, OR use `Tm` (text matrix) which sets absolute position:
-
-```
-BT
-/F1 10 Tf
-1 0 0 1 50 790 Tm   <-- absolute position via text matrix
-(EDUFORYOU UK) Tj
-1 0 0 1 50 770 Tm   <-- next absolute position
-(Student Enrollment Consent Form) Tj
-...
-ET
+```text
+EduForYou Backup (root folder shared)
+├── Admin_NumeAdmin/
+│   ├── Agent_NumeAgent1/
+│   │   ├── Student_NumePrenume1/
+│   │   │   ├── Student_Profile.pdf       (toate detaliile)
+│   │   │   ├── Passport_1234.pdf         (documente uploadate)
+│   │   │   ├── Consent_Form_5678.pdf
+│   │   │   └── Transcript_9012.pdf
+│   │   └── Student_NumePrenume2/
+│   └── Agent_NumeAgent2/
+└── Agent_FaraAdmin/              (agenți fără admin)
+    └── Student_X/
 ```
 
-This ensures every line renders at the correct absolute coordinate.
+### Cerințe
 
-#### 2. Add PDF Preview Before Save
+Google Drive API necesită un **Service Account** (cont de serviciu Google). Nu există un connector Google Drive disponibil în Lovable, deci trebuie configurare manuală:
 
-**File**: `src/components/student-detail/StudentDocumentsTab.tsx`
+1. Creezi un **Service Account** în Google Cloud Console
+2. Partajezi folderul root din Drive cu email-ul service account-ului
+3. Adaugi cheia JSON ca secret în proiect
 
-- Add a "Preview" button alongside "Generate & Save" in the consent dialog
-- On click, call the same `generate-consent-pdf` edge function
-- Convert the returned base64 to a blob URL and display it in an `<iframe>` within the dialog
-- User can then choose to "Save" or "Cancel"
-- Same preview capability added to enrollment flow consent step
+### Ce se implementează
 
-#### 3. Add Consent Form Indicator on Student Detail Page
+#### 1. Edge Function `sync-to-drive`
+- Primește acțiunea (student_created, document_uploaded, enrollment_updated)
+- Creează automat ierarhia de foldere dacă nu există (Admin → Agent → Student)
+- Generează un PDF sumar cu toate detaliile studentului (date personale, enrollments, funding, note)
+- Uploadează PDF-ul sumar + copiază documentele existente
+- Stochează mapping-urile folder ID-uri într-un tabel `drive_folder_mappings`
 
-**File**: `src/pages/shared/StudentDetailPage.tsx`
+#### 2. Tabel nou: `drive_folder_mappings`
+- Coloane: `id`, `entity_type` (admin/agent/student), `entity_id`, `drive_folder_id`, `created_at`
+- Evită recrearea folderelor la fiecare sync
 
-- Query `student_documents` for a record with `doc_type = 'Consent Form'` for the current student
-- Display a badge next to the student name:
-  - Green `ShieldCheck` icon + "Consent Signed" if found
-  - Orange `ShieldAlert` icon + "No Consent" if missing
+#### 3. Trigger-e automate (apeluri din frontend)
+- La **crearea unui student** → creează folderul + generează PDF
+- La **upload document** → copiază fișierul în Drive
+- La **schimbare status enrollment** → regenerează PDF sumar
+- La **re-generare consent** → uploadează noul consent în Drive
 
-### Files Changed
+#### 4. PDF Sumar Student
+Generat cu reportlab/edge function, include:
+- Date personale (nume, DOB, naționalitate, adresă, NI, share code)
+- Enrollment-uri (universitate, curs, status, funding)
+- Note importante
+- Lista documentelor uploadate
 
-| File | Change |
-|------|--------|
-| `supabase/functions/generate-consent-pdf/index.ts` | Fix Td→Tm for absolute positioning so all text renders correctly |
-| `src/components/student-detail/StudentDocumentsTab.tsx` | Add preview iframe + preview button in consent dialog |
-| `src/pages/shared/StudentDetailPage.tsx` | Add consent form indicator badge |
-| `src/pages/agent/EnrollStudent.tsx` | Add preview button on Step 5 consent |
-| `src/components/EnrollStudentDialog.tsx` | Add preview button on consent step |
+### Pași de setup pentru tine (user)
+
+1. **Google Cloud Console** → Creează un proiect → Activează Google Drive API
+2. **Service Account** → Creează un service account → Descarcă cheia JSON
+3. **Google Drive** → Partajează folderul root cu email-ul service account-ului (Editor access)
+4. **Lovable** → Adaugă secretul `GOOGLE_DRIVE_SERVICE_ACCOUNT` cu conținutul JSON
+
+### Fișiere modificate/create
+
+| Fișier | Schimbare |
+|--------|-----------|
+| `supabase/functions/sync-to-drive/index.ts` | Edge function nouă — logica Drive API |
+| Migration nouă | Tabel `drive_folder_mappings` |
+| `src/components/student-detail/StudentDocumentsTab.tsx` | Apel sync după upload/consent |
+| `src/pages/agent/EnrollStudent.tsx` | Apel sync după creare student |
+| `src/components/EnrollStudentDialog.tsx` | Apel sync după creare student |
+
+### Limitări
+- Google Drive API are limită de 300 requests/min per user — suficient pentru usage normal
+- PDF-ul sumar se regenerează la fiecare schimbare, nu doar append
 
