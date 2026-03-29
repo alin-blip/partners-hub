@@ -1,38 +1,43 @@
 
 
-## Plan: Fix 2 Enrollment Errors + 2 Digital Card Errors
+## Plan: Fix Storage Upload "Failed to fetch" Error
 
-### Error 1: Enrollment "TypeError: Failed to fetch"
+### Root Cause
+The storage bucket `student-documents` has an RLS policy for agent uploads:
+```sql
+(storage.foldername(name))[1] IN (SELECT s.id::text FROM students s WHERE s.agent_id = auth.uid())
+```
+This expects the **first folder segment** to be the student ID. But the code creates paths like:
+```
+agentEmail_agentId/studentName_studentId/filename.ext
+```
+So `foldername[1]` = `agentEmail_agentId` which never matches any student ID → upload blocked by RLS.
 
-**Root cause**: The `generate-consent-pdf` edge function is being called with `signatureImage` (a data URL) but NOT with `signatureRgb`/`signatureWidth`/`signatureHeight`. The edge function's validation on line 133 requires at least one of `signature`, `signatureImage`, or `signatureRgb`. When `signatureImage` is provided, the function accepts it but doesn't actually use it to embed the image (only `signatureRgb` path embeds an image). However, the real problem is the edge function may be failing or the request payload with a large base64 data URL is too big.
+### Fix
+Update the RLS policies to use `foldername[2]` and extract just the UUID from the second folder segment (which contains `studentName_studentId`). OR simpler: change the file path structure in the code to put student ID first.
 
-**Fix**: In `EnrollStudent.tsx` `generateAndUploadConsentPdf`, use `extractSignatureRgb` to convert the signature canvas data URL to raw RGB before sending to the edge function. Send `signatureRgb`, `signatureWidth`, `signatureHeight` instead of `signatureImage`.
+**Approach: Change file paths to `{studentId}/{filename}`** — simplest, matches existing policy.
 
-**File**: `src/pages/agent/EnrollStudent.tsx` (lines ~219-232)
-- Import `extractSignatureRgb` from `@/lib/signature-utils`
-- Before calling `generate-consent-pdf`, extract RGB from `signatureDataUrl`
-- Pass `signatureRgb`, `signatureWidth`, `signatureHeight` in the body
-
-### Error 2: Enrollment — same fix needed in EnrollStudentDialog
-
-**File**: `src/components/EnrollStudentDialog.tsx`
-- Same fix: use `extractSignatureRgb` before calling the edge function
-
-### Error 3: Digital Card "duplicate key value violates unique constraint profiles_slug_key"
-
-**Root cause**: When saving card settings, the code updates the profile's `slug` field. If the agent enters a slug that's already taken by another user, it throws a unique constraint violation. The code doesn't check for slug uniqueness before saving.
-
-**Fix**: In `CardSettingsSection.tsx`, before updating the slug, check if it's already taken by another user. If so, show a user-friendly error "This slug is already taken."
-
-**File**: `src/components/CardSettingsSection.tsx` (lines ~93-100)
-- Add a uniqueness check: query profiles for slug match excluding current user
-- If duplicate found, throw a descriptive error
-
-### Files Changed
+### Files to Change
 
 | File | Change |
 |------|--------|
-| `src/pages/agent/EnrollStudent.tsx` | Use `extractSignatureRgb` to send RGB data for consent PDF signature |
-| `src/components/EnrollStudentDialog.tsx` | Same signature RGB fix |
-| `src/components/CardSettingsSection.tsx` | Add slug uniqueness check before save |
+| `src/pages/agent/EnrollStudent.tsx` | Change storage paths from `agentFolder/studentFolder/file` to `studentId/file` (lines ~255, ~309) |
+| `src/components/student-detail/StudentDocumentsTab.tsx` | Same path structure fix for document uploads |
+| `src/components/EnrollStudentDialog.tsx` | Same path structure fix if it does uploads |
+| `supabase/functions/generate-consent-pdf` | No change needed |
+
+### Path Change
+```
+// Before:
+`${agentName}_${agentId}/${studentName}_${studentId}/Consent_Form_${Date.now()}.pdf`
+
+// After:
+`${studentId}/Consent_Form_${Date.now()}.pdf`
+```
+
+This makes `foldername[1]` = student ID, matching the existing RLS policy.
+
+### Note
+The existing RLS policies for SELECT, DELETE also use `foldername[1]`, so this fix aligns all operations. The consent preview "Failed to fetch" would also be fixed since both preview and submission use the same upload path.
 
