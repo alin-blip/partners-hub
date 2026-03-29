@@ -277,21 +277,28 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-3">
           <CardTitle className="text-base">Documents</CardTitle>
-          {canEdit && (
-            <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" onClick={() => setConsentDialogOpen(true)}>
-                <RefreshCw className="w-3 h-3 mr-1" /> Re-generate Consent
+          <div className="flex items-center gap-2">
+            {documents.length > 0 && (
+              <Button size="sm" variant="outline" onClick={handleDownloadAll} disabled={downloadingAll}>
+                <Archive className="w-3 h-3 mr-1" /> {downloadingAll ? "Zipping…" : "Download All"}
               </Button>
-              <Select value={selectedDocType} onValueChange={setSelectedDocType}>
-                <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>{DOC_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-              </Select>
-              <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-                <Upload className="w-3 h-3 mr-1" /> {uploading ? "Uploading…" : "Upload"}
-              </Button>
-              <input ref={fileInputRef} type="file" className="hidden" onChange={handleUpload} />
-            </div>
-          )}
+            )}
+            {canEdit && (
+              <>
+                <Button size="sm" variant="outline" onClick={() => setConsentDialogOpen(true)}>
+                  <RefreshCw className="w-3 h-3 mr-1" /> Re-generate Consent
+                </Button>
+                <Select value={selectedDocType} onValueChange={setSelectedDocType}>
+                  <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>{DOC_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                </Select>
+                <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                  <Upload className="w-3 h-3 mr-1" /> {uploading ? "Uploading…" : "Upload"}
+                </Button>
+                <input ref={fileInputRef} type="file" className="hidden" onChange={handleUpload} />
+              </>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {documents.length === 0 ? (
