@@ -132,6 +132,7 @@ export function AppSidebar() {
 
 
   const actionItems: NavItem[] = [
+    { title: "Social Posts", url: `${prefix}/social-posts`, icon: Share2 },
     { title: "Digital Card", url: `${prefix}/digital-card`, icon: CreditCard },
     { title: "Create Image", url: `${prefix}/create-image`, icon: ImageIcon },
     { title: "Resources", url: `${prefix}/resources`, icon: FolderOpen },

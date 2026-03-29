@@ -102,6 +102,7 @@ const App = () => (
             <Route path="/agent/create-image" element={<CreateImagePage />} />
             <Route path="/agent/enroll" element={<EnrollStudent />} />
             <Route path="/agent/digital-card" element={<DigitalCardPage />} />
+            <Route path="/agent/social-posts" element={<AgentSocialFeedPage />} />
             <Route path="/agent/leads" element={<LeadsPage />} />
             <Route path="/agent/tasks" element={<TasksPage />} />
             
