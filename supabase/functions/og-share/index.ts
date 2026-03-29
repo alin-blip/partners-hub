@@ -24,11 +24,12 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
-  // Fetch agent profile
+  // Fetch agent profile (use profiles table directly — view may not work with service role)
   const { data: profile } = await supabase
-    .from("public_agent_profiles")
+    .from("profiles")
     .select("id, full_name, avatar_url, slug")
     .eq("slug", slug)
+    .eq("is_active", true)
     .single();
 
   if (!profile) {
