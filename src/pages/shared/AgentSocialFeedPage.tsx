@@ -77,45 +77,38 @@ export default function AgentSocialFeedPage() {
   const hasCard = cardSettings?.is_public && cardSettings?.slug;
   const cardUrl = hasCard ? `${window.location.origin}/card/${cardSettings.slug}` : null;
 
-  const getOgShareUrl = (postId: string) => {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    return `${supabaseUrl}/functions/v1/og-share?slug=${cardSettings?.slug}&post=${postId}`;
+  const platformNames: Record<string, string> = {
+    facebook: "Facebook",
+    instagram: "Instagram",
+    tiktok: "TikTok",
+    linkedin: "LinkedIn",
   };
 
-  const copyForPlatform = async (post: any, platform: string) => {
+  const handleShareForPlatform = async (post: any, platform: string) => {
     if (!hasCard) {
-      toast.error("Create your digital card first to share posts");
+      toast.error("Creează-ți cardul digital pentru a distribui postări");
       return;
     }
-    if (!post.seen_at) markSeen.mutate(post.id);
+    try {
+      const response = await fetch(post.image_url);
+      const blob = await response.blob();
+      const ext = blob.type.includes("png") ? "png" : "jpg";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `eduforyou-post-${post.id.slice(0, 8)}.${ext}`;
+      a.click();
+      URL.revokeObjectURL(url);
 
-    const ogUrl = getOgShareUrl(post.id);
-    const shareText = `${post.caption}\n\n🔗 ${cardUrl}`;
-    const encodedOgUrl = encodeURIComponent(ogUrl);
+      const shareText = `${post.caption}\n\n🔗 ${cardUrl}`;
+      await navigator.clipboard.writeText(shareText);
 
-    switch (platform) {
-      case "facebook":
-        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodedOgUrl}&quote=${encodeURIComponent(post.caption)}`, "_blank");
-        break;
-      case "linkedin":
-        window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodedOgUrl}`, "_blank");
-        break;
-      case "instagram":
-      case "tiktok":
-        try {
-          await navigator.clipboard.writeText(shareText);
-          toast.success(`Caption + link copied! Paste it in ${platform === "instagram" ? "Instagram" : "TikTok"}.`);
-        } catch {
-          toast.error("Failed to copy to clipboard");
-        }
-        break;
-      default:
-        try {
-          await navigator.clipboard.writeText(shareText);
-          toast.success("Caption + your card link copied!");
-        } catch {
-          toast.error("Failed to copy to clipboard");
-        }
+      if (!post.seen_at) markSeen.mutate(post.id);
+
+      const name = platformNames[platform] || platform;
+      toast.success(`Imagine salvată și descriere copiată! Postează pe ${name}.`);
+    } catch {
+      toast.error("Eroare la descărcare sau copiere");
     }
   };
 
