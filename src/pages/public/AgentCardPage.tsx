@@ -47,10 +47,10 @@ export default function AgentCardPage() {
   useEffect(() => {
     if (!slug) return;
     (async () => {
-      // Fetch profile by slug
+      // Fetch profile by slug using the public view (no email/phone exposed)
       const { data: prof } = await supabase
-        .from("profiles")
-        .select("id, full_name, email, phone, avatar_url")
+        .from("public_agent_profiles" as any)
+        .select("id, full_name, avatar_url, slug")
         .eq("slug", slug)
         .single();
 
