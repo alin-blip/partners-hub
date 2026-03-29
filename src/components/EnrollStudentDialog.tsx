@@ -23,33 +23,7 @@ const STUDY_PATTERNS_FALLBACK = ["Weekdays", "Weekend", "Evenings"];
 const RELATIONSHIP_OPTIONS = ["Parent", "Spouse", "Sibling", "Friend", "Other"];
 const DOC_TYPES_ENROLL = ["Passport", "Proof of Address", "Other"];
 
-const CONSENT_CLAUSES = [
-  {
-    id: "data_processing",
-    title: "Data Processing Consent",
-    text: "I consent to EduForYou UK collecting, processing, and storing my personal data for the purpose of facilitating my enrollment at the selected university. This includes sharing my personal information with the university's admissions team as required under the UK General Data Protection Regulation (UK GDPR).",
-  },
-  {
-    id: "document_sharing",
-    title: "Document Sharing Consent",
-    text: "I authorise EduForYou UK to share all documents I have provided (including identification documents, proof of address, qualifications, and any other supporting materials) with the university and relevant regulatory bodies as part of the enrollment and admissions process.",
-  },
-  {
-    id: "communication",
-    title: "Communication Consent",
-    text: "I consent to being contacted by EduForYou UK and the university regarding my application, enrollment status, and any related matters via email, telephone, SMS, or postal correspondence.",
-  },
-  {
-    id: "student_finance",
-    title: "Student Finance Consent",
-    text: "Where applicable, I consent to EduForYou UK sharing my data with Student Finance England (SFE) or other relevant funding bodies to facilitate my student finance application and funding arrangements.",
-  },
-  {
-    id: "accuracy",
-    title: "Declaration of Accuracy",
-    text: "I declare that all information I have provided is true, complete, and accurate to the best of my knowledge. I understand that providing false or misleading information may result in the withdrawal of any offer of admission or termination of enrollment.",
-  },
-];
+import { CONSENT_CLAUSES, MARKETING_OPTIONS } from "@/lib/consent-clauses";
 
 function sanitizeName(name: string) {
   return name.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 30);

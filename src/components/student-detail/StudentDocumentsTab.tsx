@@ -18,13 +18,7 @@ import JSZip from "jszip";
 
 const DOC_TYPES = ["Passport", "Transcript", "Offer Letter", "Visa", "Qualification Certificate", "Share Code", "Proof of Address", "Other"];
 
-const CONSENT_CLAUSES = [
-  { id: "data_processing", title: "Data Processing Consent", text: "I consent to EduForYou UK collecting, processing, and storing my personal data for the purpose of facilitating my enrollment at the selected university." },
-  { id: "document_sharing", title: "Document Sharing Consent", text: "I authorise EduForYou UK to share all documents I have provided with the university and relevant regulatory bodies." },
-  { id: "communication", title: "Communication Consent", text: "I consent to being contacted by EduForYou UK and the university regarding my application." },
-  { id: "student_finance", title: "Student Finance Consent", text: "Where applicable, I consent to EduForYou UK sharing my data with Student Finance England (SFE)." },
-  { id: "accuracy", title: "Declaration of Accuracy", text: "I declare that all information I have provided is true, complete, and accurate to the best of my knowledge." },
-];
+import { CONSENT_CLAUSES, MARKETING_OPTIONS } from "@/lib/consent-clauses";
 
 function sanitizeName(name: string) {
   return name.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 30);
