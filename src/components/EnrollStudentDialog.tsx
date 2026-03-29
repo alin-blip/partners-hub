@@ -116,7 +116,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
     setPreviousFundingYears(""); setCrn(""); setQualifications(""); setNotes("");
     setNokName(""); setNokPhone(""); setNokRelationship("");
     setDocFiles([]); setSelectedDocType("Passport");
-    setConsentChecks({}); setConsentSignature("");
+    setConsentChecks({}); setConsentSignature(""); setSignatureDataUrl(null);
   };
 
   const { data: universities = [] } = useQuery({
