@@ -209,9 +209,7 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
       }
       const pdfBlob = new Blob([bytes], { type: "application/pdf" });
 
-      const agName = sanitizeName(agentProfile?.full_name || "agent");
-      const stName = sanitizeName(`${student.first_name}_${student.last_name}`);
-      const storagePath = `${agName}_${student.agent_id}/${stName}_${student.id}/Consent_Form_${Date.now()}.pdf`;
+      const storagePath = `${student.id}/Consent_Form_${Date.now()}.pdf`;
 
       const { error: uploadError } = await supabase.storage
         .from("student-documents")
