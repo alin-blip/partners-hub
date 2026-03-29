@@ -191,10 +191,10 @@ export default function AgentCardPage() {
             </TabsList>
 
             <TabsContent value="personal" className="mt-4 space-y-3">
-              {profile.phone && (
-                <a href={`tel:${profile.phone}`} className="flex items-center gap-3 text-sm text-foreground hover:text-accent transition-colors">
+              {settings.whatsapp && (
+                <a href={`tel:${settings.whatsapp}`} className="flex items-center gap-3 text-sm text-foreground hover:text-accent transition-colors">
                   <Phone className="w-4 h-4 text-accent" />
-                  {profile.phone}
+                  {settings.whatsapp}
                 </a>
               )}
               {whatsappUrl && (
@@ -203,10 +203,6 @@ export default function AgentCardPage() {
                   WhatsApp
                 </a>
               )}
-              <a href={`mailto:${profile.email}`} className="flex items-center gap-3 text-sm text-foreground hover:text-accent transition-colors">
-                <Mail className="w-4 h-4 text-accent" />
-                {profile.email}
-              </a>
               {settings.bio && (
                 <p className="text-sm text-muted-foreground pt-2 border-t">{settings.bio}</p>
               )}
