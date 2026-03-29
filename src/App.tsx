@@ -26,6 +26,8 @@ import CreateImagePage from "./pages/shared/CreateImagePage";
 import UnsubscribePage from "./pages/shared/UnsubscribePage";
 import MessagesPage from "./pages/shared/MessagesPage";
 import DigitalCardPage from "./pages/shared/DigitalCardPage";
+import SocialPostsPage from "./pages/shared/SocialPostsPage";
+import AgentSocialFeedPage from "./pages/shared/AgentSocialFeedPage";
 
 import FeedbackPage from "./pages/owner/FeedbackPage";
 import LeadsPage from "./pages/shared/LeadsPage";
