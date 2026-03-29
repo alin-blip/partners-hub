@@ -18,7 +18,7 @@ import JSZip from "jszip";
 
 const DOC_TYPES = ["Passport", "Transcript", "Offer Letter", "Visa", "Qualification Certificate", "Share Code", "Proof of Address", "Other"];
 
-import { CONSENT_CLAUSES, MARKETING_OPTIONS } from "@/lib/consent-clauses";
+import { CONSENT_CLAUSES, MARKETING_OPTIONS, DEFAULT_MARKETING_CHECKS } from "@/lib/consent-clauses";
 
 function sanitizeName(name: string) {
   return name.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 30);
