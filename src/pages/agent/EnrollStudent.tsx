@@ -309,6 +309,9 @@ export default function EnrollStudent() {
       // Generate and upload consent PDF
       await generateAndUploadConsentPdf(student.id);
 
+      // Sync to Google Drive (non-blocking)
+      syncToDrive("student_created", student.id);
+
       return student.id;
     },
     onSuccess: async (studentId) => {

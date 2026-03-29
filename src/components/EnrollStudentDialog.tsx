@@ -313,6 +313,9 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
 
       // Generate and upload consent PDF
       await generateAndUploadConsentPdf(student.id);
+
+      // Sync to Google Drive (non-blocking)
+      syncToDrive("student_created", student.id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["all-students"] });
