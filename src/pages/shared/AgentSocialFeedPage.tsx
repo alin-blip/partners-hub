@@ -159,23 +159,45 @@ export default function AgentSocialFeedPage() {
                           <span className="ml-2 text-accent font-medium">● New</span>
                         )}
                       </span>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleShare(post)}
-                          disabled={!hasCard}
-                        >
-                          <Copy className="w-3 h-3 mr-1" /> Share
-                        </Button>
+                      <div className="flex gap-1.5 items-center">
+                        <TooltipProvider delayDuration={300}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button size="icon" variant="outline" className="h-8 w-8" disabled={!hasCard} onClick={() => copyForPlatform(post, "facebook")}>
+                                <SiFacebook className="w-3.5 h-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Share on Facebook</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button size="icon" variant="outline" className="h-8 w-8" disabled={!hasCard} onClick={() => copyForPlatform(post, "instagram")}>
+                                <SiInstagram className="w-3.5 h-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Copy for Instagram</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button size="icon" variant="outline" className="h-8 w-8" disabled={!hasCard} onClick={() => copyForPlatform(post, "tiktok")}>
+                                <SiTiktok className="w-3.5 h-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Copy for TikTok</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button size="icon" variant="outline" className="h-8 w-8" disabled={!hasCard} onClick={() => copyForPlatform(post, "linkedin")}>
+                                <FaLinkedinIn className="w-3.5 h-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Share on LinkedIn</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                         {hasCard && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            asChild
-                          >
+                          <Button size="icon" variant="ghost" className="h-8 w-8" asChild>
                             <a href={cardUrl!} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="w-3 h-3 mr-1" /> My Card
+                              <ExternalLink className="w-3.5 h-3.5" />
                             </a>
                           </Button>
                         )}
