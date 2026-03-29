@@ -156,7 +156,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         url: publicUrl.publicUrl,
-        remaining: 5 - ((count ?? 0) + 1),
+        remaining: DAILY_LIMIT - ((count ?? 0) + 1),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
