@@ -219,6 +219,8 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
       setPreviewUrl(null);
       refetchDocs();
       queryClient.invalidateQueries({ queryKey: ["student-consent-status", student.id] });
+      // Sync to Google Drive
+      syncToDrive("consent_generated", student.id);
     } catch (err: any) {
       toast({ title: "Failed to generate consent form", description: err.message, variant: "destructive" });
     } finally {
