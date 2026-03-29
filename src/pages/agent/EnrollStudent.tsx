@@ -212,6 +212,7 @@ export default function EnrollStudent() {
         agentName: agentProfile?.full_name || "EduForYou UK",
         signature: consentSignature,
         consentDate: new Date().toLocaleDateString("en-GB"),
+        marketingConsent: marketingChecks,
         ...sigBody,
       },
     });
