@@ -123,6 +123,8 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
       if (dbError) throw dbError;
       toast({ title: "Document uploaded" });
       refetchDocs();
+      // Sync to Google Drive
+      syncToDrive("document_uploaded", student.id, undefined);
     } catch (err: any) {
       toast({ title: "Upload failed", description: err.message, variant: "destructive" });
     } finally {
