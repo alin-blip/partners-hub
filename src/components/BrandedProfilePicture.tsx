@@ -6,10 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Download, Upload, UserCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-const LOGO_URL = "/images/eduforyou-logo.png";
+const LOGO_URL = "/images/eduforyou-icon.jpg";
 const CANVAS_SIZE = 1080;
-const BORDER_WIDTH = 80;
-const LOGO_HEIGHT = 100;
+const BORDER_WIDTH = 140;
+const LOGO_ICON_SIZE = 70;
 
 export function BrandedProfilePicture() {
   const { profile } = useAuth();
@@ -89,24 +89,56 @@ export function BrandedProfilePicture() {
       ctx.drawImage(avatarImg, drawX, drawY, drawW, drawH);
       ctx.restore();
 
-      // Draw logo at the bottom of the ring
-      const logoAspect = logoImg.width / logoImg.height;
-      const logoW = LOGO_HEIGHT * logoAspect;
-      const logoX = center - logoW / 2;
-      const logoY = CANVAS_SIZE - BORDER_WIDTH - LOGO_HEIGHT / 2 + 10;
+      // Draw icon + "EduForYou" text at the top of the ring
+      const iconSize = LOGO_ICON_SIZE;
+      const iconAspect = logoImg.width / logoImg.height;
+      const iconW = iconSize * iconAspect;
+      const iconX = center - 120;
+      const iconY = 30;
 
-      // White pill background behind logo for readability
-      const pillPadX = 16;
-      const pillPadY = 8;
-      const pillW = logoW + pillPadX * 2;
-      const pillH = LOGO_HEIGHT + pillPadY * 2;
+      // White pill background
+      const pillW = 280;
+      const pillH = iconSize + 20;
       const pillX = center - pillW / 2;
-      const pillY = logoY - pillPadY;
+      const pillY = iconY - 6;
       ctx.fillStyle = "rgba(255,255,255,0.95)";
       roundRect(ctx, pillX, pillY, pillW, pillH, pillH / 2);
       ctx.fill();
 
-      ctx.drawImage(logoImg, logoX, logoY, logoW, LOGO_HEIGHT);
+      ctx.drawImage(logoImg, iconX, iconY + 4, iconW, iconSize - 8);
+
+      // "EduForYou" text next to icon
+      ctx.fillStyle = "#E8600A";
+      ctx.font = "bold 38px Inter, Arial, sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText("EduForYou", iconX + iconW + 10, iconY + iconSize / 2);
+
+      // "AGENT CERTIFICAT" banner at the bottom
+      const bannerH = 70;
+      const bannerY = CANVAS_SIZE - BORDER_WIDTH + 15;
+      const bannerGrad = ctx.createLinearGradient(0, bannerY, CANVAS_SIZE, bannerY);
+      bannerGrad.addColorStop(0, "rgba(15, 25, 45, 0.95)");
+      bannerGrad.addColorStop(1, "rgba(25, 40, 70, 0.95)");
+
+      // Pill-shaped banner
+      const bannerW = 460;
+      const bannerX = center - bannerW / 2;
+      ctx.fillStyle = bannerGrad;
+      roundRect(ctx, bannerX, bannerY, bannerW, bannerH, bannerH / 2);
+      ctx.fill();
+
+      // White border on banner
+      ctx.strokeStyle = "#E8600A";
+      ctx.lineWidth = 3;
+      roundRect(ctx, bannerX, bannerY, bannerW, bannerH, bannerH / 2);
+      ctx.stroke();
+
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "bold 34px Inter, Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("⭐ AGENT CERTIFICAT ⭐", center, bannerY + bannerH / 2);
 
       setIsReady(true);
     } catch (e) {
