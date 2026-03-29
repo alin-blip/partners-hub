@@ -83,31 +83,55 @@ export default function AgentSocialFeedPage() {
     linkedin: "LinkedIn",
   };
 
+  const platformFallbackUrls: Record<string, (text: string, url: string) => string | null> = {
+    facebook: (text, url) => `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}&quote=${encodeURIComponent(text)}`,
+    linkedin: (_text, url) => `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
+    whatsapp: (text) => `https://wa.me/?text=${encodeURIComponent(text)}`,
+    instagram: () => null,
+    tiktok: () => null,
+  };
+
   const handleShareForPlatform = async (post: any, platform: string) => {
     if (!hasCard) {
       toast.error("Creează-ți cardul digital pentru a distribui postări");
       return;
     }
+    const shareText = `${post.caption}\n\n🔗 ${cardUrl}`;
+
     try {
       const response = await fetch(post.image_url);
       const blob = await response.blob();
-      const ext = blob.type.includes("png") ? "png" : "jpg";
-      const url = URL.createObjectURL(blob);
+      const mimeType = blob.type || "image/jpeg";
+      const ext = mimeType.includes("png") ? "png" : "jpg";
+      const imageFile = new File([blob], `eduforyou-post.${ext}`, { type: mimeType });
+
+      const shareData: ShareData = { files: [imageFile], text: shareText };
+
+      if (navigator.canShare && navigator.canShare(shareData)) {
+        await navigator.share(shareData);
+        if (!post.seen_at) markSeen.mutate(post.id);
+        return;
+      }
+
+      // Fallback: download + copy + open platform URL
+      const dlUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
+      a.href = dlUrl;
       a.download = `eduforyou-post-${post.id.slice(0, 8)}.${ext}`;
       a.click();
-      URL.revokeObjectURL(url);
+      URL.revokeObjectURL(dlUrl);
 
-      const shareText = `${post.caption}\n\n🔗 ${cardUrl}`;
       await navigator.clipboard.writeText(shareText);
 
-      if (!post.seen_at) markSeen.mutate(post.id);
+      const fallbackUrl = platformFallbackUrls[platform]?.(shareText, cardUrl!);
+      if (fallbackUrl) window.open(fallbackUrl, "_blank");
 
+      if (!post.seen_at) markSeen.mutate(post.id);
       const name = platformNames[platform] || platform;
       toast.success(`Imagine salvată și descriere copiată! Postează pe ${name}.`);
-    } catch {
-      toast.error("Eroare la descărcare sau copiere");
+    } catch (err: any) {
+      if (err?.name === "AbortError") return;
+      toast.error("Eroare la partajare");
     }
   };
 
@@ -123,14 +147,13 @@ export default function AgentSocialFeedPage() {
       a.click();
       URL.revokeObjectURL(url);
 
-      // Also copy caption + link to clipboard
       const shareText = `${post.caption}${cardUrl ? `\n\n🔗 ${cardUrl}` : ""}`;
       await navigator.clipboard.writeText(shareText);
-      toast.success("Image downloaded & caption copied!");
+      toast.success("Imagine salvată și descriere copiată!");
 
       if (!post.seen_at) markSeen.mutate(post.id);
     } catch {
-      toast.error("Failed to download image");
+      toast.error("Eroare la descărcare");
     }
   };
 
