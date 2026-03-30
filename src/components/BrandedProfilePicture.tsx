@@ -125,8 +125,8 @@ export function BrandedProfilePicture() {
       } catch (e) {
         console.error("Canvas draw error:", e);
         toast({
-          title: "Eroare",
-          description: "Nu s-a putut compune poza cu overlay-ul transparent.",
+          title: "Error",
+          description: "Could not compose the photo with the overlay.",
           variant: "destructive",
         });
       } finally {
@@ -147,11 +147,11 @@ export function BrandedProfilePicture() {
     if (!file || !user) return;
 
     if (!file.type.startsWith("image/")) {
-      toast({ title: "Fișier invalid", description: "Încarcă JPG sau PNG", variant: "destructive" });
+      toast({ title: "Invalid file", description: "Upload a JPG or PNG", variant: "destructive" });
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast({ title: "Prea mare", description: "Maximum 5MB", variant: "destructive" });
+      toast({ title: "Too large", description: "Maximum 5MB", variant: "destructive" });
       return;
     }
 
@@ -174,7 +174,7 @@ export function BrandedProfilePicture() {
     link.href = canvas.toDataURL("image/png");
     link.click();
 
-    toast({ title: "Descărcat!", description: "Imaginea de profil a fost salvată." });
+    toast({ title: "Downloaded!", description: "Profile picture saved." });
   };
 
   return (
@@ -185,7 +185,7 @@ export function BrandedProfilePicture() {
           Profile Photo
         </CardTitle>
         <CardDescription>
-          Încarcă o poză de profil — se va folosi pe Digital Card și rețele sociale cu overlay-ul EduForYou
+          Upload a profile photo — it will be used on your Digital Card and social media with the EduForYou overlay
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -195,7 +195,7 @@ export function BrandedProfilePicture() {
               <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
                 <div className="flex flex-col items-center gap-2">
                   <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                  <span className="text-xs text-muted-foreground">Se compune imaginea...</span>
+                  <span className="text-xs text-muted-foreground">Composing image...</span>
                 </div>
               </div>
             )}
@@ -203,7 +203,7 @@ export function BrandedProfilePicture() {
             {!avatarSrc && !generating && (
               <div className="text-center text-muted-foreground text-sm p-4">
                 <UserCircle className="w-12 h-12 mx-auto mb-2 opacity-40" />
-                Încarcă o poză pentru a genera
+                Upload a photo to generate
               </div>
             )}
 
@@ -224,19 +224,19 @@ export function BrandedProfilePicture() {
             />
             <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
               <Upload className="w-4 h-4 mr-1" />
-              {avatarSrc ? "Schimbă poza" : "Încarcă poză"}
+              {avatarSrc ? "Change photo" : "Upload photo"}
             </Button>
             {isReady && (
               <Button size="sm" onClick={handleDownload}>
                 <Download className="w-4 h-4 mr-1" />
-                Descarcă
+                Download
               </Button>
             )}
           </div>
 
           {avatarSrc && (
             <p className="text-xs text-muted-foreground text-center max-w-xs">
-              Poza umple cercul complet, iar overlay-ul transparent rămâne fix pe margine.
+              The photo fills the circle completely, and the transparent overlay stays fixed on the edge.
             </p>
           )}
         </div>

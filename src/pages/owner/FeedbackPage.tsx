@@ -15,10 +15,10 @@ const statusColors: Record<string, string> = {
 };
 
 const categoryLabels: Record<string, string> = {
-  suggestion: "Sugestie",
+  suggestion: "Suggestion",
   bug: "Bug",
-  simplify: "Simplificare",
-  feature: "Funcție nouă",
+  simplify: "Simplification",
+  feature: "New Feature",
 };
 
 export default function FeedbackPage() {
@@ -60,7 +60,7 @@ export default function FeedbackPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["feedback"] });
-      toast({ title: "Status actualizat" });
+      toast({ title: "Status updated" });
     },
   });
 
@@ -68,34 +68,34 @@ export default function FeedbackPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Feedback utilizatori</h1>
+          <h1 className="text-2xl font-bold">User Feedback</h1>
           <Select value={filterStatus} onValueChange={setFilterStatus}>
             <SelectTrigger className="w-40">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Toate</SelectItem>
-              <SelectItem value="new">Noi</SelectItem>
-              <SelectItem value="reviewed">Revizuite</SelectItem>
-              <SelectItem value="done">Rezolvate</SelectItem>
+               <SelectItem value="all">All</SelectItem>
+               <SelectItem value="new">New</SelectItem>
+               <SelectItem value="reviewed">Reviewed</SelectItem>
+               <SelectItem value="done">Resolved</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         {isLoading ? (
-          <p className="text-muted-foreground">Se încarcă...</p>
+          <p className="text-muted-foreground">Loading...</p>
         ) : feedbacks.length === 0 ? (
-          <p className="text-muted-foreground">Niciun feedback încă.</p>
+          <p className="text-muted-foreground">No feedback yet.</p>
         ) : (
           <div className="rounded-lg border bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Utilizator</TableHead>
-                  <TableHead>Categorie</TableHead>
-                  <TableHead className="min-w-[300px]">Mesaj</TableHead>
-                  <TableHead>Status</TableHead>
+               <TableHead>Date</TableHead>
+                   <TableHead>User</TableHead>
+                   <TableHead>Category</TableHead>
+                   <TableHead className="min-w-[300px]">Message</TableHead>
+                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -122,9 +122,9 @@ export default function FeedbackPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="new">Nou</SelectItem>
-                            <SelectItem value="reviewed">Revizuit</SelectItem>
-                            <SelectItem value="done">Rezolvat</SelectItem>
+                             <SelectItem value="new">New</SelectItem>
+                             <SelectItem value="reviewed">Reviewed</SelectItem>
+                             <SelectItem value="done">Resolved</SelectItem>
                           </SelectContent>
                         </Select>
                       </TableCell>

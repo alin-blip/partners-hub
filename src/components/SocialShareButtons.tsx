@@ -81,9 +81,9 @@ export function SocialShareButtons({
 
         onShared?.();
         const name = platformNames[platform] || platform;
-        toast.success(`Imagine salvată și text copiat! Postează pe ${name} și lipește textul.`);
+        toast.success(`Image saved & text copied! Post on ${name} and paste the caption.`);
       } catch {
-        toast.error("Eroare la descărcare");
+        toast.error("Download failed");
       }
       return;
     }
@@ -115,10 +115,10 @@ export function SocialShareButtons({
 
       onShared?.();
       const name = platformNames[platform] || platform;
-      toast.success(`Imagine salvată și text copiat! Postează pe ${name} și lipește textul.`);
+      toast.success(`Image saved & text copied! Post on ${name} and paste the caption.`);
     } catch (err: any) {
       if (err?.name === "AbortError") return;
-      toast.error("Eroare la partajare");
+      toast.error("Share failed");
     }
   };
 
@@ -137,13 +137,13 @@ export function SocialShareButtons({
       const shareText = cardUrl ? `${caption}\n\n🔗 ${cardUrl}` : caption;
       if (shareText) {
         await navigator.clipboard.writeText(shareText);
-        toast.success("Imagine salvată și descriere copiată!");
+        toast.success("Image saved & caption copied!");
       } else {
-        toast.success("Imagine salvată!");
+        toast.success("Image saved!");
       }
       onShared?.();
     } catch {
-      toast.error("Eroare la descărcare");
+      toast.error("Download failed");
     }
   };
 

@@ -35,6 +35,7 @@ interface CardSettings {
   social_facebook: string;
   social_linkedin: string;
   social_tiktok: string;
+  ai_voice_enabled: boolean;
 }
 
 export default function AgentCardPage() {
@@ -79,6 +80,22 @@ export default function AgentCardPage() {
       setLoading(false);
     })();
   }, [slug]);
+
+  // Load ElevenLabs widget script when AI voice is enabled
+  useEffect(() => {
+    if (!settings?.ai_voice_enabled) return;
+    const scriptId = "elevenlabs-convai-script";
+    if (document.getElementById(scriptId)) return;
+    const script = document.createElement("script");
+    script.id = scriptId;
+    script.src = "https://elevenlabs.io/convai-widget/index.js";
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      const el = document.getElementById(scriptId);
+      if (el) el.remove();
+    };
+  }, [settings?.ai_voice_enabled]);
 
   if (loading) {
     return (
@@ -264,6 +281,15 @@ export default function AgentCardPage() {
                 </a>
               ))}
             </div>
+          )}
+
+          {/* ElevenLabs AI Voice Widget */}
+          {settings.ai_voice_enabled && (
+            <div
+              dangerouslySetInnerHTML={{
+                __html: '<elevenlabs-convai agent-id="agent_4501kmytq1bnekgs59jh6rzjwxw4"></elevenlabs-convai>',
+              }}
+            />
           )}
         </div>
       </div>

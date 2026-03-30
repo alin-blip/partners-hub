@@ -17,6 +17,7 @@ export type Database = {
       agent_card_settings: {
         Row: {
           accreditation: string | null
+          ai_voice_enabled: boolean
           apply_url: string | null
           bio: string | null
           booking_url: string | null
@@ -40,6 +41,7 @@ export type Database = {
         }
         Insert: {
           accreditation?: string | null
+          ai_voice_enabled?: boolean
           apply_url?: string | null
           bio?: string | null
           booking_url?: string | null
@@ -63,6 +65,7 @@ export type Database = {
         }
         Update: {
           accreditation?: string | null
+          ai_voice_enabled?: boolean
           apply_url?: string | null
           bio?: string | null
           booking_url?: string | null

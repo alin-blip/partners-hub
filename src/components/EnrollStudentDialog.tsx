@@ -435,7 +435,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
               <div className="space-y-2">
                 <Label>CRN (Customer Reference Number)</Label>
                 <Input value={crn} onChange={(e) => setCrn(e.target.value)} placeholder="e.g. 1234567890" />
-                <p className="text-xs text-muted-foreground">Numărul de referință SFE al studentului</p>
+                <p className="text-xs text-muted-foreground">Student's SFE reference number</p>
               </div>
             )}
             <div className="space-y-2"><Label>Qualifications</Label><Textarea value={qualifications} onChange={(e) => setQualifications(e.target.value)} placeholder="Previous qualifications…" /></div>

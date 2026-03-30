@@ -98,7 +98,7 @@ export default function AgentSocialFeedPage() {
 
   const handleShareForPlatform = async (post: any, platform: string) => {
     if (!hasCard) {
-      toast.error("Creează-ți cardul digital pentru a distribui postări");
+      toast.error("Set up your digital card first to share posts");
       return;
     }
     const shareText = `${post.caption}\n\n🔗 ${cardUrl}`;
@@ -125,9 +125,9 @@ export default function AgentSocialFeedPage() {
 
         if (!post.seen_at) markSeen.mutate(post.id);
         const name = platformNames[platform] || platform;
-        toast.success(`Imagine salvată și text copiat! Postează pe ${name} și lipește textul.`);
+        toast.success(`Image saved & text copied! Post on ${name} and paste the caption.`);
       } catch {
-        toast.error("Eroare la descărcare");
+        toast.error("Download failed");
       }
       return;
     }
@@ -158,10 +158,10 @@ export default function AgentSocialFeedPage() {
 
       if (!post.seen_at) markSeen.mutate(post.id);
       const name = platformNames[platform] || platform;
-      toast.success(`Imagine salvată și text copiat! Postează pe ${name} și lipește textul.`);
+      toast.success(`Image saved & text copied! Post on ${name} and paste the caption.`);
     } catch (err: any) {
       if (err?.name === "AbortError") return;
-      toast.error("Eroare la partajare");
+      toast.error("Share failed");
     }
   };
 
@@ -179,11 +179,11 @@ export default function AgentSocialFeedPage() {
 
       const shareText = `${post.caption}${cardUrl ? `\n\n🔗 ${cardUrl}` : ""}`;
       await navigator.clipboard.writeText(shareText);
-      toast.success("Imagine salvată și descriere copiată!");
+      toast.success("Image saved & caption copied!");
 
       if (!post.seen_at) markSeen.mutate(post.id);
     } catch {
-      toast.error("Eroare la descărcare");
+      toast.error("Download failed");
     }
   };
 
