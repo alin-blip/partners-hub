@@ -146,8 +146,9 @@ export default function CardSettingsSection() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  const cardUrl = slug ? `${window.location.origin}/card/${slug}` : "";
-  const applyFormUrl = slug ? `${window.location.origin}/apply/${slug}` : "";
+  const BASE_URL = import.meta.env.PROD ? "https://agentseduforyou.lovable.app" : window.location.origin;
+  const cardUrl = slug ? `${BASE_URL}/card/${slug}` : "";
+  const applyFormUrl = slug ? `${BASE_URL}/apply/${slug}` : "";
 
   const copyLink = (url: string, label = "Link") => {
     navigator.clipboard.writeText(url);
