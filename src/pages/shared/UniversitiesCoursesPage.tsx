@@ -27,13 +27,21 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 
 const UNIVERSITY_URLS: Record<string, string> = {
-  "Global Banking School": "https://globalbanking.ac.uk/",
-  "QA": "https://qahighereducation.com/",
-  "Regent": "https://www.rcl.ac.uk/",
-  "Arden": "https://arden.ac.uk/",
-  "LSC": "https://www.lsclondon.co.uk/",
-  "UWTSD": "https://www.uwtsd.ac.uk/",
+  "global banking school": "https://globalbanking.ac.uk/",
+  "qa": "https://qahighereducation.com/",
+  "regent": "https://www.rcl.ac.uk/",
+  "arden": "https://arden.ac.uk/",
+  "lsc": "https://www.lsclondon.co.uk/",
+  "uwtsd": "https://www.uwtsd.ac.uk/",
 };
+
+function getUniversityUrl(uniName: string): string | null {
+  const lower = uniName.toLowerCase();
+  for (const [key, url] of Object.entries(UNIVERSITY_URLS)) {
+    if (lower.startsWith(key) || lower.includes(key)) return url;
+  }
+  return null;
+}
 
 export default function UniversitiesCoursesPage() {
   const [search, setSearch] = useState("");
