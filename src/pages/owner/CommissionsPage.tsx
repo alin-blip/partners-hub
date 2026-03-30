@@ -36,7 +36,7 @@ export default function CommissionsPage() {
     queryFn: async () => {
       const { data } = await (supabase as any)
         .from("university_commissions")
-        .select("university_id, commission_per_student, universities(name)");
+        .select("university_id, commission_per_student, tier_id, universities(name)");
       return data || [];
     },
   });

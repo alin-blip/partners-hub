@@ -473,9 +473,11 @@ function UniversityCommissionsSection({ universities }: { universities: any[] })
                 <TableRow key={uc.id}>
                   <TableCell className="font-medium">{uc.universities?.name}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">
-                    {tier ? `${tier.tier_name} (${tier.min_students}–${tier.max_students ?? "∞"})` : "Custom"}
+                    {tier ? <span className="text-accent font-medium">Linked to {tier.tier_name}</span> : <span>Custom</span>}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums font-semibold">£{Number(uc.commission_per_student).toLocaleString()}</TableCell>
+                  <TableCell className="text-right tabular-nums font-semibold">
+                    £{tier ? Number(tier.commission_per_student).toLocaleString() : Number(uc.commission_per_student).toLocaleString()}
+                  </TableCell>
                   <TableCell>{uc.is_highlighted ? "✅" : "—"}</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
