@@ -2,12 +2,11 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Upload, UserCircle, Loader2, RefreshCw } from "lucide-react";
+import { Download, Upload, UserCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import frameOverlay from "@/assets/profile-frame-transparent.png";
 
 const CANVAS_SIZE = 1080;
-const FRAME_STORAGE_URL_BASE = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/brand-assets/profile-frame-v1.png`;
 
 async function fetchImageAsBase64(url: string): Promise<string> {
   const response = await fetch(url);
@@ -27,63 +26,23 @@ export function BrandedProfilePicture() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
-  const [frameUrl, setFrameUrl] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [generatingFrame, setGeneratingFrame] = useState(false);
 
-  // Use profile avatar as default — convert to base64 to avoid CORS issues on canvas
   useEffect(() => {
     const avatarUrl = (profile as any)?.avatar_url;
     if (avatarUrl && !avatarSrc) {
-      fetchImageAsBase64(avatarUrl).then(setAvatarSrc).catch(() => {
-        // Fallback: try using URL directly
-        setAvatarSrc(avatarUrl);
-      });
+      fetchImageAsBase64(avatarUrl)
+        .then(setAvatarSrc)
+        .catch(() => setAvatarSrc(avatarUrl));
     }
-  }, [profile]);
-
-  // Load or generate frame on mount
-  useEffect(() => {
-    loadFrame(false);
-  }, []);
-
-  const loadFrame = async (regenerate: boolean) => {
-    setGeneratingFrame(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("generate-profile-frame", {
-        body: { regenerate },
-      });
-
-      if (error) throw error;
-      if (data?.url) {
-        // Add cache-buster for regenerated frames
-        const url = regenerate ? `${data.url}?t=${Date.now()}` : data.url;
-        setFrameUrl(url);
-      } else if (data?.error) {
-        throw new Error(data.error);
-      }
-    } catch (e: any) {
-      console.error("Frame load error:", e);
-      // If frame doesn't exist yet, that's okay — we'll show a message
-      if (!regenerate) {
-        // Try checking if the frame exists directly
-        setFrameUrl(`${FRAME_STORAGE_URL_BASE}?t=${Date.now()}`);
-      } else {
-        toast({
-          title: "Eroare",
-          description: e.message || "Nu s-a putut genera cadrul.",
-          variant: "destructive",
-        });
-      }
-    } finally {
-      setGeneratingFrame(false);
-    }
-  };
+  }, [profile, avatarSrc]);
 
   const drawCanvas = useCallback(
-    async (photoSrc: string, frameSrc: string) => {
+    async (photoSrc: string) => {
       setGenerating(true);
+      setIsReady(false);
+
       const canvas = canvasRef.current;
       if (!canvas) return;
 
@@ -94,33 +53,29 @@ export function BrandedProfilePicture() {
       canvas.height = CANVAS_SIZE;
 
       const center = CANVAS_SIZE / 2;
-      const photoRadius = CANVAS_SIZE / 2; // fill entire canvas with photo
+      const photoRadius = CANVAS_SIZE / 2;
 
       try {
-        // Convert URLs to base64 to avoid CORS canvas tainting
-        const [photoB64, frameB64] = await Promise.all([
-          photoSrc.startsWith("data:") ? photoSrc : fetchImageAsBase64(photoSrc),
-          frameSrc.startsWith("data:") ? frameSrc : fetchImageAsBase64(frameSrc),
-        ]);
-
+        const safePhotoSrc = photoSrc.startsWith("data:") ? photoSrc : await fetchImageAsBase64(photoSrc);
         const [avatarImg, frameImg] = await Promise.all([
-          loadImage(photoB64),
-          loadImage(frameB64),
+          loadImage(safePhotoSrc),
+          loadImage(frameOverlay),
         ]);
 
-        // Clear
         ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-        // 1. Draw circular photo first (underneath)
         ctx.save();
         ctx.beginPath();
         ctx.arc(center, center, photoRadius, 0, Math.PI * 2);
         ctx.closePath();
         ctx.clip();
 
-        // Cover-fit the avatar
         const imgAspect = avatarImg.width / avatarImg.height;
-        let drawW: number, drawH: number, drawX: number, drawY: number;
+        let drawW: number;
+        let drawH: number;
+        let drawX: number;
+        let drawY: number;
+
         if (imgAspect > 1) {
           drawH = photoRadius * 2;
           drawW = drawH * imgAspect;
@@ -132,18 +87,17 @@ export function BrandedProfilePicture() {
           drawX = center - photoRadius;
           drawY = center - drawH / 2;
         }
+
         ctx.drawImage(avatarImg, drawX, drawY, drawW, drawH);
         ctx.restore();
 
-        // 2. Draw AI-generated frame overlay on top
         ctx.drawImage(frameImg, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
-
         setIsReady(true);
       } catch (e) {
         console.error("Canvas draw error:", e);
         toast({
           title: "Eroare",
-          description: "Nu s-a putut genera imaginea. Verifică cadrul.",
+          description: "Nu s-a putut compune poza cu overlay-ul transparent.",
           variant: "destructive",
         });
       } finally {
@@ -153,36 +107,31 @@ export function BrandedProfilePicture() {
     [toast]
   );
 
-  // Re-draw whenever photo or frame changes
   useEffect(() => {
-    if (avatarSrc && frameUrl) {
-      drawCanvas(avatarSrc, frameUrl);
+    if (avatarSrc) {
+      drawCanvas(avatarSrc);
     }
-  }, [avatarSrc, frameUrl, drawCanvas]);
+  }, [avatarSrc, drawCanvas]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     const reader = new FileReader();
-    reader.onload = () => {
-      setAvatarSrc(reader.result as string);
-    };
+    reader.onload = () => setAvatarSrc(reader.result as string);
     reader.readAsDataURL(file);
   };
 
   const handleDownload = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
     const link = document.createElement("a");
     link.download = "eduforyou-profile-picture.png";
     link.href = canvas.toDataURL("image/png");
     link.click();
-    toast({ title: "Descărcat!", description: "Imaginea de profil a fost salvată." });
-  };
 
-  const handleRegenerateFrame = () => {
-    setIsReady(false);
-    loadFrame(true);
+    toast({ title: "Descărcat!", description: "Imaginea de profil a fost salvată." });
   };
 
   return (
@@ -193,29 +142,28 @@ export function BrandedProfilePicture() {
           Branded Profile Picture
         </CardTitle>
         <CardDescription>
-          Generează o poză de profil premium cu cadru AI EduForYou pentru social media
+          Generează o poză de profil premium cu overlay transparent EduForYou
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-col items-center gap-4">
-          {/* Canvas preview */}
           <div className="relative w-64 h-64 rounded-full overflow-hidden border-2 border-muted bg-muted flex items-center justify-center">
-            {(generating || generatingFrame) && (
+            {generating && (
               <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
                 <div className="flex flex-col items-center gap-2">
                   <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                  <span className="text-xs text-muted-foreground">
-                    {generatingFrame ? "Se generează cadrul AI..." : "Se compune imaginea..."}
-                  </span>
+                  <span className="text-xs text-muted-foreground">Se compune imaginea...</span>
                 </div>
               </div>
             )}
-            {!avatarSrc && !generating && !generatingFrame && (
+
+            {!avatarSrc && !generating && (
               <div className="text-center text-muted-foreground text-sm p-4">
                 <UserCircle className="w-12 h-12 mx-auto mb-2 opacity-40" />
                 Încarcă o poză pentru a genera
               </div>
             )}
+
             <canvas
               ref={canvasRef}
               className={`w-full h-full ${!avatarSrc ? "hidden" : ""}`}
@@ -223,7 +171,6 @@ export function BrandedProfilePicture() {
             />
           </div>
 
-          {/* Actions */}
           <div className="flex flex-wrap gap-2 justify-center">
             <input
               ref={fileInputRef}
@@ -232,11 +179,7 @@ export function BrandedProfilePicture() {
               className="hidden"
               onChange={handleFileUpload}
             />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-            >
+            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
               <Upload className="w-4 h-4 mr-1" />
               {avatarSrc ? "Schimbă poza" : "Încarcă poză"}
             </Button>
@@ -246,20 +189,11 @@ export function BrandedProfilePicture() {
                 Descarcă
               </Button>
             )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleRegenerateFrame}
-              disabled={generatingFrame}
-            >
-              <RefreshCw className={`w-4 h-4 mr-1 ${generatingFrame ? "animate-spin" : ""}`} />
-              Regenerează cadrul
-            </Button>
           </div>
 
           {avatarSrc && (
             <p className="text-xs text-muted-foreground text-center max-w-xs">
-              Descarcă și folosește ca poză de profil pe Facebook, Instagram, LinkedIn, WhatsApp etc.
+              Poza umple cercul complet, iar overlay-ul transparent rămâne fix pe margine.
             </p>
           )}
         </div>
@@ -271,7 +205,6 @@ export function BrandedProfilePicture() {
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
     img.onerror = reject;
     img.src = src;
