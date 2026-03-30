@@ -241,20 +241,31 @@ function CommissionTiersSection({ deleteItem, universities }: { deleteItem: any;
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <CardTitle className="text-base">Commission Tiers</CardTitle>
-        <Dialog open={addOpen} onOpenChange={(o) => { setAddOpen(o); if (!o) setAddUniId(""); }}>
+        <Dialog open={addOpen} onOpenChange={(o) => { setAddOpen(o); if (!o) { setAddUniId(""); setBulkTiers([{ tier_name: "", min_students: "0", max_students: "", commission_per_student: "500" }]); } }}>
           <DialogTrigger asChild>
             <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90">
               <Plus className="w-3 h-3 mr-1" /> Add
             </Button>
           </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Add Commission Tier</DialogTitle></DialogHeader>
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader><DialogTitle>Add Commission Tiers</DialogTitle></DialogHeader>
             <form className="space-y-4 pt-2" onSubmit={(e) => {
               e.preventDefault();
-              const fd = Object.fromEntries(new FormData(e.currentTarget));
-              addTier.mutate({ ...fd, university_id: addUniId && addUniId !== "global" ? addUniId : null });
+              const uniId = addUniId && addUniId !== "global" ? addUniId : null;
+              const rows = bulkTiers
+                .filter(t => t.tier_name.trim())
+                .map(t => ({
+                  tier_name: t.tier_name,
+                  min_students: Number(t.min_students),
+                  max_students: t.max_students ? Number(t.max_students) : null,
+                  commission_per_student: Number(t.commission_per_student),
+                  university_id: uniId,
+                }));
+              if (rows.length === 0) return;
+              addTiersBulk.mutate(rows);
               setAddOpen(false);
               setAddUniId("");
+              setBulkTiers([{ tier_name: "", min_students: "0", max_students: "", commission_per_student: "500" }]);
             }}>
               <div className="space-y-2">
                 <Label>University (optional — leave empty for global)</Label>
@@ -268,8 +279,86 @@ function CommissionTiersSection({ deleteItem, universities }: { deleteItem: any;
                   </SelectContent>
                 </Select>
               </div>
-              {tierFormFields()}
-              <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">Save</Button>
+
+              <div className="space-y-3">
+                <div className="grid grid-cols-[1fr_80px_80px_100px_36px] gap-2 text-xs font-medium text-muted-foreground px-1">
+                  <span>Tier Name</span>
+                  <span>Min</span>
+                  <span>Max</span>
+                  <span>£/Student</span>
+                  <span></span>
+                </div>
+                {bulkTiers.map((tier, idx) => (
+                  <div key={idx} className="grid grid-cols-[1fr_80px_80px_100px_36px] gap-2 items-center">
+                    <Input
+                      placeholder="e.g. Bronze"
+                      value={tier.tier_name}
+                      onChange={(e) => {
+                        const next = [...bulkTiers];
+                        next[idx] = { ...next[idx], tier_name: e.target.value };
+                        setBulkTiers(next);
+                      }}
+                      required
+                    />
+                    <Input
+                      type="number"
+                      min={0}
+                      value={tier.min_students}
+                      onChange={(e) => {
+                        const next = [...bulkTiers];
+                        next[idx] = { ...next[idx], min_students: e.target.value };
+                        setBulkTiers(next);
+                      }}
+                      required
+                    />
+                    <Input
+                      type="number"
+                      placeholder="∞"
+                      value={tier.max_students}
+                      onChange={(e) => {
+                        const next = [...bulkTiers];
+                        next[idx] = { ...next[idx], max_students: e.target.value };
+                        setBulkTiers(next);
+                      }}
+                    />
+                    <Input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={tier.commission_per_student}
+                      onChange={(e) => {
+                        const next = [...bulkTiers];
+                        next[idx] = { ...next[idx], commission_per_student: e.target.value };
+                        setBulkTiers(next);
+                      }}
+                      required
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      disabled={bulkTiers.length === 1}
+                      onClick={() => setBulkTiers(bulkTiers.filter((_, i) => i !== idx))}
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => setBulkTiers([...bulkTiers, { tier_name: "", min_students: "0", max_students: "", commission_per_student: "500" }])}
+                >
+                  <Plus className="w-3 h-3 mr-1" /> Add Another Tier
+                </Button>
+              </div>
+
+              <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
+                Save {bulkTiers.length > 1 ? `${bulkTiers.length} Tiers` : "Tier"}
+              </Button>
             </form>
           </DialogContent>
         </Dialog>
