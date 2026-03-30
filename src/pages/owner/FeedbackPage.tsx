@@ -74,10 +74,10 @@ export default function FeedbackPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Toate</SelectItem>
-              <SelectItem value="new">Noi</SelectItem>
-              <SelectItem value="reviewed">Revizuite</SelectItem>
-              <SelectItem value="done">Rezolvate</SelectItem>
+               <SelectItem value="all">All</SelectItem>
+               <SelectItem value="new">New</SelectItem>
+               <SelectItem value="reviewed">Reviewed</SelectItem>
+               <SelectItem value="done">Resolved</SelectItem>
             </SelectContent>
           </Select>
         </div>
