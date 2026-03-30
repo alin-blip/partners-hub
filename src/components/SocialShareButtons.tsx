@@ -38,6 +38,7 @@ interface SocialShareButtonsProps {
   filenamePrefix?: string;
   size?: "sm" | "default";
   onShared?: () => void;
+  ogShareUrl?: string | null;
 }
 
 export function SocialShareButtons({
