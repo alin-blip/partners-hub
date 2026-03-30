@@ -224,7 +224,7 @@ export function BrandedProfilePicture() {
             />
             <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
               <Upload className="w-4 h-4 mr-1" />
-              {avatarSrc ? "Schimbă poza" : "Încarcă poză"}
+              {avatarSrc ? "Change photo" : "Upload photo"}
             </Button>
             {isReady && (
               <Button size="sm" onClick={handleDownload}>
