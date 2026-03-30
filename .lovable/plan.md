@@ -1,48 +1,60 @@
 
 
-## Plan: Improve Course Details Visual Design
+## Plan: Scrape Course Details from University Websites
 
-The current inline details section uses a generic card with plain text blocks — hard to scan and visually flat against the dark course card background.
+Create a new edge function `scrape-course-details` that, for each university:
+1. Queries the DB for courses that DON'T have a `course_details` entry yet
+2. Uses Firecrawl to map + scrape course pages from the university website
+3. Uses AI to match scraped content to existing course names and extract details
+4. Upserts results into `course_details` table
 
-### Changes
+Then add a UI trigger on the Universities page (or Settings) to run this per-university.
 
-**File: `src/components/CourseDetailsInfoCard.tsx`**
+### Edge Function: `supabase/functions/scrape-course-details/index.ts`
 
-Redesign the compact mode (used inside course cards) with:
+**Input:** `{ university_id: string, university_url: string }`
 
-1. **Remove the wrapping Card** in compact mode — it creates a card-inside-a-card that clashes with the dark slate background. Use a simple `div` instead.
-2. **Section headers as colored badges/pills** — each section label (Entry Requirements, Admission Test, etc.) rendered as a small accent-colored badge instead of plain bold text.
-3. **Better spacing and visual hierarchy** — each section gets a subtle left border accent line (like a quote block) for scanability.
-4. **Improved text contrast** — use `text-slate-200` for labels and `text-slate-400` for content text to work with the dark card background.
-5. **Accordion-style collapsible sections** — use the existing `Accordion` component so users can expand/collapse individual requirement sections, reducing visual noise when there are many sections.
+**Flow:**
+1. Auth check (owner/admin only)
+2. Query `courses` for the given `university_id` where no matching `course_details` row exists (LEFT JOIN)
+3. If no courses missing details, return early
+4. Use Firecrawl `/v1/map` to discover course page URLs on the university site
+5. For each course without details, try to find a matching URL from the map results (fuzzy match course name in URL)
+6. Scrape matched URLs in batches of 5 using Firecrawl `/v1/scrape`
+7. Send all scraped content + list of course names to the AI (Gemini Flash) with a prompt to extract structured details per course:
+   - `entry_requirements`, `admission_test_info`, `interview_info`, `documents_required`, `personal_statement_guidelines`, `additional_info`
+8. Upsert results into `course_details` table
+9. Return summary of how many courses got details
 
-**File: `src/pages/shared/UniversitiesCoursesPage.tsx`**
+### UI: Add button on `UniversitiesCoursesPage.tsx`
 
-- Add a smooth expand animation on the details container (animate height with CSS transition class).
+- Add a "Scan Course Details" button (visible to owner/admin) per university tab
+- Shows a loading state while scanning
+- On completion, shows a toast with summary and refreshes the course details query
+- University URL mapping is hardcoded in the frontend:
+  ```typescript
+  const UNIVERSITY_URLS: Record<string, string> = {
+    "Global Banking School": "https://globalbanking.ac.uk/",
+    "QA": "https://qahighereducation.com/",
+    "Regent": "https://www.rcl.ac.uk/",
+    "Arden": "https://arden.ac.uk/",
+    "LSC": "https://www.lsclondon.co.uk/",
+    "UWTSD": "https://www.uwtsd.ac.uk/",
+  };
+  ```
 
-### Visual Result
+### Files to Create/Edit
 
-```text
-┌─────────────────────────────────┐
-│ BA (Hons) Business Management   │
-│ [Undergraduate] [Full-Time]     │
-│ 📅 May 2026, May 2025          │
-│                                 │
-│  [Hide]  [Apply →]             │
-│ ─────────────────────────────── │
-│  ▸ Entry Requirements           │
-│  ▸ Admission Test               │
-│  ▸ Interview                    │
-│  ▸ Documents Required           │
-│  ▸ Personal Statement           │
-└─────────────────────────────────┘
-```
-
-Each section expands on click to show the content with an accent left-border.
-
-### Files to Edit
 | File | Change |
 |------|--------|
-| `src/components/CourseDetailsInfoCard.tsx` | Redesign compact mode: accordion sections, accent borders, better dark-theme colors |
-| `src/pages/shared/UniversitiesCoursesPage.tsx` | Add smooth expand animation on details wrapper |
+| `supabase/functions/scrape-course-details/index.ts` | New edge function: map site → scrape → AI extract → upsert course_details |
+| `src/pages/shared/UniversitiesCoursesPage.tsx` | Add "Scan Details" button per university for owner/admin |
+
+### Technical Details
+
+- The AI prompt instructs Gemini to return a JSON array where each object has `course_name` (must match exactly one of the provided names) plus the 6 detail fields
+- Courses that the AI can't find info for are skipped (no empty rows inserted)
+- Uses service role key for DB operations in the edge function
+- Firecrawl map search query uses the course names to find relevant pages
+- Scrapes up to 30 pages per university to stay within reasonable limits
 
