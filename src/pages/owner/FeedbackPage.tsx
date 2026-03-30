@@ -60,7 +60,7 @@ export default function FeedbackPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["feedback"] });
-      toast({ title: "Status actualizat" });
+      toast({ title: "Status updated" });
     },
   });
 
