@@ -383,7 +383,7 @@ export default function CardSettingsSection() {
               </div>
             </div>
 
-            <Button type="submit" disabled={saveSettings.isPending} className="bg-accent text-accent-foreground hover:bg-accent/90">
+            <Button type="submit" disabled={saveSettings.isPending || slugTaken || checkingSlug} className="bg-accent text-accent-foreground hover:bg-accent/90">
               <Save className="w-3 h-3 mr-1" />
               {saveSettings.isPending ? "Saving…" : "Save Card Settings"}
             </Button>
