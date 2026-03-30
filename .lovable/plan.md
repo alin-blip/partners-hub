@@ -1,57 +1,39 @@
 
 
-## Plan: University-Level Commission Settings + Dashboard Offer Cards
+## Plan: Dynamic Tier Linking for University Commissions
 
-### What You Want
-1. **Set commission per university** — instead of only global tiers, assign a specific commission rate (or starting tier) to each university (e.g., LSC = £600/student)
-2. **Dashboard offer cards** — small promotional cards visible to agents/admins showing "Enroll at [University]: £[amount]/student"
+### Current Problem
+When you assign a tier to a university, the system copies the `commission_per_student` value at save time. It's static — changing the tier later doesn't update the university rate. Also, adding more tiers doesn't conflict, but the UI doesn't make this clear.
 
-### Database Changes
+### What Changes
 
-**New table: `university_commissions`**
-- `id` (uuid, PK)
-- `university_id` (uuid, references universities)
-- `commission_per_student` (numeric, e.g. 600)
-- `label` (text, optional — e.g. "Growth" or custom label)
-- `is_highlighted` (boolean, default false — controls if it shows as a dashboard offer card)
-- `highlight_text` (text, optional — e.g. "Inscrie studenti la LSC!")
-- `created_at`, `updated_at`
+**1. Make university commissions dynamically linked to tiers**
+- When a university has a `tier_id` set, the commission calculation should look up the tier's current rate at calculation time, not use the stored `commission_per_student`
+- The `commission_per_student` field becomes a fallback only used for "Custom" (no tier selected)
 
-RLS: owner full access, authenticated can read.
+**2. Update `calcCommissionByEnrollments` in `src/lib/commissions.ts`**
+- Accept university commissions with `tier_id` included
+- When a uni commission has a `tier_id`, look up the current tier rate from the tiers array
+- When no `tier_id`, use the stored `commission_per_student` (custom rate)
 
-### UI Changes
+**3. Update Settings UI (`src/pages/owner/SettingsPage.tsx`)**
+- In the university commissions table, show the **current** tier rate (from the linked tier), not the stored value
+- Add a visual indicator: "Linked to Gold tier" vs "Custom £600"
+- When saving with a tier selected, still store `commission_per_student` as a snapshot but the calculation will use live tier data
 
-**1. Settings > Commissions tab — University Commission Section**
-- Below the existing global tiers, add a new section: "University Commission Rates"
-- Table listing each university with a dropdown/input to set `commission_per_student` and a toggle for "Show on Dashboard"
-- Owner can set a custom rate per university, or leave blank to use the global tier system
-
-**2. Commission calculation logic update (`src/lib/commissions.ts`)**
-- Update `calcCommission` to accept an optional `universityCommissions` map
-- When calculating per-enrollment commission: if a university-specific rate exists, use it; otherwise fall back to the global tier system
-- The CommissionsPage will aggregate per-agent totals using per-enrollment university rates
-
-**3. CommissionsPage update**
-- Fetch `university_commissions` and enrollments with `university_id`
-- Calculate per-agent commission by summing each enrollment's university-specific rate (or global tier fallback)
-- Show university breakdown per agent
-
-**4. Dashboard offer cards**
-- New component `CommissionOfferCards` — fetches `university_commissions` where `is_highlighted = true`, joined with university name
-- Renders small colored cards: university name + "£X/student" + optional highlight text
-- Placed on Agent Dashboard and Admin Dashboard (above or beside existing metrics)
+**4. Update CommissionsPage and dashboards**
+- Pass full tier data alongside university commissions so the dynamic lookup works
 
 ### Files Changed
-- **Migration**: Create `university_commissions` table with RLS
-- **`src/pages/owner/SettingsPage.tsx`**: Add University Commission Rates section in Commissions tab
-- **`src/lib/commissions.ts`**: Add per-university commission lookup
-- **`src/pages/owner/CommissionsPage.tsx`**: Use per-university rates in calculations
-- **`src/components/CommissionOfferCards.tsx`** (new): Dashboard offer card component
-- **`src/pages/agent/AgentDashboard.tsx`**: Add `CommissionOfferCards`
-- **`src/pages/admin/AdminDashboard.tsx`**: Add `CommissionOfferCards`
+- `src/lib/commissions.ts` — update `UniversityCommission` interface + `calcCommissionByEnrollments` to use live tier rates
+- `src/pages/owner/SettingsPage.tsx` — show live tier rate in table, clarify UI
+- `src/pages/owner/CommissionsPage.tsx` — pass tier data for dynamic lookup
+- `src/components/CommissionOfferCards.tsx` — use live tier rate for display
 
-### How It Works (Summary)
-- Owner goes to Settings > Commissions, sees universities listed, sets £600 for LSC, £500 for another, toggles "Show on Dashboard" for LSC
-- Agent opens dashboard, sees a card: "LSC — £600/student"
-- Commission calculations now use per-university rates instead of (or alongside) global tiers
+### How It Works After
+- Owner sets LSC → Gold tier (£600/student)
+- Later, owner updates Gold tier to £650/student
+- LSC commission automatically becomes £650 — no need to re-edit each university
+- Universities with "Custom" rate stay at whatever was manually entered
+- Global tiers still apply as fallback for universities without any specific commission set
 
