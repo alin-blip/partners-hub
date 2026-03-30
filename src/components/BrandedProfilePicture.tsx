@@ -133,7 +133,7 @@ export function BrandedProfilePicture() {
         setGenerating(false);
       }
     },
-    [toast]
+    [toast, user]
   );
 
   useEffect(() => {
