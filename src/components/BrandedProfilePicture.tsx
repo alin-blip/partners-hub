@@ -203,7 +203,7 @@ export function BrandedProfilePicture() {
             {!avatarSrc && !generating && (
               <div className="text-center text-muted-foreground text-sm p-4">
                 <UserCircle className="w-12 h-12 mx-auto mb-2 opacity-40" />
-                Încarcă o poză pentru a genera
+                Upload a photo to generate
               </div>
             )}
 
