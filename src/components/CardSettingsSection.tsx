@@ -129,6 +129,7 @@ export default function CardSettingsSection() {
         social_facebook: socialFacebook,
         social_linkedin: socialLinkedin,
         social_tiktok: socialTiktok,
+        ai_voice_enabled: aiVoiceEnabled,
         updated_at: new Date().toISOString(),
       };
 
