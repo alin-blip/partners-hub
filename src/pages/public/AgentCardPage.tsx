@@ -81,6 +81,22 @@ export default function AgentCardPage() {
     })();
   }, [slug]);
 
+  // Load ElevenLabs widget script when AI voice is enabled
+  useEffect(() => {
+    if (!settings?.ai_voice_enabled) return;
+    const scriptId = "elevenlabs-convai-script";
+    if (document.getElementById(scriptId)) return;
+    const script = document.createElement("script");
+    script.id = scriptId;
+    script.src = "https://elevenlabs.io/convai-widget/index.js";
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      const el = document.getElementById(scriptId);
+      if (el) el.remove();
+    };
+  }, [settings?.ai_voice_enabled]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-muted flex items-center justify-center">
