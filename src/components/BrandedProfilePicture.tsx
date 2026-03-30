@@ -125,8 +125,8 @@ export function BrandedProfilePicture() {
       } catch (e) {
         console.error("Canvas draw error:", e);
         toast({
-          title: "Eroare",
-          description: "Nu s-a putut compune poza cu overlay-ul transparent.",
+          title: "Error",
+          description: "Could not compose the photo with the overlay.",
           variant: "destructive",
         });
       } finally {
