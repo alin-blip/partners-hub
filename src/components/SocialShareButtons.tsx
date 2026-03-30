@@ -48,6 +48,7 @@ export function SocialShareButtons({
   filenamePrefix = "eduforyou",
   size = "default",
   onShared,
+  ogShareUrl,
 }: SocialShareButtonsProps) {
   const iconSize = size === "sm" ? "w-3 h-3" : "w-3.5 h-3.5";
   const btnSize = size === "sm" ? "h-7 w-7" : "h-8 w-8";
