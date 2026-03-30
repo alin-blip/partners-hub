@@ -22,6 +22,7 @@ export default function PublicApplicationPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [aiVoiceEnabled, setAiVoiceEnabled] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Form fields
