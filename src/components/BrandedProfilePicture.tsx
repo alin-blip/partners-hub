@@ -185,7 +185,7 @@ export function BrandedProfilePicture() {
           Profile Photo
         </CardTitle>
         <CardDescription>
-          Încarcă o poză de profil — se va folosi pe Digital Card și rețele sociale cu overlay-ul EduForYou
+          Upload a profile photo — it will be used on your Digital Card and social media with the EduForYou overlay
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
