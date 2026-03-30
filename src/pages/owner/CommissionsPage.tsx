@@ -102,7 +102,7 @@ export default function CommissionsPage() {
   const uniNameMap = new Map(universities.map((u: any) => [u.id, u.name]));
   const agentList = agents.filter((a: any) => roleMap.get(a.id) === "agent");
 
-  const uniMap = new Map(uniCommissions.map((uc: any) => [uc.university_id, uc]));
+  const uniMap = new Map<string, any>(uniCommissions.map((uc: any) => [uc.university_id, uc]));
   const tierMap = new Map(tiers.map((t: any) => [t.id, t]));
 
   // Group enrollments per agent, keeping university_id
