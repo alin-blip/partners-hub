@@ -6,7 +6,7 @@ export function CommissionOfferCards() {
   const { data: offers = [] } = useQuery({
     queryKey: ["university-commission-offers"],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from("university_commissions")
         .select("id, commission_per_student, highlight_text, university_id, universities(name)")
         .eq("is_highlighted", true);
@@ -29,7 +29,7 @@ export function CommissionOfferCards() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm truncate">
-                {(offer as any).universities?.name}
+                {offer.universities?.name}
               </p>
               <p className="text-xl font-bold text-accent tabular-nums">
                 £{Number(offer.commission_per_student).toLocaleString()}
