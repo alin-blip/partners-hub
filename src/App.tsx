@@ -28,6 +28,7 @@ import MessagesPage from "./pages/shared/MessagesPage";
 import DigitalCardPage from "./pages/shared/DigitalCardPage";
 import SocialPostsPage from "./pages/shared/SocialPostsPage";
 import AgentSocialFeedPage from "./pages/shared/AgentSocialFeedPage";
+import UniversitiesCoursesPage from "./pages/shared/UniversitiesCoursesPage";
 
 import FeedbackPage from "./pages/owner/FeedbackPage";
 import LeadsPage from "./pages/shared/LeadsPage";
