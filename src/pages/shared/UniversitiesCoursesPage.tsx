@@ -33,6 +33,7 @@ const UNIVERSITY_URLS: Record<string, string> = {
   "arden": "https://arden.ac.uk/",
   "lsc": "https://www.lsclondon.co.uk/",
   "uwtsd": "https://www.uwtsd.ac.uk/",
+  "cecos": "https://cecos.ac.uk/",
 };
 
 function getUniversityUrl(uniName: string): string | null {
