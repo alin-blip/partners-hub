@@ -147,11 +147,11 @@ export function BrandedProfilePicture() {
     if (!file || !user) return;
 
     if (!file.type.startsWith("image/")) {
-      toast({ title: "Fișier invalid", description: "Încarcă JPG sau PNG", variant: "destructive" });
+      toast({ title: "Invalid file", description: "Upload a JPG or PNG", variant: "destructive" });
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast({ title: "Prea mare", description: "Maximum 5MB", variant: "destructive" });
+      toast({ title: "Too large", description: "Maximum 5MB", variant: "destructive" });
       return;
     }
 
