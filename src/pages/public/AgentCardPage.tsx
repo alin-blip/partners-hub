@@ -35,6 +35,7 @@ interface CardSettings {
   social_facebook: string;
   social_linkedin: string;
   social_tiktok: string;
+  ai_voice_enabled: boolean;
 }
 
 export default function AgentCardPage() {
