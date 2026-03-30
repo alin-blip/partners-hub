@@ -44,6 +44,8 @@ export default function CardSettingsSection() {
   });
 
   const [slug, setSlug] = useState("");
+  const [slugTaken, setSlugTaken] = useState(false);
+  const [checkingSlug, setCheckingSlug] = useState(false);
   const [isPublic, setIsPublic] = useState(false);
   const [jobTitle, setJobTitle] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
