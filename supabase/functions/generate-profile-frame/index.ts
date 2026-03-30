@@ -60,7 +60,13 @@ serve(async (req) => {
       const iconRes = await fetch(iconUrl);
       if (iconRes.ok) {
         const iconBytes = new Uint8Array(await iconRes.arrayBuffer());
-        const iconB64 = btoa(String.fromCharCode(...iconBytes));
+        // Chunk the conversion to avoid stack overflow
+        let binary = "";
+        const chunkSize = 8192;
+        for (let i = 0; i < iconBytes.length; i += chunkSize) {
+          binary += String.fromCharCode(...iconBytes.slice(i, i + chunkSize));
+        }
+        const iconB64 = btoa(binary);
         const contentType = iconRes.headers.get("content-type") || "image/jpeg";
         iconBase64Url = `data:${contentType};base64,${iconB64}`;
       }
