@@ -75,6 +75,9 @@ export default function AgentSocialFeedPage() {
 
   const hasCard = cardSettings?.is_public && cardSettings?.slug;
   const cardUrl = hasCard ? `${window.location.origin}/card/${cardSettings.slug}` : null;
+  const ogShareBaseUrl = hasCard
+    ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/og-share?slug=${cardSettings.slug}`
+    : null;
 
   const platformNames: Record<string, string> = {
     facebook: "Facebook",
