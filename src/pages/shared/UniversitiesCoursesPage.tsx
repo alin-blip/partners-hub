@@ -55,9 +55,7 @@ export default function UniversitiesCoursesPage() {
   const queryClient = useQueryClient();
 
   const handleScanDetails = async (uniId: string, uniName: string) => {
-    const url = Object.entries(UNIVERSITY_URLS).find(
-      ([key]) => uniName.toLowerCase().includes(key.toLowerCase()) || key.toLowerCase().includes(uniName.toLowerCase().split(" ")[0])
-    )?.[1];
+    const url = getUniversityUrl(uniName);
 
     if (!url) {
       toast({ title: "No URL configured", description: `No website URL mapped for "${uniName}"`, variant: "destructive" });
