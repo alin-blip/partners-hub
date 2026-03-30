@@ -5,11 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useToast } from "@/hooks/use-toast";
-import { Save } from "lucide-react";
-import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Save, Download, Upload, FileText, CheckCircle2, Clock, Pencil } from "lucide-react";
+import { useState, useRef } from "react";
+import { StudentFinanceFormDialog } from "./StudentFinanceFormDialog";
 
 const FUNDING_STATUSES = ["not_started", "application_submitted", "approved", "rejected", "disbursed"];
 const FUNDING_TYPES = ["SFE (Student Finance England)", "SFW (Student Finance Wales)", "SAAS", "Student Finance NI", "Bursary", "Scholarship", "Self-funded", "Employer Sponsored", "Other"];
@@ -17,13 +20,18 @@ const FUNDING_TYPES = ["SFE (Student Finance England)", "SFW (Student Finance Wa
 interface Props {
   studentId: string;
   canEdit: boolean;
+  student?: any;
 }
 
-export function StudentFundingTab({ studentId, canEdit }: Props) {
+export function StudentFundingTab({ studentId, canEdit, student }: Props) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const qc = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<any>({});
+  const [formDialogOpen, setFormDialogOpen] = useState(false);
+  const [editingForm, setEditingForm] = useState<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: enrollments = [] } = useQuery({
     queryKey: ["student-enrollments-funding", studentId],
@@ -31,6 +39,18 @@ export function StudentFundingTab({ studentId, canEdit }: Props) {
       const { data } = await supabase
         .from("enrollments")
         .select("id, status, funding_status, funding_type, funding_reference, funding_notes, universities!inner(name), courses!inner(name)")
+        .eq("student_id", studentId)
+        .order("created_at", { ascending: false });
+      return data || [];
+    },
+  });
+
+  const { data: financeForms = [] } = useQuery({
+    queryKey: ["student-finance-forms", studentId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("student_finance_forms")
+        .select("*")
         .eq("student_id", studentId)
         .order("created_at", { ascending: false });
       return data || [];
@@ -60,8 +80,50 @@ export function StudentFundingTab({ studentId, canEdit }: Props) {
     });
   };
 
+  const handleUploadPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    const filePath = `${studentId}/finance_form_${Date.now()}_${file.name}`;
+    const { error: uploadErr } = await supabase.storage.from("student-documents").upload(filePath, file);
+    if (uploadErr) {
+      toast({ title: "Upload failed", description: uploadErr.message, variant: "destructive" });
+      return;
+    }
+    const { error: insertErr } = await supabase.from("student_finance_forms").insert({
+      student_id: studentId,
+      agent_id: user.id,
+      method: "upload",
+      uploaded_file_path: filePath,
+    });
+    if (insertErr) {
+      toast({ title: "Error saving record", description: insertErr.message, variant: "destructive" });
+      return;
+    }
+    qc.invalidateQueries({ queryKey: ["student-finance-forms", studentId] });
+    toast({ title: "Finance form uploaded successfully" });
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleDownloadUploaded = async (filePath: string) => {
+    const { data } = await supabase.storage.from("student-documents").createSignedUrl(filePath, 300);
+    if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+  };
+
+  const openEditForm = (form: any) => {
+    setEditingForm(form);
+    setFormDialogOpen(true);
+  };
+
+  const openNewForm = () => {
+    setEditingForm(null);
+    setFormDialogOpen(true);
+  };
+
+  const hasCompletedForm = financeForms.length > 0;
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Enrollment Funding Cards */}
       {enrollments.length === 0 ? (
         <Card><CardContent className="py-6"><p className="text-sm text-muted-foreground text-center">No enrollments to track funding for</p></CardContent></Card>
       ) : (
@@ -94,11 +156,11 @@ export function StudentFundingTab({ studentId, canEdit }: Props) {
                   </div>
                   <div className="space-y-2">
                     <Label>Reference Number</Label>
-                    <Input value={editData.funding_reference} onChange={(e) => setEditData({ ...editData, funding_reference: e.target.value })} placeholder="e.g. SFE reference" />
+                    <Input value={editData.funding_reference} onChange={(ev) => setEditData({ ...editData, funding_reference: ev.target.value })} placeholder="e.g. SFE reference" />
                   </div>
                   <div className="space-y-2">
                     <Label>Notes</Label>
-                    <Textarea value={editData.funding_notes} onChange={(e) => setEditData({ ...editData, funding_notes: e.target.value })} placeholder="Funding notes..." />
+                    <Textarea value={editData.funding_notes} onChange={(ev) => setEditData({ ...editData, funding_notes: ev.target.value })} placeholder="Funding notes..." />
                   </div>
                   <div className="flex gap-2">
                     <Button size="sm" onClick={() => updateFunding.mutate({ id: e.id, ...editData })} disabled={updateFunding.isPending}>
@@ -138,6 +200,91 @@ export function StudentFundingTab({ studentId, canEdit }: Props) {
           </Card>
         ))
       )}
+
+      {/* Student Finance Application Section */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              Student Finance Application
+            </span>
+            {hasCompletedForm ? (
+              <Badge className="gap-1 bg-green-100 text-green-700 border-green-200">
+                <CheckCircle2 className="w-3 h-3" /> Completed
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="gap-1">
+                <Clock className="w-3 h-3" /> Not Started
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Existing forms */}
+          {financeForms.map((f: any) => (
+            <div key={f.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+              <div className="flex items-center gap-3">
+                <FileText className="w-4 h-4 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">
+                    {f.method === "platform" ? "Filled in Platform" : "Uploaded PDF"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(f.created_at).toLocaleDateString("en-GB")}
+                    {f.consent_full_name && ` — Signed by ${f.consent_full_name}`}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                {f.method === "platform" && canEdit && (
+                  <Button size="sm" variant="outline" onClick={() => openEditForm(f)}>
+                    <Pencil className="w-3 h-3 mr-1" /> Edit
+                  </Button>
+                )}
+                {f.method === "upload" && f.uploaded_file_path && (
+                  <Button size="sm" variant="outline" onClick={() => handleDownloadUploaded(f.uploaded_file_path)}>
+                    <Download className="w-3 h-3 mr-1" /> Download
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+
+          {/* Action buttons */}
+          {canEdit && (
+            <div className="flex flex-wrap gap-3">
+              <Button variant="outline" size="sm" onClick={openNewForm}>
+                <Pencil className="w-3.5 h-3.5 mr-1.5" /> Fill in Platform
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <a href="/EduForYou_Student_Finance_Form.pdf" download>
+                  <Download className="w-3.5 h-3.5 mr-1.5" /> Download Blank Form
+                </a>
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="w-3.5 h-3.5 mr-1.5" /> Upload Completed Form
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf"
+                className="hidden"
+                onChange={handleUploadPdf}
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Form Dialog */}
+      <StudentFinanceFormDialog
+        open={formDialogOpen}
+        onOpenChange={setFormDialogOpen}
+        studentId={studentId}
+        student={student}
+        existingForm={editingForm}
+      />
     </div>
   );
 }
