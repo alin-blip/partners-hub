@@ -75,6 +75,9 @@ export default function AgentSocialFeedPage() {
 
   const hasCard = cardSettings?.is_public && cardSettings?.slug;
   const cardUrl = hasCard ? `${window.location.origin}/card/${cardSettings.slug}` : null;
+  const ogShareBaseUrl = hasCard
+    ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/og-share?slug=${cardSettings.slug}`
+    : null;
 
   const platformNames: Record<string, string> = {
     facebook: "Facebook",
@@ -102,7 +105,9 @@ export default function AgentSocialFeedPage() {
 
     // For Facebook/LinkedIn: open URL synchronously to avoid popup blocking
     if (skipNativeSharePlatforms.includes(platform)) {
-      const fallbackUrl = platformFallbackUrls[platform]?.(shareText, cardUrl!);
+      // Use og-share URL so Facebook/LinkedIn crawlers get proper OG meta tags
+      const ogUrl = ogShareBaseUrl ? `${ogShareBaseUrl}&post=${post.id}` : cardUrl!;
+      const fallbackUrl = platformFallbackUrls[platform]?.(shareText, ogUrl);
       if (fallbackUrl) window.open(fallbackUrl, "_blank");
 
       try {

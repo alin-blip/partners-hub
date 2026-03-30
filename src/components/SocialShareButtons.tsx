@@ -38,6 +38,7 @@ interface SocialShareButtonsProps {
   filenamePrefix?: string;
   size?: "sm" | "default";
   onShared?: () => void;
+  ogShareUrl?: string | null;
 }
 
 export function SocialShareButtons({
@@ -47,6 +48,7 @@ export function SocialShareButtons({
   filenamePrefix = "eduforyou",
   size = "default",
   onShared,
+  ogShareUrl,
 }: SocialShareButtonsProps) {
   const iconSize = size === "sm" ? "w-3 h-3" : "w-3.5 h-3.5";
   const btnSize = size === "sm" ? "h-7 w-7" : "h-8 w-8";
@@ -56,8 +58,10 @@ export function SocialShareButtons({
 
     // For Facebook/LinkedIn: open URL synchronously to avoid popup blocking
     if (skipNativeSharePlatforms.includes(platform)) {
-      const fallbackUrl = cardUrl
-        ? platformFallbackUrls[platform]?.(shareText, cardUrl)
+      // Use og-share URL for Facebook/LinkedIn so crawlers get proper OG meta tags
+      const shareUrlForCrawler = ogShareUrl || cardUrl;
+      const fallbackUrl = shareUrlForCrawler
+        ? platformFallbackUrls[platform]?.(shareText, shareUrlForCrawler)
         : null;
       if (fallbackUrl) window.open(fallbackUrl, "_blank");
 

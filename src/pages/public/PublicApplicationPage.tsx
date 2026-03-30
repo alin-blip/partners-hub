@@ -110,35 +110,41 @@ export default function PublicApplicationPage() {
     if (!agent) return;
     setSubmitting(true);
 
-    // Build course_interest text summary
-    const uniName = universities.find(u => u.id === universityId)?.name || "";
-    const campusName = campuses.find(c => c.id === campusId)?.name || "";
-    const courseName = courses.find(c => c.id === courseId)?.name || "";
-    const intakeLabel = intakes.find(i => i.id === intakeId)?.label || "";
-    const parts = [uniName, campusName, courseName, intakeLabel, timetableOption].filter(Boolean);
+    try {
+      // Build course_interest text summary
+      const uniName = universities.find(u => u.id === universityId)?.name || "";
+      const campusName = campuses.find(c => c.id === campusId)?.name || "";
+      const courseName = courses.find(c => c.id === courseId)?.name || "";
+      const intakeLabel = intakes.find(i => i.id === intakeId)?.label || "";
+      const parts = [uniName, campusName, courseName, intakeLabel, timetableOption].filter(Boolean);
 
-    const leadId = crypto.randomUUID();
+      const leadId = crypto.randomUUID();
 
-    const { error } = await supabase.from("leads").insert({
-      id: leadId,
-      agent_id: agent.id,
-      first_name: firstName.trim(),
-      last_name: lastName.trim(),
-      email: email.trim().toLowerCase(),
-      phone: phone.trim() || null,
-      nationality: nationality.trim() || null,
-      course_interest: parts.join(" — ") || null,
-      university_id: universityId || null,
-      campus_id: campusId || null,
-      course_id: courseId || null,
-      intake_id: intakeId || null,
-      timetable_option: timetableOption || null,
-      status: "new",
-    } as any);
+      const { error } = await supabase.from("leads").insert({
+        id: leadId,
+        agent_id: agent.id,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        email: email.trim().toLowerCase(),
+        phone: phone.trim() || null,
+        nationality: nationality.trim() || null,
+        course_interest: parts.join(" — ") || null,
+        university_id: universityId || null,
+        campus_id: campusId || null,
+        course_id: courseId || null,
+        intake_id: intakeId || null,
+        timetable_option: timetableOption || null,
+        status: "new",
+      } as any);
 
-    if (!error) {
+      if (error) {
+        console.error("Lead insert error:", error);
+        // Show a user-friendly error message
+        setSubmitting(false);
+        return;
+      }
+
       // Send email notification to the agent via edge function
-      // The edge function uses service role and can look up the agent's email
       const leadName = `${firstName.trim()} ${lastName.trim()}`;
       const courseInterest = parts.join(" — ") || undefined;
 
@@ -160,6 +166,8 @@ export default function PublicApplicationPage() {
       });
 
       setSubmitted(true);
+    } catch (err) {
+      console.error("Submit error:", err);
     }
 
     setSubmitting(false);

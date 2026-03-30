@@ -96,6 +96,32 @@ export function BrandedProfilePicture() {
 
         ctx.drawImage(frameImg, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
         setIsReady(true);
+
+        // Upload branded canvas as avatar_url
+        if (user) {
+          canvas.toBlob(async (blob) => {
+            if (!blob) return;
+            try {
+              const brandedPath = `${user.id}/branded-avatar.png`;
+              const brandedFile = new File([blob], "branded-avatar.png", { type: "image/png" });
+              const { error: upErr } = await supabase.storage
+                .from("avatars")
+                .upload(brandedPath, brandedFile, { upsert: true });
+              if (upErr) throw upErr;
+
+              const { data: pub } = supabase.storage.from("avatars").getPublicUrl(brandedPath);
+              const brandedUrl = `${pub.publicUrl}?t=${Date.now()}`;
+
+              const { error: updateErr } = await supabase
+                .from("profiles")
+                .update({ avatar_url: brandedUrl } as any)
+                .eq("id", user.id);
+              if (updateErr) throw updateErr;
+            } catch (err: any) {
+              console.error("Branded avatar upload error:", err);
+            }
+          }, "image/png");
+        }
       } catch (e) {
         console.error("Canvas draw error:", e);
         toast({
@@ -107,7 +133,7 @@ export function BrandedProfilePicture() {
         setGenerating(false);
       }
     },
-    [toast]
+    [toast, user]
   );
 
   useEffect(() => {
@@ -134,31 +160,9 @@ export function BrandedProfilePicture() {
     reader.onload = () => setAvatarSrc(reader.result as string);
     reader.readAsDataURL(file);
 
-    // Also save as profile avatar
-    setUploading(true);
-    try {
-      const ext = file.name.split(".").pop();
-      const path = `${user.id}/avatar.${ext}`;
-      const { error: uploadErr } = await supabase.storage
-        .from("avatars")
-        .upload(path, file, { upsert: true });
-      if (uploadErr) throw uploadErr;
-
-      const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
-      const url = `${pub.publicUrl}?t=${Date.now()}`;
-
-      const { error: updateErr } = await supabase
-        .from("profiles")
-        .update({ avatar_url: url } as any)
-        .eq("id", user.id);
-      if (updateErr) throw updateErr;
-
-      toast({ title: "Poză salvată", description: "Poza de profil a fost actualizată." });
-    } catch (err: any) {
-      toast({ title: "Eroare upload", description: err.message, variant: "destructive" });
-    } finally {
-      setUploading(false);
-    }
+    // Raw file upload is no longer saved as avatar_url.
+    // The branded canvas version will be uploaded after drawing completes.
+    setUploading(false);
   };
 
   const handleDownload = () => {
