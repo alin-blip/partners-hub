@@ -44,6 +44,8 @@ export default function CardSettingsSection() {
   });
 
   const [slug, setSlug] = useState("");
+  const [slugTaken, setSlugTaken] = useState(false);
+  const [checkingSlug, setCheckingSlug] = useState(false);
   const [isPublic, setIsPublic] = useState(false);
   const [jobTitle, setJobTitle] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
@@ -66,6 +68,26 @@ export default function CardSettingsSection() {
   useEffect(() => {
     if (currentSlug) setSlug(currentSlug);
   }, [currentSlug]);
+
+  // Debounced slug availability check
+  useEffect(() => {
+    if (!slug || slug === currentSlug) {
+      setSlugTaken(false);
+      return;
+    }
+    setCheckingSlug(true);
+    const timer = setTimeout(async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("slug", slug)
+        .neq("id", user!.id)
+        .maybeSingle();
+      setSlugTaken(!!data);
+      setCheckingSlug(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [slug, currentSlug, user]);
 
   useEffect(() => {
     if (settings) {
@@ -206,6 +228,12 @@ export default function CardSettingsSection() {
                     placeholder="john-doe"
                   />
                 </div>
+                {slugTaken && (
+                  <p className="text-xs text-destructive">Acest slug este deja luat. Încearcă altul, de ex. adaugă o terminație.</p>
+                )}
+                {checkingSlug && (
+                  <p className="text-xs text-muted-foreground">Se verifică disponibilitatea…</p>
+                )}
               </div>
               <div className="flex items-center gap-2 pb-1">
                 <Switch checked={isPublic} onCheckedChange={setIsPublic} />
@@ -355,7 +383,7 @@ export default function CardSettingsSection() {
               </div>
             </div>
 
-            <Button type="submit" disabled={saveSettings.isPending} className="bg-accent text-accent-foreground hover:bg-accent/90">
+            <Button type="submit" disabled={saveSettings.isPending || slugTaken || checkingSlug} className="bg-accent text-accent-foreground hover:bg-accent/90">
               <Save className="w-3 h-3 mr-1" />
               {saveSettings.isPending ? "Saving…" : "Save Card Settings"}
             </Button>
