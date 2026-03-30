@@ -1136,6 +1136,204 @@ export type Database = {
           },
         ]
       }
+      student_finance_forms: {
+        Row: {
+          address_history_1: string | null
+          address_history_2: string | null
+          address_history_3: string | null
+          agent_id: string
+          applied_before: string | null
+          applied_before_details: string | null
+          consent_date: string | null
+          consent_full_name: string | null
+          course_length_start: string | null
+          course_name: string | null
+          created_at: string
+          crn: string | null
+          current_address: string | null
+          date_of_birth: string | null
+          dependants_info: string | null
+          email: string | null
+          employment_type: string | null
+          enrollment_id: string | null
+          expiry_date: string | null
+          family_name: string | null
+          first_name: string | null
+          id: string
+          immigration_status: string | null
+          job_title_company: string | null
+          method: string
+          nationality: string | null
+          ni_number: string | null
+          password: string | null
+          phone: string | null
+          relationship_status: string | null
+          secret_answer: string | null
+          share_code: string | null
+          spouse_address: string | null
+          spouse_dob: string | null
+          spouse_email: string | null
+          spouse_employment_status: string | null
+          spouse_full_name: string | null
+          spouse_has_income: string | null
+          spouse_marriage_date: string | null
+          spouse_ni_number: string | null
+          spouse_phone: string | null
+          spouse_place_of_birth: string | null
+          student_id: string
+          title: string | null
+          town_of_birth: string | null
+          uk_contact_1_address: string | null
+          uk_contact_1_name: string | null
+          uk_contact_1_phone: string | null
+          uk_contact_1_relationship: string | null
+          uk_contact_2_address: string | null
+          uk_contact_2_name: string | null
+          uk_contact_2_phone: string | null
+          uk_contact_2_relationship: string | null
+          university_name_address: string | null
+          updated_at: string
+          uploaded_file_path: string | null
+          worked_last_3_months: string | null
+          year_tuition_fee: string | null
+        }
+        Insert: {
+          address_history_1?: string | null
+          address_history_2?: string | null
+          address_history_3?: string | null
+          agent_id: string
+          applied_before?: string | null
+          applied_before_details?: string | null
+          consent_date?: string | null
+          consent_full_name?: string | null
+          course_length_start?: string | null
+          course_name?: string | null
+          created_at?: string
+          crn?: string | null
+          current_address?: string | null
+          date_of_birth?: string | null
+          dependants_info?: string | null
+          email?: string | null
+          employment_type?: string | null
+          enrollment_id?: string | null
+          expiry_date?: string | null
+          family_name?: string | null
+          first_name?: string | null
+          id?: string
+          immigration_status?: string | null
+          job_title_company?: string | null
+          method?: string
+          nationality?: string | null
+          ni_number?: string | null
+          password?: string | null
+          phone?: string | null
+          relationship_status?: string | null
+          secret_answer?: string | null
+          share_code?: string | null
+          spouse_address?: string | null
+          spouse_dob?: string | null
+          spouse_email?: string | null
+          spouse_employment_status?: string | null
+          spouse_full_name?: string | null
+          spouse_has_income?: string | null
+          spouse_marriage_date?: string | null
+          spouse_ni_number?: string | null
+          spouse_phone?: string | null
+          spouse_place_of_birth?: string | null
+          student_id: string
+          title?: string | null
+          town_of_birth?: string | null
+          uk_contact_1_address?: string | null
+          uk_contact_1_name?: string | null
+          uk_contact_1_phone?: string | null
+          uk_contact_1_relationship?: string | null
+          uk_contact_2_address?: string | null
+          uk_contact_2_name?: string | null
+          uk_contact_2_phone?: string | null
+          uk_contact_2_relationship?: string | null
+          university_name_address?: string | null
+          updated_at?: string
+          uploaded_file_path?: string | null
+          worked_last_3_months?: string | null
+          year_tuition_fee?: string | null
+        }
+        Update: {
+          address_history_1?: string | null
+          address_history_2?: string | null
+          address_history_3?: string | null
+          agent_id?: string
+          applied_before?: string | null
+          applied_before_details?: string | null
+          consent_date?: string | null
+          consent_full_name?: string | null
+          course_length_start?: string | null
+          course_name?: string | null
+          created_at?: string
+          crn?: string | null
+          current_address?: string | null
+          date_of_birth?: string | null
+          dependants_info?: string | null
+          email?: string | null
+          employment_type?: string | null
+          enrollment_id?: string | null
+          expiry_date?: string | null
+          family_name?: string | null
+          first_name?: string | null
+          id?: string
+          immigration_status?: string | null
+          job_title_company?: string | null
+          method?: string
+          nationality?: string | null
+          ni_number?: string | null
+          password?: string | null
+          phone?: string | null
+          relationship_status?: string | null
+          secret_answer?: string | null
+          share_code?: string | null
+          spouse_address?: string | null
+          spouse_dob?: string | null
+          spouse_email?: string | null
+          spouse_employment_status?: string | null
+          spouse_full_name?: string | null
+          spouse_has_income?: string | null
+          spouse_marriage_date?: string | null
+          spouse_ni_number?: string | null
+          spouse_phone?: string | null
+          spouse_place_of_birth?: string | null
+          student_id?: string
+          title?: string | null
+          town_of_birth?: string | null
+          uk_contact_1_address?: string | null
+          uk_contact_1_name?: string | null
+          uk_contact_1_phone?: string | null
+          uk_contact_1_relationship?: string | null
+          uk_contact_2_address?: string | null
+          uk_contact_2_name?: string | null
+          uk_contact_2_phone?: string | null
+          uk_contact_2_relationship?: string | null
+          university_name_address?: string | null
+          updated_at?: string
+          uploaded_file_path?: string | null
+          worked_last_3_months?: string | null
+          year_tuition_fee?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_finance_forms_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_finance_forms_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_notes: {
         Row: {
           content: string

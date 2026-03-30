@@ -123,7 +123,7 @@ export default function StudentDetailPage() {
           </TabsContent>
 
           <TabsContent value="funding">
-            <StudentFundingTab studentId={student.id} canEdit={canChangeStatus} />
+            <StudentFundingTab studentId={student.id} canEdit={canChangeStatus} student={student} />
           </TabsContent>
 
           <TabsContent value="notes">
