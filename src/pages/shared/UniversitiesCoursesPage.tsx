@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,19 +18,65 @@ import {
   GraduationCap,
   Filter,
   ArrowRight,
+  ScanSearch,
+  Loader2,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
+
+const UNIVERSITY_URLS: Record<string, string> = {
+  "Global Banking School": "https://globalbanking.ac.uk/",
+  "QA": "https://qahighereducation.com/",
+  "Regent": "https://www.rcl.ac.uk/",
+  "Arden": "https://arden.ac.uk/",
+  "LSC": "https://www.lsclondon.co.uk/",
+  "UWTSD": "https://www.uwtsd.ac.uk/",
+};
 
 export default function UniversitiesCoursesPage() {
   const [search, setSearch] = useState("");
   const [showInactive, setShowInactive] = useState(false);
   const [selectedUniId, setSelectedUniId] = useState<string | null>(null);
   const [detailsCourseId, setDetailsCourseId] = useState<string | null>(null);
+  const [scanningUniId, setScanningUniId] = useState<string | null>(null);
   const navigate = useNavigate();
   const { role } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
+  const handleScanDetails = async (uniId: string, uniName: string) => {
+    const url = Object.entries(UNIVERSITY_URLS).find(
+      ([key]) => uniName.toLowerCase().includes(key.toLowerCase()) || key.toLowerCase().includes(uniName.toLowerCase().split(" ")[0])
+    )?.[1];
+
+    if (!url) {
+      toast({ title: "No URL configured", description: `No website URL mapped for "${uniName}"`, variant: "destructive" });
+      return;
+    }
+
+    setScanningUniId(uniId);
+    try {
+      const { data, error } = await supabase.functions.invoke("scrape-course-details", {
+        body: { university_id: uniId, university_url: url },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Scan Complete",
+        description: data.message || `Updated ${data.updated} courses`,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["course-details"] });
+    } catch (e: any) {
+      console.error("Scan error:", e);
+      toast({ title: "Scan Failed", description: e.message || "Failed to scan course details", variant: "destructive" });
+    } finally {
+      setScanningUniId(null);
+    }
+  };
   const { data: universities = [] } = useQuery({
     queryKey: ["universities-all"],
     queryFn: async () => {
@@ -156,6 +202,28 @@ export default function UniversitiesCoursesPage() {
               </Label>
             </div>
           )}
+          {(role === "owner" || role === "admin") && effectiveUniId && (() => {
+            const uni = displayUniversities.find((u: any) => u.id === effectiveUniId);
+            const uniName = uni?.name || "";
+            const hasUrl = Object.entries(UNIVERSITY_URLS).some(
+              ([key]) => uniName.toLowerCase().includes(key.toLowerCase()) || key.toLowerCase().includes(uniName.toLowerCase().split(" ")[0])
+            );
+            if (!hasUrl) return null;
+            return (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={scanningUniId === effectiveUniId}
+                onClick={() => handleScanDetails(effectiveUniId, uniName)}
+              >
+                {scanningUniId === effectiveUniId ? (
+                  <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Scanning...</>
+                ) : (
+                  <><ScanSearch className="h-4 w-4 mr-1" /> Scan Details</>
+                )}
+              </Button>
+            );
+          })()}
         </div>
 
         {/* Summary */}
