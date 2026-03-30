@@ -98,7 +98,7 @@ export default function AgentSocialFeedPage() {
 
   const handleShareForPlatform = async (post: any, platform: string) => {
     if (!hasCard) {
-      toast.error("Creează-ți cardul digital pentru a distribui postări");
+      toast.error("Set up your digital card first to share posts");
       return;
     }
     const shareText = `${post.caption}\n\n🔗 ${cardUrl}`;
