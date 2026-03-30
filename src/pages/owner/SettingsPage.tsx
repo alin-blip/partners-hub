@@ -255,7 +255,7 @@ function CommissionTiersSection({ deleteItem, universities }: { deleteItem: any;
             <form className="space-y-4 pt-2" onSubmit={(e) => {
               e.preventDefault();
               const fd = Object.fromEntries(new FormData(e.currentTarget));
-              addTier.mutate({ ...fd, university_id: addUniId || null });
+              addTier.mutate({ ...fd, university_id: addUniId && addUniId !== "global" ? addUniId : null });
               setAddOpen(false);
               setAddUniId("");
             }}>
