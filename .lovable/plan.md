@@ -1,49 +1,33 @@
 
 
-## Plan: Redesign Universities & Courses Page + Course Active/Inactive Toggle
+## Plan: Fix Apply Navigation + Inline Course Details
 
-### What Changes
+### Problem 1: Apply button → 404
+The Apply button navigates to `/${role}/enroll-student?...` but the route is `/${role}/enroll`. Also, the `EnrollStudent` page doesn't read URL query params to pre-select university/course.
 
-**1. Database Migration — Add fields to `courses` table**
-- `is_active` (boolean, default true) — toggle courses open/closed in Settings
-- `duration` (text, nullable) — e.g. "4 years"  
-- `fees` (text, nullable) — e.g. "£9,535/year"
+### Problem 2: Details opens dialog
+Currently "Details" opens a dialog. User wants it to expand inline below the course card instead.
 
-**2. Redesign Universities & Courses Page**
+---
 
-Replace the current accordion layout with a new design inspired by the screenshot:
+### Changes
 
-- **Top header**: University selector tabs/buttons (horizontal scrollable). Click a university to filter courses below.
-- **Course grid**: 3-column responsive grid of dark-themed cards. Each card shows:
-  - Course name (bold, white text)
-  - Duration (clock icon)
-  - Intakes for that university (calendar icon, comma-separated labels)
-  - Fees (currency icon)
-  - "Începe Pregătirea" / "Start Application" button linking to the enrollment page with course pre-selected
-- Only active courses shown by default; "Show inactive" toggle for admin/owner
-- Search bar to filter courses by name
-- Course details (entry requirements, etc.) shown on card click via a dialog or expandable section
+**1. Fix Apply button URL (`UniversitiesCoursesPage.tsx`)**
+- Change `enroll-student` → `enroll` in the navigate call
 
-**3. Settings Page — Course Active/Inactive Toggle**
+**2. Pre-select university & course in EnrollStudent (`EnrollStudent.tsx`)**
+- Import `useSearchParams` from react-router-dom
+- Read `university` and `course` params on mount
+- Set `universityId` and `courseId` state from URL params as initial values
 
-In the existing Courses section of SettingsPage, add:
-- An `is_active` switch per course row (same pattern as universities)
-- Editable `duration` and `fees` fields when adding/editing courses
+**3. Replace Details dialog with inline expand (`UniversitiesCoursesPage.tsx`)**
+- Remove the `Dialog` for course details
+- Change `detailsCourseId` to toggle: clicking "Details" on a card expands/collapses that card to show `CourseDetailsInfoCard` directly below the card's content
+- Use a simple conditional render inside the card — when `detailsCourseId === course.id`, show the details section below the buttons with a smooth transition
 
-### Files to Change
-
+### Files to Edit
 | File | Change |
 |------|--------|
-| **Migration** | Add `is_active`, `duration`, `fees` columns to `courses` |
-| `src/pages/shared/UniversitiesCoursesPage.tsx` | Full redesign: university tabs at top, course card grid below, apply button |
-| `src/pages/owner/SettingsPage.tsx` | Add is_active switch, duration & fees fields to course CRUD |
-| `src/components/CourseDetailsInfoCard.tsx` | Minor: ensure it works in dialog context |
-
-### Technical Details
-
-- Apply button navigates to `/${role}/enroll-student?university=${uniId}&course=${courseId}` (pre-fills enrollment form)
-- Card styling: dark background (`bg-slate-800`), orange/primary accent for the apply button, white text
-- University tabs use existing `universities` data, show active count badge
-- Intakes mapped per university from existing `intakes` table
-- Fees and duration are new text fields on `courses` — free-form to handle complex pricing like "£5,760 first year then £9,535/year"
+| `src/pages/shared/UniversitiesCoursesPage.tsx` | Fix navigate URL; replace dialog with inline expand |
+| `src/pages/agent/EnrollStudent.tsx` | Read `useSearchParams` and pre-fill university + course |
 
