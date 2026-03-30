@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Download, Upload, UserCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import frameOverlay from "@/assets/profile-frame-transparent.png";
+import frameAgent from "@/assets/profile-frame-transparent.png";
+import frameAdmin from "@/assets/profile-frame-admin.png";
 
 const CANVAS_SIZE = 1080;
 
