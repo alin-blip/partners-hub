@@ -195,7 +195,7 @@ export function BrandedProfilePicture() {
               <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
                 <div className="flex flex-col items-center gap-2">
                   <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                  <span className="text-xs text-muted-foreground">Se compune imaginea...</span>
+                  <span className="text-xs text-muted-foreground">Composing image...</span>
                 </div>
               </div>
             )}
