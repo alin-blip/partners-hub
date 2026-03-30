@@ -9,6 +9,7 @@ export interface CommissionTier {
 export interface UniversityCommission {
   university_id: string;
   commission_per_student: number;
+  tier_id?: string | null;
 }
 
 export function matchTier(
