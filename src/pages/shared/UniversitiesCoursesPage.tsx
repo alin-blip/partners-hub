@@ -1,47 +1,41 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { CourseDetailsInfoCard } from "@/components/CourseDetailsInfoCard";
 import {
   Search,
   Building2,
-  MapPin,
-  BookOpen,
-  CalendarDays,
   Clock,
-  ChevronDown,
+  CalendarDays,
+  PoundSterling,
+  GraduationCap,
   Filter,
+  ArrowRight,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { format } from "date-fns";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 export default function UniversitiesCoursesPage() {
   const [search, setSearch] = useState("");
   const [showInactive, setShowInactive] = useState(false);
+  const [selectedUniId, setSelectedUniId] = useState<string | null>(null);
+  const [detailsCourseId, setDetailsCourseId] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const { role } = useAuth();
 
   const { data: universities = [] } = useQuery({
     queryKey: ["universities-all"],
@@ -50,14 +44,6 @@ export default function UniversitiesCoursesPage() {
         .from("universities")
         .select("*")
         .order("name");
-      return data || [];
-    },
-  });
-
-  const { data: campuses = [] } = useQuery({
-    queryKey: ["campuses-all"],
-    queryFn: async () => {
-      const { data } = await supabase.from("campuses").select("*").order("name");
       return data || [];
     },
   });
@@ -81,286 +67,222 @@ export default function UniversitiesCoursesPage() {
     },
   });
 
-  const { data: timetableOptions = [] } = useQuery({
-    queryKey: ["timetable-options-all"],
-    queryFn: async () => {
-      const { data } = await supabase.from("timetable_options").select("*").order("label");
-      return data || [];
-    },
-  });
+  const activeUniversities = universities.filter((u: any) => u.is_active);
+  const displayUniversities = showInactive ? universities : activeUniversities;
 
-  const { data: courseTimetableGroups = [] } = useQuery({
-    queryKey: ["course-timetable-groups-all"],
-    queryFn: async () => {
-      const { data } = await supabase.from("course_timetable_groups").select("*");
-      return data || [];
-    },
-  });
+  // Auto-select first uni
+  const effectiveUniId =
+    selectedUniId && displayUniversities.some((u: any) => u.id === selectedUniId)
+      ? selectedUniId
+      : displayUniversities[0]?.id || null;
 
-  const filtered = universities.filter((u) => {
-    if (!showInactive && !u.is_active) return false;
-    if (search && !u.name.toLowerCase().includes(search.toLowerCase())) return false;
+  const filteredCourses = courses.filter((c: any) => {
+    if (effectiveUniId && c.university_id !== effectiveUniId) return false;
+    if (!showInactive && c.is_active === false) return false;
+    if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
-  const getCampuses = (uniId: string) => campuses.filter((c) => c.university_id === uniId);
-  const getCourses = (uniId: string) => courses.filter((c) => c.university_id === uniId);
-  const getIntakes = (uniId: string) => intakes.filter((i) => i.university_id === uniId);
-  const getTimetables = (uniId: string) => timetableOptions.filter((t) => t.university_id === uniId);
-  const getCourseTimetables = (courseId: string) => {
-    const groupIds = courseTimetableGroups
-      .filter((g) => g.course_id === courseId)
-      .map((g) => g.timetable_option_id);
-    return timetableOptions.filter((t) => groupIds.includes(t.id));
-  };
+  const getIntakeLabels = (uniId: string) =>
+    intakes
+      .filter((i: any) => i.university_id === uniId)
+      .map((i: any) => i.label);
+
+  const currentRole = role || "agent";
 
   return (
     <DashboardLayout>
       <div className="space-y-6 p-4 md:p-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Universities & Courses</h1>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <GraduationCap className="h-6 w-6 text-primary" />
+            Universities & Courses
+          </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Browse all universities, campuses, courses, intakes and timetable options.
+            Browse available courses and start an application.
           </p>
         </div>
+
+        {/* University tabs */}
+        <ScrollArea className="w-full">
+          <div className="flex gap-2 pb-2">
+            {displayUniversities.map((uni: any) => {
+              const courseCount = courses.filter(
+                (c: any) => c.university_id === uni.id && (showInactive || c.is_active !== false)
+              ).length;
+              return (
+                <button
+                  key={uni.id}
+                  onClick={() => setSelectedUniId(uni.id)}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium whitespace-nowrap transition-colors ${
+                    effectiveUniId === uni.id
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-card text-foreground border-border hover:bg-muted"
+                  }`}
+                >
+                  <Building2 className="h-4 w-4 shrink-0" />
+                  {uni.name}
+                  {!uni.is_active && (
+                    <Badge variant="secondary" className="text-[9px] px-1">Inactive</Badge>
+                  )}
+                  <Badge
+                    variant={effectiveUniId === uni.id ? "secondary" : "outline"}
+                    className="text-[10px] ml-1"
+                  >
+                    {courseCount}
+                  </Badge>
+                </button>
+              );
+            })}
+          </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search universities..."
+              placeholder="Search courses..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <Switch
-              id="show-inactive"
-              checked={showInactive}
-              onCheckedChange={setShowInactive}
-            />
-            <Label htmlFor="show-inactive" className="text-sm cursor-pointer">
-              Show inactive
-            </Label>
-          </div>
+          {(role === "owner" || role === "admin") && (
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Switch
+                id="show-inactive"
+                checked={showInactive}
+                onCheckedChange={setShowInactive}
+              />
+              <Label htmlFor="show-inactive" className="text-sm cursor-pointer">
+                Show inactive
+              </Label>
+            </div>
+          )}
         </div>
 
         {/* Summary */}
         <p className="text-sm text-muted-foreground">
-          Showing {filtered.length} of {universities.length} universities
+          {filteredCourses.length} course{filteredCourses.length !== 1 ? "s" : ""} available
         </p>
 
-        {/* Accordion list */}
-        {filtered.length === 0 ? (
+        {/* Course grid */}
+        {filteredCourses.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center text-muted-foreground">
-              No universities found.
+              No courses found.
             </CardContent>
           </Card>
         ) : (
-          <Accordion type="single" collapsible className="space-y-3">
-            {filtered.map((uni) => {
-              const uniCampuses = getCampuses(uni.id);
-              const uniCourses = getCourses(uni.id);
-              const uniIntakes = getIntakes(uni.id);
-              const uniTimetables = getTimetables(uni.id);
-
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredCourses.map((course: any) => {
+              const uniIntakes = getIntakeLabels(course.university_id);
               return (
-                <AccordionItem
-                  key={uni.id}
-                  value={uni.id}
-                  className="border rounded-lg bg-card px-4"
+                <Card
+                  key={course.id}
+                  className="bg-slate-800 border-slate-700 text-white overflow-hidden hover:border-primary/50 transition-colors"
                 >
-                  <AccordionTrigger className="hover:no-underline py-4">
-                    <div className="flex items-center gap-3 text-left flex-1">
-                      <Building2 className="h-5 w-5 text-primary shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <span className="font-semibold text-base">{uni.name}</span>
-                        <div className="flex flex-wrap gap-2 mt-1">
-                          <Badge variant={uni.is_active ? "default" : "secondary"} className="text-[10px]">
-                            {uni.is_active ? "Active" : "Inactive"}
+                  <CardContent className="p-5 flex flex-col gap-3 h-full">
+                    <div className="flex-1 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-semibold text-base leading-tight">
+                          {course.name}
+                        </h3>
+                        {course.is_active === false && (
+                          <Badge variant="secondary" className="text-[9px] shrink-0">
+                            Inactive
                           </Badge>
-                          <Badge variant="outline" className="text-[10px]">
-                            {uniCampuses.length} campus{uniCampuses.length !== 1 ? "es" : ""}
-                          </Badge>
-                          <Badge variant="outline" className="text-[10px]">
-                            {uniCourses.length} course{uniCourses.length !== 1 ? "s" : ""}
-                          </Badge>
-                          <Badge variant="outline" className="text-[10px]">
-                            {uniIntakes.length} intake{uniIntakes.length !== 1 ? "s" : ""}
-                          </Badge>
-                        </div>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] capitalize border-slate-500 text-slate-300"
+                        >
+                          {course.level}
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] capitalize border-slate-500 text-slate-300"
+                        >
+                          {course.study_mode}
+                        </Badge>
+                      </div>
+
+                      <div className="space-y-1.5 text-sm text-slate-300">
+                        {course.duration && (
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-3.5 w-3.5 text-primary shrink-0" />
+                            <span>{course.duration}</span>
+                          </div>
+                        )}
+                        {uniIntakes.length > 0 && (
+                          <div className="flex items-center gap-2">
+                            <CalendarDays className="h-3.5 w-3.5 text-primary shrink-0" />
+                            <span className="truncate">
+                              {uniIntakes.slice(0, 3).join(", ")}
+                              {uniIntakes.length > 3 && ` +${uniIntakes.length - 3}`}
+                            </span>
+                          </div>
+                        )}
+                        {course.fees && (
+                          <div className="flex items-center gap-2">
+                            <PoundSterling className="h-3.5 w-3.5 text-primary shrink-0" />
+                            <span>{course.fees}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </AccordionTrigger>
 
-                  <AccordionContent className="pb-4 space-y-6">
-                    {/* Timetable message */}
-                    {uni.timetable_available && uni.timetable_message && (
-                      <div className="rounded-md bg-accent/10 border border-accent/20 p-3 text-sm text-accent-foreground">
-                        <Clock className="inline h-4 w-4 mr-1.5 -mt-0.5" />
-                        {uni.timetable_message}
-                      </div>
-                    )}
-
-                    {/* Campuses */}
-                    {uniCampuses.length > 0 && (
-                      <Section icon={MapPin} title="Campuses">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Name</TableHead>
-                              <TableHead>City</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {uniCampuses.map((c) => (
-                              <TableRow key={c.id}>
-                                <TableCell className="font-medium">{c.name}</TableCell>
-                                <TableCell className="text-muted-foreground">{c.city || "—"}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </Section>
-                    )}
-
-                    {/* Courses */}
-                    {uniCourses.length > 0 && (
-                      <Section icon={BookOpen} title="Courses">
-                        <div className="space-y-2">
-                          {uniCourses.map((course) => (
-                            <CourseRow
-                              key={course.id}
-                              course={course}
-                              timetables={getCourseTimetables(course.id)}
-                            />
-                          ))}
-                        </div>
-                      </Section>
-                    )}
-
-                    {/* Intakes */}
-                    {uniIntakes.length > 0 && (
-                      <Section icon={CalendarDays} title="Intakes">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Label</TableHead>
-                              <TableHead>Start Date</TableHead>
-                              <TableHead>Application Deadline</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {uniIntakes.map((intake) => (
-                              <TableRow key={intake.id}>
-                                <TableCell className="font-medium">{intake.label}</TableCell>
-                                <TableCell>{formatDate(intake.start_date)}</TableCell>
-                                <TableCell>
-                                  {intake.application_deadline
-                                    ? formatDate(intake.application_deadline)
-                                    : "—"}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </Section>
-                    )}
-
-                    {/* Timetable Options */}
-                    {uniTimetables.length > 0 && (
-                      <Section icon={Clock} title="Timetable Options">
-                        <div className="flex flex-wrap gap-2">
-                          {uniTimetables.map((t) => (
-                            <Badge key={t.id} variant="secondary">
-                              {t.label}
-                            </Badge>
-                          ))}
-                        </div>
-                      </Section>
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 border-slate-500 text-slate-300 hover:bg-slate-700 hover:text-white"
+                        onClick={() => setDetailsCourseId(course.id)}
+                      >
+                        Details
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
+                        onClick={() =>
+                          navigate(
+                            `/${currentRole}/enroll-student?university=${course.university_id}&course=${course.id}`
+                          )
+                        }
+                      >
+                        Apply <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               );
             })}
-          </Accordion>
+          </div>
         )}
+
+        {/* Course details dialog */}
+        <Dialog
+          open={!!detailsCourseId}
+          onOpenChange={(open) => !open && setDetailsCourseId(null)}
+        >
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>
+                {courses.find((c: any) => c.id === detailsCourseId)?.name || "Course Details"}
+              </DialogTitle>
+            </DialogHeader>
+            {detailsCourseId && (
+              <CourseDetailsInfoCard courseId={detailsCourseId} />
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
-}
-
-function Section({
-  icon: Icon,
-  title,
-  children,
-}: {
-  icon: React.ElementType;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <h3 className="text-sm font-semibold flex items-center gap-2 mb-2 text-foreground">
-        <Icon className="h-4 w-4 text-primary" />
-        {title}
-      </h3>
-      {children}
-    </div>
-  );
-}
-
-function CourseRow({
-  course,
-  timetables,
-}: {
-  course: { id: string; name: string; level: string; study_mode: string };
-  timetables: { id: string; label: string }[];
-}) {
-  return (
-    <Collapsible>
-      <CollapsibleTrigger className="flex items-center justify-between w-full rounded-md border px-3 py-2.5 text-left hover:bg-muted/50 transition-colors group">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="font-medium text-sm truncate">{course.name}</span>
-          <Badge variant="outline" className="text-[10px] shrink-0 capitalize">
-            {course.level}
-          </Badge>
-          <Badge variant="outline" className="text-[10px] shrink-0 capitalize">
-            {course.study_mode}
-          </Badge>
-        </div>
-        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-      </CollapsibleTrigger>
-      <CollapsibleContent className="pt-2 pl-3 space-y-3">
-        <CourseDetailsInfoCard courseId={course.id} compact />
-        {timetables.length > 0 && (
-          <div>
-            <p className="text-xs font-medium text-muted-foreground mb-1">Timetable Options</p>
-            <div className="flex flex-wrap gap-1.5">
-              {timetables.map((t) => (
-                <Badge key={t.id} variant="secondary" className="text-[10px]">
-                  {t.label}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
-        {timetables.length === 0 && (
-          <p className="text-xs text-muted-foreground italic">No course details or timetables available.</p>
-        )}
-      </CollapsibleContent>
-    </Collapsible>
-  );
-}
-
-function formatDate(d: string) {
-  try {
-    return format(new Date(d), "dd MMM yyyy");
-  } catch {
-    return d;
-  }
 }
