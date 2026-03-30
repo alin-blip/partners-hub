@@ -39,11 +39,44 @@ export default function UniversitiesCoursesPage() {
   const [search, setSearch] = useState("");
   const [showInactive, setShowInactive] = useState(false);
   const [selectedUniId, setSelectedUniId] = useState<string | null>(null);
+  const [detailsCourseId, setDetailsCourseId] = useState<string | null>(null);
   const [scanningUniId, setScanningUniId] = useState<string | null>(null);
   const navigate = useNavigate();
   const { role } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const handleScanDetails = async (uniId: string, uniName: string) => {
+    const url = Object.entries(UNIVERSITY_URLS).find(
+      ([key]) => uniName.toLowerCase().includes(key.toLowerCase()) || key.toLowerCase().includes(uniName.toLowerCase().split(" ")[0])
+    )?.[1];
+
+    if (!url) {
+      toast({ title: "No URL configured", description: `No website URL mapped for "${uniName}"`, variant: "destructive" });
+      return;
+    }
+
+    setScanningUniId(uniId);
+    try {
+      const { data, error } = await supabase.functions.invoke("scrape-course-details", {
+        body: { university_id: uniId, university_url: url },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Scan Complete",
+        description: data.message || `Updated ${data.updated} courses`,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["course-details"] });
+    } catch (e: any) {
+      console.error("Scan error:", e);
+      toast({ title: "Scan Failed", description: e.message || "Failed to scan course details", variant: "destructive" });
+    } finally {
+      setScanningUniId(null);
+    }
+  };
   const { data: universities = [] } = useQuery({
     queryKey: ["universities-all"],
     queryFn: async () => {
