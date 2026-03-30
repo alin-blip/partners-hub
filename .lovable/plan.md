@@ -1,58 +1,49 @@
 
 
-## Plan: Universities & Courses Page (Read-Only for All Roles)
+## Plan: Redesign Universities & Courses Page + Course Active/Inactive Toggle
 
-### What We're Building
-A new **Universities & Courses** page accessible from the sidebar for all roles (Owner, Admin, Agent). This is a read-only reference page where users can browse all university/campus/course/intake/timetable data with full details. No CRUD — management stays in Owner Settings.
+### What Changes
 
-### Data Sources (existing tables)
-- `universities` — name, is_active, timetable_available, timetable_message
-- `campuses` — name, city, university_id
-- `courses` — name, level, study_mode, university_id
-- `course_details` — entry_requirements, admission_test_info, interview_info, documents_required, personal_statement_guidelines, additional_info
-- `intakes` — label, start_date, application_deadline, university_id
-- `timetable_options` — label, university_id
-- `course_timetable_groups` — links courses to timetable_options per campus
+**1. Database Migration — Add fields to `courses` table**
+- `is_active` (boolean, default true) — toggle courses open/closed in Settings
+- `duration` (text, nullable) — e.g. "4 years"  
+- `fees` (text, nullable) — e.g. "£9,535/year"
 
-All these tables already have RLS policies allowing authenticated users to SELECT.
+**2. Redesign Universities & Courses Page**
 
-### Page Design
+Replace the current accordion layout with a new design inspired by the screenshot:
 
-**Layout**: Accordion-based, one section per university. Each university expands to show:
+- **Top header**: University selector tabs/buttons (horizontal scrollable). Click a university to filter courses below.
+- **Course grid**: 3-column responsive grid of dark-themed cards. Each card shows:
+  - Course name (bold, white text)
+  - Duration (clock icon)
+  - Intakes for that university (calendar icon, comma-separated labels)
+  - Fees (currency icon)
+  - "Începe Pregătirea" / "Start Application" button linking to the enrollment page with course pre-selected
+- Only active courses shown by default; "Show inactive" toggle for admin/owner
+- Search bar to filter courses by name
+- Course details (entry requirements, etc.) shown on card click via a dialog or expandable section
 
-1. **University Header** — Name, active status badge, number of campuses/courses
-2. **Campuses** — Table with name and city
-3. **Courses** — Table with name, level, study_mode. Each course row is expandable (collapsible) to show:
-   - Course Details card (reuse `CourseDetailsInfoCard` component)
-   - Linked timetable options for that course
-4. **Intakes** — Table with label, start date, application deadline
-5. **Timetable Options** — List of available timetables for the university
+**3. Settings Page — Course Active/Inactive Toggle**
 
-**Features**:
-- Search bar to filter universities by name
-- Filter by active/inactive status
-- Course count summary per university
+In the existing Courses section of SettingsPage, add:
+- An `is_active` switch per course row (same pattern as universities)
+- Editable `duration` and `fees` fields when adding/editing courses
 
-### Files to Create/Edit
+### Files to Change
 
-1. **Create `src/pages/shared/UniversitiesCoursesPage.tsx`**
-   - Fetch all universities, campuses, courses, course_details, intakes, timetable_options
-   - Render accordion per university with sub-sections
-   - Search + filter controls
-   - Reuse `CourseDetailsInfoCard` for course requirement details
-
-2. **Edit `src/App.tsx`**
-   - Add route `/:role/universities` for owner, admin, and agent
-
-3. **Edit `src/components/AppSidebar.tsx`**
-   - Add "Universities & Courses" nav item with `GraduationCap` or `School` icon in the Main group, visible to all roles
+| File | Change |
+|------|--------|
+| **Migration** | Add `is_active`, `duration`, `fees` columns to `courses` |
+| `src/pages/shared/UniversitiesCoursesPage.tsx` | Full redesign: university tabs at top, course card grid below, apply button |
+| `src/pages/owner/SettingsPage.tsx` | Add is_active switch, duration & fees fields to course CRUD |
+| `src/components/CourseDetailsInfoCard.tsx` | Minor: ensure it works in dialog context |
 
 ### Technical Details
 
-- All queries use existing RLS (all tables allow authenticated SELECT)
-- No database changes needed — all tables and policies exist
-- Use `Accordion` from shadcn for university sections
-- Use `Collapsible` for expandable course rows showing details
-- Use React Query with proper query keys for caching
-- Badge components for status indicators (active/inactive, level, study_mode)
+- Apply button navigates to `/${role}/enroll-student?university=${uniId}&course=${courseId}` (pre-fills enrollment form)
+- Card styling: dark background (`bg-slate-800`), orange/primary accent for the apply button, white text
+- University tabs use existing `universities` data, show active count badge
+- Intakes mapped per university from existing `intakes` table
+- Fees and duration are new text fields on `courses` — free-form to handle complex pricing like "£5,760 first year then £9,535/year"
 
