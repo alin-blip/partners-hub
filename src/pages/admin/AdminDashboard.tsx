@@ -10,6 +10,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { format } from "date-fns";
+import { CommissionOfferCards } from "@/components/CommissionOfferCards";
 
 export default function AdminDashboard() {
   const { user } = useAuth();
