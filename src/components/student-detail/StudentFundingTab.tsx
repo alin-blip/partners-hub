@@ -258,7 +258,7 @@ export function StudentFundingTab({ studentId, canEdit, student }: Props) {
                 <Pencil className="w-3.5 h-3.5 mr-1.5" /> Fill in Platform
               </Button>
               <Button variant="outline" size="sm" asChild>
-                <a href="/EduForYou_Student_Finance_Form.pdf" download>
+                <a href="/EduForYou_Student_Finance_Form.pdf" download target="_blank" rel="noopener noreferrer">
                   <Download className="w-3.5 h-3.5 mr-1.5" /> Download Blank Form
                 </a>
               </Button>
