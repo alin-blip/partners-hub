@@ -91,11 +91,11 @@ export default function FeedbackPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Utilizator</TableHead>
-                  <TableHead>Categorie</TableHead>
-                  <TableHead className="min-w-[300px]">Mesaj</TableHead>
-                  <TableHead>Status</TableHead>
+               <TableHead>Date</TableHead>
+                   <TableHead>User</TableHead>
+                   <TableHead>Category</TableHead>
+                   <TableHead className="min-w-[300px]">Message</TableHead>
+                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
