@@ -140,12 +140,14 @@ function CrudSection({
 /*  Commission Tiers                                       */
 /* ──────────────────────────────────────────────────────── */
 
-function CommissionTiersSection({ deleteItem }: { deleteItem: any }) {
+function CommissionTiersSection({ deleteItem, universities }: { deleteItem: any; universities: any[] }) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingTier, setEditingTier] = useState<any>(null);
+  const [addUniId, setAddUniId] = useState<string>("");
+  const [editUniId, setEditUniId] = useState<string>("");
 
   const { data: tiers = [] } = useQuery({
     queryKey: ["commission-tiers"],
@@ -162,6 +164,7 @@ function CommissionTiersSection({ deleteItem }: { deleteItem: any }) {
         min_students: Number(d.min_students),
         max_students: d.max_students ? Number(d.max_students) : null,
         commission_per_student: Number(d.commission_per_student),
+        university_id: d.university_id || null,
       });
       if (error) throw error;
     },
@@ -175,11 +178,14 @@ function CommissionTiersSection({ deleteItem }: { deleteItem: any }) {
         min_students: Number(d.min_students),
         max_students: d.max_students ? Number(d.max_students) : null,
         commission_per_student: Number(d.commission_per_student),
+        university_id: d.university_id || null,
       }).eq("id", d.id);
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["commission-tiers"] }); toast({ title: "Tier updated" }); },
   });
+
+  const uniNameMap = new Map(universities.map((u: any) => [u.id, u.name]));
 
   const tierFormFields = (defaults?: any) => (
     <>
@@ -204,11 +210,41 @@ function CommissionTiersSection({ deleteItem }: { deleteItem: any }) {
     </>
   );
 
+  // Group tiers: global first, then by university
+  const globalTiers = tiers.filter((t: any) => !t.university_id);
+  const uniTierGroups = new Map<string, any[]>();
+  for (const t of tiers) {
+    if (t.university_id) {
+      if (!uniTierGroups.has(t.university_id)) uniTierGroups.set(t.university_id, []);
+      uniTierGroups.get(t.university_id)!.push(t);
+    }
+  }
+
+  const renderTierRows = (tierList: any[]) =>
+    tierList.map((t: any) => (
+      <TableRow key={t.id}>
+        <TableCell className="font-medium">{t.tier_name}</TableCell>
+        <TableCell>{t.min_students}</TableCell>
+        <TableCell>{t.max_students ?? "∞"}</TableCell>
+        <TableCell>£{t.commission_per_student}</TableCell>
+        <TableCell>
+          <div className="flex gap-1">
+            <Button variant="ghost" size="icon" onClick={() => { setEditingTier(t); setEditUniId(t.university_id || ""); setEditOpen(true); }}>
+              <Pencil className="w-4 h-4 text-muted-foreground" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => deleteItem.mutate({ table: "commission_tiers", id: t.id })}>
+              <Trash2 className="w-4 h-4 text-destructive" />
+            </Button>
+          </div>
+        </TableCell>
+      </TableRow>
+    ));
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <CardTitle className="text-base">Commission Tiers</CardTitle>
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <Dialog open={addOpen} onOpenChange={(o) => { setAddOpen(o); if (!o) setAddUniId(""); }}>
           <DialogTrigger asChild>
             <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90">
               <Plus className="w-3 h-3 mr-1" /> Add
@@ -218,52 +254,79 @@ function CommissionTiersSection({ deleteItem }: { deleteItem: any }) {
             <DialogHeader><DialogTitle>Add Commission Tier</DialogTitle></DialogHeader>
             <form className="space-y-4 pt-2" onSubmit={(e) => {
               e.preventDefault();
-              addTier.mutate(Object.fromEntries(new FormData(e.currentTarget)));
+              const fd = Object.fromEntries(new FormData(e.currentTarget));
+              addTier.mutate({ ...fd, university_id: addUniId && addUniId !== "global" ? addUniId : null });
               setAddOpen(false);
+              setAddUniId("");
             }}>
+              <div className="space-y-2">
+                <Label>University (optional — leave empty for global)</Label>
+                <Select value={addUniId} onValueChange={setAddUniId}>
+                  <SelectTrigger><SelectValue placeholder="Global (all universities)" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="global">Global (all universities)</SelectItem>
+                    {universities.map((u: any) => (
+                      <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               {tierFormFields()}
               <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">Save</Button>
             </form>
           </DialogContent>
         </Dialog>
       </CardHeader>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Tier</TableHead>
-              <TableHead>Min Students</TableHead>
-              <TableHead>Max Students</TableHead>
-              <TableHead>£ per Student</TableHead>
-              <TableHead className="w-24" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {tiers.map((t: any) => (
-              <TableRow key={t.id}>
-                <TableCell className="font-medium">{t.tier_name}</TableCell>
-                <TableCell>{t.min_students}</TableCell>
-                <TableCell>{t.max_students ?? "∞"}</TableCell>
-                <TableCell>£{t.commission_per_student}</TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => { setEditingTier(t); setEditOpen(true); }}>
-                      <Pencil className="w-4 h-4 text-muted-foreground" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => deleteItem.mutate({ table: "commission_tiers", id: t.id })}>
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-            {tiers.length === 0 && (
+      <CardContent className="p-0 space-y-4">
+        {/* Global Tiers */}
+        <div>
+          <div className="px-4 pt-2 pb-1">
+            <p className="text-sm font-semibold text-muted-foreground">Global Tiers</p>
+          </div>
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground py-6">No tiers yet</TableCell>
+                <TableHead>Tier</TableHead>
+                <TableHead>Min Students</TableHead>
+                <TableHead>Max Students</TableHead>
+                <TableHead>£ per Student</TableHead>
+                <TableHead className="w-24" />
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {renderTierRows(globalTiers)}
+              {globalTiers.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-4">No global tiers</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* University-specific Tiers */}
+        {Array.from(uniTierGroups.entries()).map(([uniId, uniTiers]) => (
+          <div key={uniId}>
+            <div className="px-4 pt-2 pb-1 flex items-center gap-2">
+              <p className="text-sm font-semibold text-muted-foreground">{uniNameMap.get(uniId) || uniId}</p>
+              <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">University Tiers</span>
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tier</TableHead>
+                  <TableHead>Min Students</TableHead>
+                  <TableHead>Max Students</TableHead>
+                  <TableHead>£ per Student</TableHead>
+                  <TableHead className="w-24" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {renderTierRows(uniTiers)}
+              </TableBody>
+            </Table>
+          </div>
+        ))}
       </CardContent>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
@@ -272,9 +335,22 @@ function CommissionTiersSection({ deleteItem }: { deleteItem: any }) {
           {editingTier && (
             <form className="space-y-4 pt-2" onSubmit={(e) => {
               e.preventDefault();
-              updateTier.mutate({ id: editingTier.id, ...Object.fromEntries(new FormData(e.currentTarget)) });
+              const fd = Object.fromEntries(new FormData(e.currentTarget));
+              updateTier.mutate({ id: editingTier.id, ...fd, university_id: editUniId === "global" ? null : editUniId || null });
               setEditOpen(false);
             }}>
+              <div className="space-y-2">
+                <Label>University</Label>
+                <Select value={editUniId || "global"} onValueChange={setEditUniId}>
+                  <SelectTrigger><SelectValue placeholder="Global" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="global">Global (all universities)</SelectItem>
+                    {universities.map((u: any) => (
+                      <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               {tierFormFields(editingTier)}
               <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">Save Changes</Button>
             </form>
@@ -1858,7 +1934,7 @@ export default function SettingsPage() {
           </TabsContent>
 
           <TabsContent value="commissions" className="mt-4 space-y-6">
-            <CommissionTiersSection deleteItem={deleteItem} />
+            <CommissionTiersSection deleteItem={deleteItem} universities={universities} />
             <UniversityCommissionsSection universities={universities} />
           </TabsContent>
 

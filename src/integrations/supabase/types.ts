@@ -279,6 +279,7 @@ export type Database = {
           max_students: number | null
           min_students: number
           tier_name: string
+          university_id: string | null
         }
         Insert: {
           commission_per_student?: number
@@ -286,6 +287,7 @@ export type Database = {
           max_students?: number | null
           min_students?: number
           tier_name: string
+          university_id?: string | null
         }
         Update: {
           commission_per_student?: number
@@ -293,8 +295,17 @@ export type Database = {
           max_students?: number | null
           min_students?: number
           tier_name?: string
+          university_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "commission_tiers_university_id_fkey"
+            columns: ["university_id"]
+            isOneToOne: false
+            referencedRelation: "universities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       course_details: {
         Row: {
