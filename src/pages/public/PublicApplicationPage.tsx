@@ -82,6 +82,23 @@ export default function PublicApplicationPage() {
     })();
   }, [slug]);
 
+  // Load ElevenLabs widget script when AI voice is enabled
+  useEffect(() => {
+    if (!aiVoiceEnabled) return;
+    const scriptId = "elevenlabs-convai-script";
+    if (document.getElementById(scriptId)) return;
+    const script = document.createElement("script");
+    script.id = scriptId;
+    script.src = "https://elevenlabs.io/convai-widget/index.js";
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      const el = document.getElementById(scriptId);
+      if (el) el.remove();
+    };
+  }, [aiVoiceEnabled]);
+  }, [slug]);
+
   // Load campuses + courses + intakes + timetable when university changes
   useEffect(() => {
     if (!universityId) {
