@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { MetricCard } from "@/components/MetricCard";
-import { calcCommission } from "@/lib/commissions";
+import { calcCommissionByEnrollments } from "@/lib/commissions";
 import { PoundSterling, Users, TrendingUp } from "lucide-react";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -31,6 +31,16 @@ export default function CommissionsPage() {
     },
   });
 
+  const { data: uniCommissions = [] } = useQuery({
+    queryKey: ["university-commissions"],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("university_commissions")
+        .select("university_id, commission_per_student, universities(name)");
+      return data || [];
+    },
+  });
+
   const { data: agents = [] } = useQuery({
     queryKey: ["all-agents-profiles"],
     queryFn: async () => {
@@ -52,7 +62,7 @@ export default function CommissionsPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("enrollments")
-        .select("id, status, student_id, created_at, students!inner(agent_id)")
+        .select("id, status, student_id, created_at, university_id, students!inner(agent_id)")
         .eq("status", "active");
       return data || [];
     },
@@ -70,23 +80,23 @@ export default function CommissionsPage() {
   const adminMap = new Map(adminProfiles.map((p: any) => [p.id, p.full_name]));
   const agentList = agents.filter((a: any) => roleMap.get(a.id) === "agent");
 
-  // Count active enrollments per agent
-  const agentStudentCounts = new Map<string, number>();
+  // Group enrollments per agent
+  const agentEnrollments = new Map<string, { university_id: string }[]>();
   for (const e of enrollments) {
     const agentId = (e as any).students?.agent_id;
     if (agentId) {
-      agentStudentCounts.set(agentId, (agentStudentCounts.get(agentId) || 0) + 1);
+      if (!agentEnrollments.has(agentId)) agentEnrollments.set(agentId, []);
+      agentEnrollments.get(agentId)!.push({ university_id: e.university_id });
     }
   }
 
   const agentCommissions = agentList.map((agent: any) => {
-    const count = agentStudentCounts.get(agent.id) || 0;
-    const { tier, amount } = calcCommission(count, tiers);
+    const agentEnrs = agentEnrollments.get(agent.id) || [];
+    const commission = calcCommissionByEnrollments(agentEnrs, uniCommissions, tiers);
     return {
       ...agent,
-      activeStudents: count,
-      tierName: tier?.tier_name || "—",
-      commission: amount,
+      activeStudents: agentEnrs.length,
+      commission,
       adminName: agent.admin_id ? adminMap.get(agent.admin_id) || "—" : "—",
     };
   });
@@ -153,7 +163,6 @@ export default function CommissionsPage() {
                   <TableHead>Agent</TableHead>
                   <TableHead>Admin</TableHead>
                   <TableHead className="text-right">Active Students</TableHead>
-                  <TableHead>Tier</TableHead>
                   <TableHead className="text-right">Commission</TableHead>
                 </TableRow>
               </TableHeader>
@@ -168,9 +177,6 @@ export default function CommissionsPage() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">{a.adminName}</TableCell>
                     <TableCell className="text-right tabular-nums">{a.activeStudents}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="text-xs">{a.tierName}</Badge>
-                    </TableCell>
                     <TableCell className="text-right font-medium tabular-nums">
                       £{a.commission.toLocaleString()}
                     </TableCell>
@@ -178,7 +184,7 @@ export default function CommissionsPage() {
                 ))}
                 {agentCommissions.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                       No agents found
                     </TableCell>
                   </TableRow>
