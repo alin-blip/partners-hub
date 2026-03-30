@@ -15,10 +15,10 @@ const statusColors: Record<string, string> = {
 };
 
 const categoryLabels: Record<string, string> = {
-  suggestion: "Sugestie",
+  suggestion: "Suggestion",
   bug: "Bug",
-  simplify: "Simplificare",
-  feature: "Funcție nouă",
+  simplify: "Simplification",
+  feature: "New Feature",
 };
 
 export default function FeedbackPage() {
