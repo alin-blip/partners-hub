@@ -1877,13 +1877,21 @@ export default function SettingsPage() {
             <CrudSection
               title="Courses"
               items={courses}
-              columns={["Name", "Level", "Mode", "University"]}
+              columns={["Name", "Level", "Mode", "University", "Active"]}
               renderRow={(c, onEditClick) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.name}</TableCell>
                   <TableCell className="capitalize">{c.level}</TableCell>
                   <TableCell className="capitalize">{c.study_mode}</TableCell>
                   <TableCell>{(c as any).universities?.name}</TableCell>
+                  <TableCell>
+                    <Switch
+                      checked={(c as any).is_active !== false}
+                      onCheckedChange={(checked) =>
+                        updateCourse.mutate({ ...c, is_active: checked })
+                      }
+                    />
+                  </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" onClick={() => onEditClick(c)}>
@@ -1918,6 +1926,14 @@ export default function SettingsPage() {
                     <Label>Study Mode</Label>
                     <Input name="study_mode" placeholder="e.g. blended" defaultValue="blended" />
                   </div>
+                  <div className="space-y-2">
+                    <Label>Duration</Label>
+                    <Input name="duration" placeholder="e.g. 4 years" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Fees</Label>
+                    <Input name="fees" placeholder="e.g. £9,535/year" />
+                  </div>
                 </>
               }
               onEdit={(d) => updateCourse.mutate(d)}
@@ -1941,6 +1957,14 @@ export default function SettingsPage() {
                   <div className="space-y-2">
                     <Label>Study Mode</Label>
                     <Input name="study_mode" defaultValue={item.study_mode} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Duration</Label>
+                    <Input name="duration" defaultValue={(item as any).duration || ""} placeholder="e.g. 4 years" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Fees</Label>
+                    <Input name="fees" defaultValue={(item as any).fees || ""} placeholder="e.g. £9,535/year" />
                   </div>
                 </>
               )}
