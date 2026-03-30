@@ -229,7 +229,7 @@ export function BrandedProfilePicture() {
             {isReady && (
               <Button size="sm" onClick={handleDownload}>
                 <Download className="w-4 h-4 mr-1" />
-                Descarcă
+                Download
               </Button>
             )}
           </div>
