@@ -1,60 +1,60 @@
 
 
-## Plan: Scrape Course Details from University Websites
+## Plan: Extract Missing Course Details for CECOS and Regent
 
-Create a new edge function `scrape-course-details` that, for each university:
-1. Queries the DB for courses that DON'T have a `course_details` entry yet
-2. Uses Firecrawl to map + scrape course pages from the university website
-3. Uses AI to match scraped content to existing course names and extract details
-4. Upserts results into `course_details` table
+### Current Status
 
-Then add a UI trigger on the Universities page (or Settings) to run this per-university.
+| University | Total Courses | With Details | Missing |
+|-----------|--------------|-------------|---------|
+| Global Banking School | 21 | 21 | 0 |
+| QA (all) | 65 | 65 | 0 |
+| LSC | 2 | 2 | 0 |
+| UWTSD | 3 | 3 | 0 |
+| MLA College | 1 | 1 | 0 |
+| **CECOS** | 5 | 2 | **3** |
+| **Regent** | 40 | 31 | **9** |
 
-### Edge Function: `supabase/functions/scrape-course-details/index.ts`
+### Courses Missing Details
 
-**Input:** `{ university_id: string, university_url: string }`
+**CECOS (3):**
+- BA Top Up in Business Management
+- Human Resource Management
+- Leadership Principles in Health & Social Care
 
-**Flow:**
-1. Auth check (owner/admin only)
-2. Query `courses` for the given `university_id` where no matching `course_details` row exists (LEFT JOIN)
-3. If no courses missing details, return early
-4. Use Firecrawl `/v1/map` to discover course page URLs on the university site
-5. For each course without details, try to find a matching URL from the map results (fuzzy match course name in URL)
-6. Scrape matched URLs in batches of 5 using Firecrawl `/v1/scrape`
-7. Send all scraped content + list of course names to the AI (Gemini Flash) with a prompt to extract structured details per course:
-   - `entry_requirements`, `admission_test_info`, `interview_info`, `documents_required`, `personal_statement_guidelines`, `additional_info`
-8. Upsert results into `course_details` table
-9. Return summary of how many courses got details
+**Regent (9):**
+- BEng (Hons) Electrical and Electronic Engineering (UOB)
+- BEng (Hons) Software Engineering (UOB)
+- BSc (Hons) Computing with FY
+- BSc (Hons) Health and Social Care - Top-Up
+- HNC Digital Technologies
+- HNC Engineering
+- HNC in Business Management
+- HNC in Health Care Practice (Integrated Health and Social Care)
+- MSc Psychology
 
-### UI: Add button on `UniversitiesCoursesPage.tsx`
+### Extraction Plan
 
-- Add a "Scan Course Details" button (visible to owner/admin) per university tab
-- Shows a loading state while scanning
-- On completion, shows a toast with summary and refreshes the course details query
-- University URL mapping is hardcoded in the frontend:
-  ```typescript
-  const UNIVERSITY_URLS: Record<string, string> = {
-    "Global Banking School": "https://globalbanking.ac.uk/",
-    "QA": "https://qahighereducation.com/",
-    "Regent": "https://www.rcl.ac.uk/",
-    "Arden": "https://arden.ac.uk/",
-    "LSC": "https://www.lsclondon.co.uk/",
-    "UWTSD": "https://www.uwtsd.ac.uk/",
-  };
-  ```
+1. **Regent** — Use the existing `scrape-course-details` edge function with `https://www.rcl.ac.uk/`. The function will search for course pages via Firecrawl, extract details with AI, and upsert into `course_details`. This should work since Regent is already in the URL mapping.
 
-### Files to Create/Edit
+2. **CECOS** — CECOS is NOT in the current `UNIVERSITY_URLS` mapping. We need to:
+   - Add CECOS URL to the mapping (need to identify their website)
+   - Or manually scrape their site if they have one
+   - Or populate manually if no public course pages exist
+
+### Implementation
+
+| Step | Action |
+|------|--------|
+| 1 | Run `scrape-course-details` for Regent (9 courses) via the edge function |
+| 2 | Identify CECOS website URL and add to `UNIVERSITY_URLS` mapping |
+| 3 | Run `scrape-course-details` for CECOS (3 courses) |
+| 4 | For any courses the scraper misses, populate manually based on available info |
+
+### Files to Edit
 
 | File | Change |
 |------|--------|
-| `supabase/functions/scrape-course-details/index.ts` | New edge function: map site → scrape → AI extract → upsert course_details |
-| `src/pages/shared/UniversitiesCoursesPage.tsx` | Add "Scan Details" button per university for owner/admin |
+| `src/pages/shared/UniversitiesCoursesPage.tsx` | Add CECOS to `UNIVERSITY_URLS` mapping |
 
-### Technical Details
-
-- The AI prompt instructs Gemini to return a JSON array where each object has `course_name` (must match exactly one of the provided names) plus the 6 detail fields
-- Courses that the AI can't find info for are skipped (no empty rows inserted)
-- Uses service role key for DB operations in the edge function
-- Firecrawl map search query uses the course names to find relevant pages
-- Scrapes up to 30 pages per university to stay within reasonable limits
+The edge function is already deployed and ready. We just need to trigger it for the two universities with missing data and add CECOS to the URL map.
 
