@@ -28,6 +28,7 @@ import MessagesPage from "./pages/shared/MessagesPage";
 import DigitalCardPage from "./pages/shared/DigitalCardPage";
 import SocialPostsPage from "./pages/shared/SocialPostsPage";
 import AgentSocialFeedPage from "./pages/shared/AgentSocialFeedPage";
+import UniversitiesCoursesPage from "./pages/shared/UniversitiesCoursesPage";
 
 import FeedbackPage from "./pages/owner/FeedbackPage";
 import LeadsPage from "./pages/shared/LeadsPage";
@@ -70,6 +71,7 @@ const App = () => (
             <Route path="/owner/enroll" element={<EnrollStudent />} />
             <Route path="/owner/digital-card" element={<DigitalCardPage />} />
             <Route path="/owner/social-posts" element={<SocialPostsPage />} />
+            <Route path="/owner/universities" element={<UniversitiesCoursesPage />} />
             
             <Route path="/owner/feedback" element={<FeedbackPage />} />
             
@@ -87,6 +89,7 @@ const App = () => (
             <Route path="/admin/enroll" element={<EnrollStudent />} />
             <Route path="/admin/digital-card" element={<DigitalCardPage />} />
             <Route path="/admin/social-posts" element={<SocialPostsPage />} />
+            <Route path="/admin/universities" element={<UniversitiesCoursesPage />} />
             <Route path="/admin/leads" element={<LeadsPage />} />
             <Route path="/admin/tasks" element={<TasksPage />} />
             
@@ -103,6 +106,7 @@ const App = () => (
             <Route path="/agent/enroll" element={<EnrollStudent />} />
             <Route path="/agent/digital-card" element={<DigitalCardPage />} />
             <Route path="/agent/social-posts" element={<AgentSocialFeedPage />} />
+            <Route path="/agent/universities" element={<UniversitiesCoursesPage />} />
             <Route path="/agent/leads" element={<LeadsPage />} />
             <Route path="/agent/tasks" element={<TasksPage />} />
             
