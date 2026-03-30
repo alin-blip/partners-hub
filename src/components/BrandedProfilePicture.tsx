@@ -177,11 +177,11 @@ export function BrandedProfilePicture() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
-          <UserCircle className="w-5 h-5" />
-          Branded Profile Picture
+          <Camera className="w-5 h-5" />
+          Profile Photo
         </CardTitle>
         <CardDescription>
-          Generează o poză de profil premium cu overlay transparent EduForYou
+          Încarcă o poză de profil — se va folosi pe Digital Card și rețele sociale cu overlay-ul EduForYou
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
