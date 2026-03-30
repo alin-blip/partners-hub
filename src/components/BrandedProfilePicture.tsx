@@ -2,8 +2,9 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Upload, UserCircle, Loader2 } from "lucide-react";
+import { Download, Upload, UserCircle, Loader2, Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import frameAgent from "@/assets/profile-frame-transparent.png";
 import frameAdmin from "@/assets/profile-frame-admin.png";
 
