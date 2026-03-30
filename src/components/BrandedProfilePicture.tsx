@@ -23,13 +23,14 @@ async function fetchImageAsBase64(url: string): Promise<string> {
 }
 
 export function BrandedProfilePicture() {
-  const { profile, role } = useAuth();
+  const { profile, role, user } = useAuth();
   const { toast } = useToast();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const avatarUrl = (profile as any)?.avatar_url;
