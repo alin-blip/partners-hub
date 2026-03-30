@@ -148,6 +148,9 @@ function CommissionTiersSection({ deleteItem, universities }: { deleteItem: any;
   const [editingTier, setEditingTier] = useState<any>(null);
   const [addUniId, setAddUniId] = useState<string>("");
   const [editUniId, setEditUniId] = useState<string>("");
+  const [bulkTiers, setBulkTiers] = useState<{ tier_name: string; min_students: string; max_students: string; commission_per_student: string }[]>([
+    { tier_name: "", min_students: "0", max_students: "", commission_per_student: "500" },
+  ]);
 
   const { data: tiers = [] } = useQuery({
     queryKey: ["commission-tiers"],
@@ -157,18 +160,12 @@ function CommissionTiersSection({ deleteItem, universities }: { deleteItem: any;
     },
   });
 
-  const addTier = useMutation({
-    mutationFn: async (d: any) => {
-      const { error } = await supabase.from("commission_tiers").insert({
-        tier_name: d.tier_name,
-        min_students: Number(d.min_students),
-        max_students: d.max_students ? Number(d.max_students) : null,
-        commission_per_student: Number(d.commission_per_student),
-        university_id: d.university_id || null,
-      });
+  const addTiersBulk = useMutation({
+    mutationFn: async (rows: any[]) => {
+      const { error } = await supabase.from("commission_tiers").insert(rows);
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["commission-tiers"] }); toast({ title: "Tier added" }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["commission-tiers"] }); toast({ title: "Tiers added" }); },
   });
 
   const updateTier = useMutation({
