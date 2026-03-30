@@ -413,7 +413,10 @@ export type Database = {
       courses: {
         Row: {
           created_at: string
+          duration: string | null
+          fees: string | null
           id: string
+          is_active: boolean
           level: string
           name: string
           study_mode: string
@@ -421,7 +424,10 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          duration?: string | null
+          fees?: string | null
           id?: string
+          is_active?: boolean
           level?: string
           name: string
           study_mode?: string
@@ -429,7 +435,10 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          duration?: string | null
+          fees?: string | null
           id?: string
+          is_active?: boolean
           level?: string
           name?: string
           study_mode?: string
