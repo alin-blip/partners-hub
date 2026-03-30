@@ -254,11 +254,19 @@ export default function UniversitiesCoursesPage() {
                       </Button>
                     </div>
 
-                    {detailsCourseId === course.id && (
-                      <div className="pt-3 border-t border-slate-600 mt-3">
-                        <CourseDetailsInfoCard courseId={course.id} compact />
+                    <div
+                      className={`grid transition-all duration-300 ease-in-out ${
+                        detailsCourseId === course.id
+                          ? "grid-rows-[1fr] opacity-100 pt-3 border-t border-slate-600 mt-3"
+                          : "grid-rows-[0fr] opacity-0"
+                      }`}
+                    >
+                      <div className="overflow-hidden">
+                        {detailsCourseId === course.id && (
+                          <CourseDetailsInfoCard courseId={course.id} compact />
+                        )}
                       </div>
-                    )}
+                    </div>
                   </CardContent>
                 </Card>
               );
