@@ -137,9 +137,9 @@ export function SocialShareButtons({
       const shareText = cardUrl ? `${caption}\n\n🔗 ${cardUrl}` : caption;
       if (shareText) {
         await navigator.clipboard.writeText(shareText);
-        toast.success("Imagine salvată și descriere copiată!");
+        toast.success("Image saved & caption copied!");
       } else {
-        toast.success("Imagine salvată!");
+        toast.success("Image saved!");
       }
       onShared?.();
     } catch {
