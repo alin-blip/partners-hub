@@ -101,7 +101,7 @@ export default function CardSettingsSection() {
           .eq("slug", slug)
           .neq("id", user!.id)
           .maybeSingle();
-        if (existing) throw new Error("Acest slug este deja folosit. Alege altul.");
+        if (existing) throw new Error("This slug is already taken. Choose another.");
 
         const { error: slugErr } = await supabase
           .from("profiles")
