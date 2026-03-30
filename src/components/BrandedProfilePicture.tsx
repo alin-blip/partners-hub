@@ -2,8 +2,9 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Upload, UserCircle, Loader2 } from "lucide-react";
+import { Download, Upload, UserCircle, Loader2, Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import frameAgent from "@/assets/profile-frame-transparent.png";
 import frameAdmin from "@/assets/profile-frame-admin.png";
 
@@ -22,13 +23,14 @@ async function fetchImageAsBase64(url: string): Promise<string> {
 }
 
 export function BrandedProfilePicture() {
-  const { profile, role } = useAuth();
+  const { profile, role, user } = useAuth();
   const { toast } = useToast();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const avatarUrl = (profile as any)?.avatar_url;
@@ -114,13 +116,49 @@ export function BrandedProfilePicture() {
     }
   }, [avatarSrc, drawCanvas]);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !user) return;
 
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Fișier invalid", description: "Încarcă JPG sau PNG", variant: "destructive" });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "Prea mare", description: "Maximum 5MB", variant: "destructive" });
+      return;
+    }
+
+    // Show preview immediately
     const reader = new FileReader();
     reader.onload = () => setAvatarSrc(reader.result as string);
     reader.readAsDataURL(file);
+
+    // Also save as profile avatar
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `${user.id}/avatar.${ext}`;
+      const { error: uploadErr } = await supabase.storage
+        .from("avatars")
+        .upload(path, file, { upsert: true });
+      if (uploadErr) throw uploadErr;
+
+      const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+      const url = `${pub.publicUrl}?t=${Date.now()}`;
+
+      const { error: updateErr } = await supabase
+        .from("profiles")
+        .update({ avatar_url: url } as any)
+        .eq("id", user.id);
+      if (updateErr) throw updateErr;
+
+      toast({ title: "Poză salvată", description: "Poza de profil a fost actualizată." });
+    } catch (err: any) {
+      toast({ title: "Eroare upload", description: err.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleDownload = () => {
@@ -139,11 +177,11 @@ export function BrandedProfilePicture() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
-          <UserCircle className="w-5 h-5" />
-          Branded Profile Picture
+          <Camera className="w-5 h-5" />
+          Profile Photo
         </CardTitle>
         <CardDescription>
-          Generează o poză de profil premium cu overlay transparent EduForYou
+          Încarcă o poză de profil — se va folosi pe Digital Card și rețele sociale cu overlay-ul EduForYou
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
