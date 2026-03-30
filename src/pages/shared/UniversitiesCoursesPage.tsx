@@ -39,10 +39,11 @@ export default function UniversitiesCoursesPage() {
   const [search, setSearch] = useState("");
   const [showInactive, setShowInactive] = useState(false);
   const [selectedUniId, setSelectedUniId] = useState<string | null>(null);
-  const [detailsCourseId, setDetailsCourseId] = useState<string | null>(null);
+  const [scanningUniId, setScanningUniId] = useState<string | null>(null);
   const navigate = useNavigate();
   const { role } = useAuth();
-
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { data: universities = [] } = useQuery({
     queryKey: ["universities-all"],
     queryFn: async () => {
