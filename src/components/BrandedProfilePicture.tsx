@@ -9,6 +9,18 @@ import { supabase } from "@/integrations/supabase/client";
 const CANVAS_SIZE = 1080;
 const FRAME_STORAGE_URL_BASE = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/brand-assets/profile-frame-v1.png`;
 
+async function fetchImageAsBase64(url: string): Promise<string> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 export function BrandedProfilePicture() {
   const { profile } = useAuth();
   const { toast } = useToast();
