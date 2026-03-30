@@ -61,12 +61,13 @@ export default function PublicApplicationPage() {
 
       const { data: card } = await supabase
         .from("agent_card_settings")
-        .select("is_public")
+        .select("is_public, ai_voice_enabled")
         .eq("user_id", prof.id)
         .eq("is_public", true)
         .single();
 
       if (!card) { setNotFound(true); setLoading(false); return; }
+      setAiVoiceEnabled(!!(card as any).ai_voice_enabled);
 
       setAgent(prof);
 
