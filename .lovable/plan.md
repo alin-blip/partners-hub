@@ -1,37 +1,57 @@
 
 
-## Plan: Always Include EduForYou Logo in Generated Images
+## Plan: University-Level Commission Settings + Dashboard Offer Cards
 
-### Problem
-Currently the edge function only adds a text instruction "Include a professional company logo placeholder area" — it doesn't pass the actual logo to the AI model. The AI invents a random logo each time.
+### What You Want
+1. **Set commission per university** — instead of only global tiers, assign a specific commission rate (or starting tier) to each university (e.g., LSC = £600/student)
+2. **Dashboard offer cards** — small promotional cards visible to agents/admins showing "Enroll at [University]: £[amount]/student"
 
-### Solution
-Upload the EduForYou logo to Supabase storage, then pass it as an **image input** to the AI model alongside the text prompt. The Gemini image generation model supports multimodal input (text + image reference), so we can instruct it: "Include this exact logo in the design."
+### Database Changes
 
-Both Social Posts and Create Image use the **same edge function** (`generate-image`), so fixing it once covers both pages.
+**New table: `university_commissions`**
+- `id` (uuid, PK)
+- `university_id` (uuid, references universities)
+- `commission_per_student` (numeric, e.g. 600)
+- `label` (text, optional — e.g. "Growth" or custom label)
+- `is_highlighted` (boolean, default false — controls if it shows as a dashboard offer card)
+- `highlight_text` (text, optional — e.g. "Inscrie studenti la LSC!")
+- `created_at`, `updated_at`
 
-### Changes
+RLS: owner full access, authenticated can read.
 
-**Step 1: Upload logo to storage**
-- Copy `logo_side_bigtext_src.png` to `public/images/eduforyou-logo.png` in the project
-- Upload it to the `generated-images` Supabase storage bucket under a `_brand/logo.png` path (or use the existing `brand_settings.logo_url` if already set)
+### UI Changes
 
-**Step 2: Update `supabase/functions/generate-image/index.ts`**
-- Instead of just adding text about a logo, fetch the actual logo image (from `brand_settings.logo_url` or the known storage path)
-- Convert it to base64
-- Pass it as a multimodal message to the AI model:
-  ```typescript
-  messages: [{
-    role: "user",
-    content: [
-      { type: "text", text: fullPrompt + "\n\nIncorporate this exact logo into the design, placing it in a visible corner:" },
-      { type: "image_url", image_url: { url: logoBase64DataUrl } }
-    ]
-  }]
-  ```
-- If no logo is available, fall back to text-only prompt (current behavior)
+**1. Settings > Commissions tab — University Commission Section**
+- Below the existing global tiers, add a new section: "University Commission Rates"
+- Table listing each university with a dropdown/input to set `commission_per_student` and a toggle for "Show on Dashboard"
+- Owner can set a custom rate per university, or leave blank to use the global tier system
 
-### Files changed
-- `public/images/eduforyou-logo.png` (new — copy uploaded logo)
-- `supabase/functions/generate-image/index.ts` (fetch logo, pass as image input to AI)
+**2. Commission calculation logic update (`src/lib/commissions.ts`)**
+- Update `calcCommission` to accept an optional `universityCommissions` map
+- When calculating per-enrollment commission: if a university-specific rate exists, use it; otherwise fall back to the global tier system
+- The CommissionsPage will aggregate per-agent totals using per-enrollment university rates
+
+**3. CommissionsPage update**
+- Fetch `university_commissions` and enrollments with `university_id`
+- Calculate per-agent commission by summing each enrollment's university-specific rate (or global tier fallback)
+- Show university breakdown per agent
+
+**4. Dashboard offer cards**
+- New component `CommissionOfferCards` — fetches `university_commissions` where `is_highlighted = true`, joined with university name
+- Renders small colored cards: university name + "£X/student" + optional highlight text
+- Placed on Agent Dashboard and Admin Dashboard (above or beside existing metrics)
+
+### Files Changed
+- **Migration**: Create `university_commissions` table with RLS
+- **`src/pages/owner/SettingsPage.tsx`**: Add University Commission Rates section in Commissions tab
+- **`src/lib/commissions.ts`**: Add per-university commission lookup
+- **`src/pages/owner/CommissionsPage.tsx`**: Use per-university rates in calculations
+- **`src/components/CommissionOfferCards.tsx`** (new): Dashboard offer card component
+- **`src/pages/agent/AgentDashboard.tsx`**: Add `CommissionOfferCards`
+- **`src/pages/admin/AdminDashboard.tsx`**: Add `CommissionOfferCards`
+
+### How It Works (Summary)
+- Owner goes to Settings > Commissions, sees universities listed, sets £600 for LSC, £500 for another, toggles "Show on Dashboard" for LSC
+- Agent opens dashboard, sees a card: "LSC — £600/student"
+- Commission calculations now use per-university rates instead of (or alongside) global tiers
 
