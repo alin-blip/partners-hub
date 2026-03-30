@@ -174,7 +174,7 @@ export function BrandedProfilePicture() {
     link.href = canvas.toDataURL("image/png");
     link.click();
 
-    toast({ title: "Descărcat!", description: "Imaginea de profil a fost salvată." });
+    toast({ title: "Downloaded!", description: "Profile picture saved." });
   };
 
   return (
