@@ -50,7 +50,7 @@ export default function AgentCardPage() {
     (async () => {
       // Fetch profile by slug using the public view (no email/phone exposed)
       const { data: prof } = await supabase
-        .from("public_agent_profiles" as any)
+        .from("public_agent_profiles")
         .select("id, full_name, avatar_url, slug")
         .eq("slug", slug)
         .single() as { data: { id: string; full_name: string; avatar_url: string | null; slug: string } | null; error: any };
