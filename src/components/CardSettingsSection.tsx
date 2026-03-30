@@ -331,6 +331,19 @@ export default function CardSettingsSection() {
               </div>
             </div>
 
+            {/* AI Voice Assistant */}
+            <div className="border-t pt-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-medium">AI Voice Assistant</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Enable an AI-powered voice chatbot on your public card that can answer questions about courses, universities, and admissions.
+                  </p>
+                </div>
+                <Switch checked={aiVoiceEnabled} onCheckedChange={setAiVoiceEnabled} />
+              </div>
+            </div>
+
             <Button type="submit" disabled={saveSettings.isPending} className="bg-accent text-accent-foreground hover:bg-accent/90">
               <Save className="w-3 h-3 mr-1" />
               {saveSettings.isPending ? "Saving…" : "Save Card Settings"}

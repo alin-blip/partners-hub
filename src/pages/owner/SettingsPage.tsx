@@ -1297,7 +1297,7 @@ function TimetableSection({ universities }: { universities: any[] }) {
                     {u.timetable_available === false ? (
                       <Input
                         defaultValue={u.timetable_message || ""}
-                        placeholder="e.g. Studentul își alege programul după testul de admitere"
+                        placeholder="e.g. Student chooses their schedule after the admission test"
                         className="text-sm"
                         onBlur={(e) => {
                           if (e.target.value !== (u.timetable_message || "")) {

@@ -282,6 +282,15 @@ export default function AgentCardPage() {
               ))}
             </div>
           )}
+
+          {/* ElevenLabs AI Voice Widget */}
+          {settings.ai_voice_enabled && (
+            <div
+              dangerouslySetInnerHTML={{
+                __html: '<elevenlabs-convai agent-id="agent_4501kmytq1bnekgs59jh6rzjwxw4"></elevenlabs-convai>',
+              }}
+            />
+          )}
         </div>
       </div>
     </div>

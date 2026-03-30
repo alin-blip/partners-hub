@@ -236,7 +236,7 @@ export function BrandedProfilePicture() {
 
           {avatarSrc && (
             <p className="text-xs text-muted-foreground text-center max-w-xs">
-              Poza umple cercul complet, iar overlay-ul transparent rămâne fix pe margine.
+              The photo fills the circle completely, and the transparent overlay stays fixed on the edge.
             </p>
           )}
         </div>

@@ -179,11 +179,11 @@ export default function AgentSocialFeedPage() {
 
       const shareText = `${post.caption}${cardUrl ? `\n\n🔗 ${cardUrl}` : ""}`;
       await navigator.clipboard.writeText(shareText);
-      toast.success("Imagine salvată și descriere copiată!");
+      toast.success("Image saved & caption copied!");
 
       if (!post.seen_at) markSeen.mutate(post.id);
     } catch {
-      toast.error("Eroare la descărcare");
+      toast.error("Download failed");
     }
   };
 
