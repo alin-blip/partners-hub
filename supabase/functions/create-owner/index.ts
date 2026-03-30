@@ -10,14 +10,53 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const supabaseAdmin = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-  );
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  // --- JWT Authentication ---
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // Verify the caller using anon key client with their token
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+  const supabaseAuth = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+
+  const { data: userData, error: userError } = await supabaseAuth.auth.getUser();
+  if (userError || !userData?.user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const callerId = userData.user.id;
+
+  // --- Role Authorization ---
+  const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+
+  const { data: callerRole } = await supabaseAdmin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", callerId)
+    .single();
+
+  if (!callerRole) {
+    return new Response(JSON.stringify({ error: "Forbidden: no role assigned" }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
   const { email, password, full_name, role = "owner", admin_id } = await req.json();
 
-  // Validate role
+  // Validate role value
   const validRoles = ["owner", "admin", "agent"];
   if (!validRoles.includes(role)) {
     return new Response(JSON.stringify({ error: "Invalid role" }), {
@@ -25,6 +64,27 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
+
+  // Authorization rules:
+  // - Owner can create any role (owner, admin, agent)
+  // - Admin can only create agents (with their own admin_id)
+  // - Agents cannot create accounts
+  if (callerRole.role === "agent") {
+    return new Response(JSON.stringify({ error: "Forbidden: agents cannot create accounts" }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  if (callerRole.role === "admin" && role !== "agent") {
+    return new Response(JSON.stringify({ error: "Forbidden: admins can only create agent accounts" }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // For admins, force admin_id to their own ID
+  const effectiveAdminId = callerRole.role === "admin" ? callerId : admin_id;
 
   // Create user
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -55,10 +115,10 @@ Deno.serve(async (req) => {
   }
 
   // Set admin_id if provided (for agents assigned to an admin)
-  if (admin_id) {
+  if (effectiveAdminId) {
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
-      .update({ admin_id })
+      .update({ admin_id: effectiveAdminId })
       .eq("id", authData.user.id);
 
     if (profileError) {

@@ -6,6 +6,7 @@ import {
   Settings,
   LogOut,
   GraduationCap,
+  UserPlus,
   PoundSterling,
   UserCircle,
   FolderOpen,
