@@ -202,6 +202,28 @@ export default function UniversitiesCoursesPage() {
               </Label>
             </div>
           )}
+          {(role === "owner" || role === "admin") && effectiveUniId && (() => {
+            const uni = displayUniversities.find((u: any) => u.id === effectiveUniId);
+            const uniName = uni?.name || "";
+            const hasUrl = Object.entries(UNIVERSITY_URLS).some(
+              ([key]) => uniName.toLowerCase().includes(key.toLowerCase()) || key.toLowerCase().includes(uniName.toLowerCase().split(" ")[0])
+            );
+            if (!hasUrl) return null;
+            return (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={scanningUniId === effectiveUniId}
+                onClick={() => handleScanDetails(effectiveUniId, uniName)}
+              >
+                {scanningUniId === effectiveUniId ? (
+                  <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Scanning...</>
+                ) : (
+                  <><ScanSearch className="h-4 w-4 mr-1" /> Scan Details</>
+                )}
+              </Button>
+            );
+          })()}
         </div>
 
         {/* Summary */}
