@@ -94,12 +94,18 @@ export function BrandedProfilePicture() {
       canvas.height = CANVAS_SIZE;
 
       const center = CANVAS_SIZE / 2;
-      const photoRadius = 400; // slightly smaller than frame cutout
+      const photoRadius = 400;
 
       try {
+        // Convert URLs to base64 to avoid CORS canvas tainting
+        const [photoB64, frameB64] = await Promise.all([
+          photoSrc.startsWith("data:") ? photoSrc : fetchImageAsBase64(photoSrc),
+          frameSrc.startsWith("data:") ? frameSrc : fetchImageAsBase64(frameSrc),
+        ]);
+
         const [avatarImg, frameImg] = await Promise.all([
-          loadImage(photoSrc),
-          loadImage(frameSrc),
+          loadImage(photoB64),
+          loadImage(frameB64),
         ]);
 
         // Clear
