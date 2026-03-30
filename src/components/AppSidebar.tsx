@@ -18,6 +18,7 @@ import {
   CreditCard,
   ContactRound,
   ListTodo,
+  School,
 } from "lucide-react";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { NavLink } from "@/components/NavLink";
