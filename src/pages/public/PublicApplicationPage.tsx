@@ -97,7 +97,6 @@ export default function PublicApplicationPage() {
       if (el) el.remove();
     };
   }, [aiVoiceEnabled]);
-  }, [slug]);
 
   // Load campuses + courses + intakes + timetable when university changes
   useEffect(() => {
