@@ -118,7 +118,7 @@ export default function AgentCardPage() {
 
   const initials = profile.full_name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 
-  const cardPageUrl = `https://agentseduforyou.lovable.app/card/${slug}`;
+  const cardPageUrl = `https://agents-eduforyou.co.uk/card/${slug}`;
 
   const handleVCard = () => {
     const lines = [

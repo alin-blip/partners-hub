@@ -146,7 +146,7 @@ export default function CardSettingsSection() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  const BASE_URL = import.meta.env.PROD ? "https://agentseduforyou.lovable.app" : window.location.origin;
+  const BASE_URL = import.meta.env.PROD ? "https://agents-eduforyou.co.uk" : window.location.origin;
   const cardUrl = slug ? `${BASE_URL}/card/${slug}` : "";
   const applyFormUrl = slug ? `${BASE_URL}/apply/${slug}` : "";
 
