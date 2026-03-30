@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,10 +18,22 @@ import {
   GraduationCap,
   Filter,
   ArrowRight,
+  ScanSearch,
+  Loader2,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
+
+const UNIVERSITY_URLS: Record<string, string> = {
+  "Global Banking School": "https://globalbanking.ac.uk/",
+  "QA": "https://qahighereducation.com/",
+  "Regent": "https://www.rcl.ac.uk/",
+  "Arden": "https://arden.ac.uk/",
+  "LSC": "https://www.lsclondon.co.uk/",
+  "UWTSD": "https://www.uwtsd.ac.uk/",
+};
 
 export default function UniversitiesCoursesPage() {
   const [search, setSearch] = useState("");
