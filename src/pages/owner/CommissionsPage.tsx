@@ -3,8 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { MetricCard } from "@/components/MetricCard";
-import { calcCommissionByEnrollments } from "@/lib/commissions";
-import { PoundSterling, Users, TrendingUp, ChevronDown, ChevronRight } from "lucide-react";
+import { calcCommissionByEnrollments, buildUniversityBreakdown, EnrollmentBreakdownItem } from "@/lib/commissions";
+import { PoundSterling, Users, TrendingUp, ChevronDown, ChevronRight, CircleDollarSign } from "lucide-react";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -12,23 +12,11 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import {
-  Collapsible, CollapsibleContent, CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 
 const months = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
-
-interface UniBreakdownItem {
-  universityId: string;
-  universityName: string;
-  count: number;
-  ratePerStudent: number;
-  subtotal: number;
-  rateSource: string; // "Tier: Gold" | "Custom" | "Global Tier"
-}
 
 export default function CommissionsPage() {
   const now = new Date();
@@ -78,13 +66,14 @@ export default function CommissionsPage() {
     },
   });
 
+  // Fetch enrollments for both stages
   const { data: enrollments = [] } = useQuery({
     queryKey: ["all-enrollments-commission", month, year],
     queryFn: async () => {
       const { data } = await supabase
         .from("enrollments")
         .select("id, status, student_id, created_at, university_id, students!inner(agent_id)")
-        .eq("status", "active");
+        .in("status", ["active", "offer_received", "accepted"]);
       return data || [];
     },
   });
@@ -101,90 +90,51 @@ export default function CommissionsPage() {
   const adminMap = new Map(adminProfiles.map((p: any) => [p.id, p.full_name]));
   const uniNameMap = new Map(universities.map((u: any) => [u.id, u.name]));
   const agentList = agents.filter((a: any) => roleMap.get(a.id) === "agent");
-
-  const uniMap = new Map<string, any>(uniCommissions.map((uc: any) => [uc.university_id, uc]));
   const tierMap = new Map(tiers.map((t: any) => [t.id, t]));
 
-  // Group enrollments per agent, keeping university_id
-  const agentEnrollments = new Map<string, { university_id: string }[]>();
-  for (const e of enrollments) {
-    const agentId = (e as any).students?.agent_id;
-    if (agentId) {
-      if (!agentEnrollments.has(agentId)) agentEnrollments.set(agentId, []);
-      agentEnrollments.get(agentId)!.push({ university_id: e.university_id });
-    }
-  }
+  // Split enrollments by stage
+  const generatedEnrollments = enrollments.filter((e: any) => e.status === "active");
+  const possibleEnrollments = enrollments.filter((e: any) => e.status === "offer_received" || e.status === "accepted");
 
-  // Build per-university breakdown for an agent
-  function buildBreakdown(agentEnrs: { university_id: string }[]): UniBreakdownItem[] {
-    const countByUni = new Map<string, number>();
-    for (const e of agentEnrs) {
-      countByUni.set(e.university_id, (countByUni.get(e.university_id) || 0) + 1);
-    }
-
-    // Count enrollments that fall back to global tier
-    let globalTierCount = 0;
-    const items: UniBreakdownItem[] = [];
-
-    for (const [uniId, count] of countByUni) {
-      const uc = uniMap.get(uniId);
-      if (uc) {
-        let rate: number;
-        let source: string;
-        if (uc.tier_id) {
-          const linkedTier = tierMap.get(uc.tier_id);
-          rate = linkedTier ? Number(linkedTier.commission_per_student) : Number(uc.commission_per_student);
-          source = linkedTier ? `Tier: ${linkedTier.tier_name}` : "Custom";
-        } else {
-          rate = Number(uc.commission_per_student);
-          source = "Custom";
-        }
-        items.push({
-          universityId: uniId,
-          universityName: uniNameMap.get(uniId) || uc.universities?.name || uniId,
-          count,
-          ratePerStudent: rate,
-          subtotal: count * rate,
-          rateSource: source,
-        });
-      } else {
-        globalTierCount += count;
-        // We'll add a single "Global Tier" line after
-        // but still need the university name per row
-        const globalTier = tiers.length > 0 ? tiers.find((t: any) =>
-          globalTierCount >= t.min_students && (t.max_students === null || globalTierCount <= t.max_students)
-        ) : null;
-        const rate = globalTier ? Number(globalTier.commission_per_student) : 0;
-        items.push({
-          universityId: uniId,
-          universityName: uniNameMap.get(uniId) || uniId,
-          count,
-          ratePerStudent: rate,
-          subtotal: count * rate,
-          rateSource: globalTier ? `Global: ${globalTier.tier_name}` : "No tier",
-        });
+  // Group enrollments per agent
+  function groupByAgent(enrs: any[]) {
+    const map = new Map<string, { university_id: string }[]>();
+    for (const e of enrs) {
+      const agentId = (e as any).students?.agent_id;
+      if (agentId) {
+        if (!map.has(agentId)) map.set(agentId, []);
+        map.get(agentId)!.push({ university_id: e.university_id });
       }
     }
-
-    return items.sort((a, b) => b.subtotal - a.subtotal);
+    return map;
   }
 
+  const generatedByAgent = groupByAgent(generatedEnrollments);
+  const possibleByAgent = groupByAgent(possibleEnrollments);
+
   const agentCommissions = agentList.map((agent: any) => {
-    const agentEnrs = agentEnrollments.get(agent.id) || [];
-    const commission = calcCommissionByEnrollments(agentEnrs, uniCommissions, tiers);
-    const breakdown = buildBreakdown(agentEnrs);
+    const genEnrs = generatedByAgent.get(agent.id) || [];
+    const posEnrs = possibleByAgent.get(agent.id) || [];
+    const generated = calcCommissionByEnrollments(genEnrs, uniCommissions, tiers);
+    const possible = calcCommissionByEnrollments(posEnrs, uniCommissions, tiers);
+    const genBreakdown = buildUniversityBreakdown(genEnrs, uniCommissions, tiers, uniNameMap, tierMap);
+    const posBreakdown = buildUniversityBreakdown(posEnrs, uniCommissions, tiers, uniNameMap, tierMap);
     return {
       ...agent,
-      activeStudents: agentEnrs.length,
-      commission,
-      breakdown,
+      generatedStudents: genEnrs.length,
+      possibleStudents: posEnrs.length,
+      generated,
+      possible,
+      genBreakdown,
+      posBreakdown,
       adminName: agent.admin_id ? adminMap.get(agent.admin_id) || "—" : "—",
     };
   });
 
-  const totalCommission = agentCommissions.reduce((s, a) => s + a.commission, 0);
-  const totalActiveStudents = agentCommissions.reduce((s, a) => s + a.activeStudents, 0);
-  const avgPerAgent = agentList.length > 0 ? Math.round(totalCommission / agentList.length) : 0;
+  const totalGenerated = agentCommissions.reduce((s, a) => s + a.generated, 0);
+  const totalPossible = agentCommissions.reduce((s, a) => s + a.possible, 0);
+  const totalActiveStudents = agentCommissions.reduce((s, a) => s + a.generatedStudents, 0);
+  const totalPossibleStudents = agentCommissions.reduce((s, a) => s + a.possibleStudents, 0);
 
   const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i);
 
@@ -225,10 +175,11 @@ export default function CommissionsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <MetricCard title="Total Commission" value={`£${totalCommission.toLocaleString()}`} icon={PoundSterling} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <MetricCard title="Generated Commission" value={`£${totalGenerated.toLocaleString()}`} icon={PoundSterling} />
+          <MetricCard title="Possible Commission" value={`£${totalPossible.toLocaleString()}`} icon={CircleDollarSign} />
           <MetricCard title="Active Students" value={totalActiveStudents} icon={Users} />
-          <MetricCard title="Avg per Agent" value={`£${avgPerAgent.toLocaleString()}`} icon={TrendingUp} />
+          <MetricCard title="Offer Stage Students" value={totalPossibleStudents} icon={TrendingUp} />
         </div>
 
         <div className="space-y-4">
@@ -240,22 +191,25 @@ export default function CommissionsPage() {
                   <TableHead className="w-8"></TableHead>
                   <TableHead>Agent</TableHead>
                   <TableHead>Admin</TableHead>
-                  <TableHead className="text-right">Active Students</TableHead>
-                  <TableHead className="text-right">Commission</TableHead>
+                  <TableHead className="text-right">Active</TableHead>
+                  <TableHead className="text-right">Offer</TableHead>
+                  <TableHead className="text-right">Generated</TableHead>
+                  <TableHead className="text-right">Possible</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {agentCommissions.map((a) => {
                   const isExpanded = expandedAgents.has(a.id);
+                  const hasData = a.generatedStudents > 0 || a.possibleStudents > 0;
                   return (
                     <>
                       <TableRow
                         key={a.id}
                         className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => a.activeStudents > 0 && toggleExpand(a.id)}
+                        onClick={() => hasData && toggleExpand(a.id)}
                       >
                         <TableCell className="w-8 px-2">
-                          {a.activeStudents > 0 && (
+                          {hasData && (
                             isExpanded
                               ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
                               : <ChevronRight className="w-4 h-4 text-muted-foreground" />
@@ -268,43 +222,20 @@ export default function CommissionsPage() {
                           </div>
                         </TableCell>
                         <TableCell className="text-muted-foreground">{a.adminName}</TableCell>
-                        <TableCell className="text-right tabular-nums">{a.activeStudents}</TableCell>
+                        <TableCell className="text-right tabular-nums">{a.generatedStudents}</TableCell>
+                        <TableCell className="text-right tabular-nums">{a.possibleStudents}</TableCell>
                         <TableCell className="text-right font-medium tabular-nums">
-                          £{a.commission.toLocaleString()}
+                          £{a.generated.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                          £{a.possible.toLocaleString()}
                         </TableCell>
                       </TableRow>
-                      {isExpanded && a.breakdown.length > 0 && (
+                      {isExpanded && (
                         <TableRow key={`${a.id}-breakdown`} className="bg-muted/20 hover:bg-muted/30">
                           <TableCell></TableCell>
-                          <TableCell colSpan={4} className="py-2">
-                            <div className="rounded-md border bg-background">
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead className="text-xs">University</TableHead>
-                                    <TableHead className="text-xs text-right">Students</TableHead>
-                                    <TableHead className="text-xs text-right">Rate</TableHead>
-                                    <TableHead className="text-xs">Source</TableHead>
-                                    <TableHead className="text-xs text-right">Subtotal</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {a.breakdown.map((b: UniBreakdownItem) => (
-                                    <TableRow key={b.universityId}>
-                                      <TableCell className="text-sm">{b.universityName}</TableCell>
-                                      <TableCell className="text-sm text-right tabular-nums">{b.count}</TableCell>
-                                      <TableCell className="text-sm text-right tabular-nums">£{b.ratePerStudent.toLocaleString()}</TableCell>
-                                      <TableCell>
-                                        <Badge variant="secondary" className="text-xs font-normal">
-                                          {b.rateSource}
-                                        </Badge>
-                                      </TableCell>
-                                      <TableCell className="text-sm text-right font-medium tabular-nums">£{b.subtotal.toLocaleString()}</TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            </div>
+                          <TableCell colSpan={6} className="py-2">
+                            <BreakdownTables genBreakdown={a.genBreakdown} posBreakdown={a.posBreakdown} />
                           </TableCell>
                         </TableRow>
                       )}
@@ -313,7 +244,7 @@ export default function CommissionsPage() {
                 })}
                 {agentCommissions.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                       No agents found
                     </TableCell>
                   </TableRow>
@@ -324,5 +255,60 @@ export default function CommissionsPage() {
         </div>
       </div>
     </DashboardLayout>
+  );
+}
+
+function BreakdownTables({ genBreakdown, posBreakdown }: { genBreakdown: EnrollmentBreakdownItem[]; posBreakdown: EnrollmentBreakdownItem[] }) {
+  return (
+    <div className="space-y-3">
+      {genBreakdown.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-foreground mb-1">Generated (Active)</p>
+          <BreakdownTable items={genBreakdown} />
+        </div>
+      )}
+      {posBreakdown.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground mb-1">Possible (Offer Stage)</p>
+          <BreakdownTable items={posBreakdown} />
+        </div>
+      )}
+      {genBreakdown.length === 0 && posBreakdown.length === 0 && (
+        <p className="text-xs text-muted-foreground">No enrollments</p>
+      )}
+    </div>
+  );
+}
+
+function BreakdownTable({ items }: { items: EnrollmentBreakdownItem[] }) {
+  return (
+    <div className="rounded-md border bg-background">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="text-xs">University</TableHead>
+            <TableHead className="text-xs text-right">Students</TableHead>
+            <TableHead className="text-xs text-right">Rate</TableHead>
+            <TableHead className="text-xs">Source</TableHead>
+            <TableHead className="text-xs text-right">Subtotal</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {items.map((b) => (
+            <TableRow key={b.universityId}>
+              <TableCell className="text-sm">{b.universityName}</TableCell>
+              <TableCell className="text-sm text-right tabular-nums">{b.count}</TableCell>
+              <TableCell className="text-sm text-right tabular-nums">£{b.ratePerStudent.toLocaleString()}</TableCell>
+              <TableCell>
+                <Badge variant="secondary" className="text-xs font-normal">
+                  {b.rateSource}
+                </Badge>
+              </TableCell>
+              <TableCell className="text-sm text-right font-medium tabular-nums">£{b.subtotal.toLocaleString()}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
