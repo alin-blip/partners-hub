@@ -13,7 +13,6 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { SocialShareButtons } from "@/components/SocialShareButtons";
-import { BrandedProfilePicture } from "@/components/BrandedProfilePicture";
 import {
   Image as ImageIcon,
   Square,
@@ -438,8 +437,7 @@ export default function CreateImagePage() {
           </CardContent>
         </Card>
 
-        {/* Branded Profile Picture */}
-        <BrandedProfilePicture />
+
       </div>
     </DashboardLayout>
   );

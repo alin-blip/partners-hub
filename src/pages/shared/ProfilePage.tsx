@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Save, Lock, Upload, Camera, Loader2, Eye, EyeOff } from "lucide-react";
+import { BrandedProfilePicture } from "@/components/BrandedProfilePicture";
 
 export default function ProfilePage() {
   const { user, profile } = useAuth();
@@ -161,6 +162,9 @@ export default function ProfilePage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Branded Profile Picture Generator */}
+        <BrandedProfilePicture />
 
         <Card>
           <CardHeader>
