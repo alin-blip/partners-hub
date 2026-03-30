@@ -68,7 +68,7 @@ export default function FeedbackPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Feedback utilizatori</h1>
+          <h1 className="text-2xl font-bold">User Feedback</h1>
           <Select value={filterStatus} onValueChange={setFilterStatus}>
             <SelectTrigger className="w-40">
               <SelectValue />
