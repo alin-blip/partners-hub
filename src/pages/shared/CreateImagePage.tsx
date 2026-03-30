@@ -437,8 +437,7 @@ export default function CreateImagePage() {
           </CardContent>
         </Card>
 
-        {/* Branded Profile Picture */}
-        <BrandedProfilePicture />
+
       </div>
     </DashboardLayout>
   );

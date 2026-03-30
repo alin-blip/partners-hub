@@ -163,6 +163,9 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
+        {/* Branded Profile Picture Generator */}
+        <BrandedProfilePicture />
+
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Personal Information</CardTitle>
