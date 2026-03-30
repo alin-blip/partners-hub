@@ -237,22 +237,28 @@ export default function UniversitiesCoursesPage() {
                         variant="outline"
                         size="sm"
                         className="flex-1 border-slate-500 text-slate-300 hover:bg-slate-700 hover:text-white"
-                        onClick={() => setDetailsCourseId(course.id)}
+                        onClick={() => setDetailsCourseId(detailsCourseId === course.id ? null : course.id)}
                       >
-                        Details
+                        {detailsCourseId === course.id ? "Hide" : "Details"}
                       </Button>
                       <Button
                         size="sm"
                         className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
                         onClick={() =>
                           navigate(
-                            `/${currentRole}/enroll-student?university=${course.university_id}&course=${course.id}`
+                            `/${currentRole}/enroll?university=${course.university_id}&course=${course.id}`
                           )
                         }
                       >
                         Apply <ArrowRight className="h-3.5 w-3.5 ml-1" />
                       </Button>
                     </div>
+
+                    {detailsCourseId === course.id && (
+                      <div className="pt-3 border-t border-slate-600 mt-3">
+                        <CourseDetailsInfoCard courseId={course.id} compact />
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               );
