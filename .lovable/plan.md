@@ -1,71 +1,67 @@
 
 
-## Plan: Student Finance Application Form in Funding Tab + Resource
+## Plan: Commission Stages + University-Specific Tier Sets
 
-### What You Want
-1. In the student Funding tab, add a "Student Finance Application" section with 2 options:
-   - **Fill in platform** — a full form matching the PDF fields, saved to the database permanently
-   - **Upload completed PDF** — download the blank PDF, fill manually, upload the completed version
-2. Add the PDF as a resource in the Resources page under category "guides" with title "Student Finance Doc"
+### 1. Commission Stages on CommissionsPage
 
-### Database Changes
+Currently the page only shows commissions for `active` enrollments. You want two categories:
 
-**New table: `student_finance_forms`**
-- `id` (uuid, PK)
-- `student_id` (uuid, references students)
-- `enrollment_id` (uuid, nullable — ties to specific enrollment)
-- `agent_id` (uuid — who filled it)
-- `method` (text — `"platform"` or `"upload"`)
-- `uploaded_file_path` (text, nullable — for uploaded PDF)
-- All form fields from the PDF (see below)
-- `created_at`, `updated_at`
+- **Possible Commission** — enrollments in offer stage (`offer_received`, `accepted`) — money that could come in
+- **Generated Commission** — enrollments in `active` stage — confirmed commission
 
-**Form fields** (all text, nullable):
-- `title`, `relationship_status`, `first_name`, `family_name`, `date_of_birth`, `nationality`, `town_of_birth`
-- `email`, `phone`, `ni_number`, `current_address`, `applied_before`, `applied_before_details`
-- `immigration_status`, `share_code`, `expiry_date`
-- `worked_last_3_months`, `employment_type`, `job_title_company`
-- `address_history_1`, `address_history_2`, `address_history_3`
-- `university_name_address`, `course_name`, `course_length_start`, `year_tuition_fee`
-- `uk_contact_1_name`, `uk_contact_1_relationship`, `uk_contact_1_phone`, `uk_contact_1_address`
-- `uk_contact_2_name`, `uk_contact_2_relationship`, `uk_contact_2_phone`, `uk_contact_2_address`
-- `crn`, `password`, `secret_answer`
-- `spouse_marriage_date`, `spouse_full_name`, `spouse_dob`, `spouse_address`, `spouse_phone`, `spouse_email`, `spouse_ni_number`, `spouse_place_of_birth`, `spouse_employment_status`, `spouse_has_income`
-- `dependants_info`
-- `consent_full_name`, `consent_date`
+**Changes to `CommissionsPage.tsx`:**
+- Fetch enrollments with status IN (`offer_received`, `accepted`, `active`) instead of only `active`
+- Split into two groups: `possibleEnrollments` (offer_received + accepted) and `generatedEnrollments` (active)
+- Add two new MetricCards: "Possible Commission" and "Generated Commission" (replacing or alongside current "Total Commission")
+- In the agent breakdown table, show two commission columns: "Possible" and "Generated"
+- The per-university breakdown also splits by stage
 
-RLS: Owner full access, agent/admin access via student ownership (same pattern as student_documents).
+### 2. University-Specific Commission Tiers
 
-### File Changes
+Currently `commission_tiers` is a single global set. You want the ability to create tier sets per university (e.g., "Premium" tiers for University X with different ranges/rates).
 
-**1. Migration** — Create `student_finance_forms` table + RLS policies
+**Database migration:**
+- Add `university_id` column (uuid, nullable, references universities) to `commission_tiers` table
+- NULL = global tier (current behavior), set = university-specific tier
 
-**2. Copy PDF to `public/`** — The blank PDF goes to `public/EduForYou_Student_Finance_Form.pdf` for download
+**Changes to `SettingsPage.tsx` (CommissionTiersSection):**
+- Add a "University" dropdown (optional) when creating/editing a tier — leave empty for global
+- Group tiers visually: "Global Tiers" section + per-university tier sections
+- Show university name badge next to university-specific tiers
 
-**3. `src/components/student-detail/StudentFundingTab.tsx`** — Major update:
-- Add a new "Student Finance Application" card below the enrollment funding cards
-- Two buttons: "Fill in Platform" and "Upload Completed Form"
-- "Fill in Platform" opens a dialog/accordion with all form sections matching the PDF:
-  - Personal Details, Contact Details, Immigration Status, Employment, Address History, University/Course, UK Contacts, CRN/Password, Financial Details (spouse), Dependants, Consent
-- Pre-fill from student data where possible (name, DOB, nationality, email, phone, NI number, address, share code)
-- Save button persists to `student_finance_forms`
-- "Upload" option: file input to upload PDF, stored in `student-documents` bucket
-- Show completed forms with view/download options
-- Badge showing "Completed" or "Not Started"
+**Changes to commission calculation (`commissions.ts`):**
+- Update `calcCommissionByEnrollments` logic:
+  1. For each enrollment, check if there are university-specific tiers for that university
+  2. If yes, match the agent's student count **at that university** against those uni-specific tiers
+  3. If no uni-specific tiers exist, check for a `university_commissions` entry (custom/linked tier)
+  4. Fallback to global tiers
 
-**4. `src/pages/shared/ResourcesPage.tsx`** — Insert the PDF as a resource record in the DB (handled via migration INSERT or manual upload by owner)
-
-### How It Works
-- Agent opens student > Funding tab
-- Sees enrollment funding cards (existing) + new "Student Finance Application" section
-- Clicks "Fill in Platform" → multi-section form pre-filled with student data → saves permanently
-- Or clicks "Download Blank Form" → gets PDF → student fills → agent uploads completed form
-- Both methods are saved and visible with status indicator
-- The blank PDF is also available in Resources for easy access
+**Changes to `CommissionsPage.tsx`:**
+- Pass university-specific tiers to breakdown calculation
+- Show tier source correctly (e.g., "Uni Tier: Premium Gold" vs "Global: Gold")
 
 ### Files Changed
-- **Migration**: `student_finance_forms` table + RLS + insert resource record
-- **`public/EduForYou_Student_Finance_Form.pdf`**: Blank form for download
-- **`src/components/student-detail/StudentFundingTab.tsx`**: Add finance form section with fill/upload options
-- **`src/components/student-detail/StudentFinanceFormDialog.tsx`** (new): Full form dialog matching PDF structure
+- **Migration**: Add `university_id` to `commission_tiers`
+- **`src/lib/commissions.ts`**: Update calculation to support uni-specific tiers + stage splitting
+- **`src/pages/owner/CommissionsPage.tsx`**: Two-stage metrics, split breakdown, uni tier awareness
+- **`src/pages/owner/SettingsPage.tsx`**: University selector in tier CRUD, grouped display
+
+### Technical Detail
+
+```text
+commission_tiers
+├── Global (university_id = NULL)
+│   ├── Bronze: 1-5 students → £400
+│   ├── Silver: 6-10 → £500
+│   └── Gold: 11+ → £600
+└── University X (university_id = 'xxx')
+    ├── Premium Bronze: 1-3 → £700
+    ├── Premium Silver: 4-8 → £800
+    └── Premium Gold: 9+ → £900
+
+Priority order per enrollment:
+1. University-specific tiers (matched by agent's count at that uni)
+2. University commission (custom rate or linked global tier)
+3. Global tiers (matched by total count)
+```
 
