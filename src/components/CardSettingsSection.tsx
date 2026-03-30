@@ -69,6 +69,26 @@ export default function CardSettingsSection() {
     if (currentSlug) setSlug(currentSlug);
   }, [currentSlug]);
 
+  // Debounced slug availability check
+  useEffect(() => {
+    if (!slug || slug === currentSlug) {
+      setSlugTaken(false);
+      return;
+    }
+    setCheckingSlug(true);
+    const timer = setTimeout(async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("slug", slug)
+        .neq("id", user!.id)
+        .maybeSingle();
+      setSlugTaken(!!data);
+      setCheckingSlug(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [slug, currentSlug, user]);
+
   useEffect(() => {
     if (settings) {
       setIsPublic((settings as any).is_public || false);
