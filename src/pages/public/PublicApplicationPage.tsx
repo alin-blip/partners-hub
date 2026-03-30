@@ -22,6 +22,7 @@ export default function PublicApplicationPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [aiVoiceEnabled, setAiVoiceEnabled] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Form fields
@@ -61,12 +62,13 @@ export default function PublicApplicationPage() {
 
       const { data: card } = await supabase
         .from("agent_card_settings")
-        .select("is_public")
+        .select("is_public, ai_voice_enabled")
         .eq("user_id", prof.id)
         .eq("is_public", true)
         .single();
 
       if (!card) { setNotFound(true); setLoading(false); return; }
+      setAiVoiceEnabled(!!(card as any).ai_voice_enabled);
 
       setAgent(prof);
 
@@ -79,6 +81,22 @@ export default function PublicApplicationPage() {
       setLoading(false);
     })();
   }, [slug]);
+
+  // Load ElevenLabs widget script when AI voice is enabled
+  useEffect(() => {
+    if (!aiVoiceEnabled) return;
+    const scriptId = "elevenlabs-convai-script";
+    if (document.getElementById(scriptId)) return;
+    const script = document.createElement("script");
+    script.id = scriptId;
+    script.src = "https://elevenlabs.io/convai-widget/index.js";
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      const el = document.getElementById(scriptId);
+      if (el) el.remove();
+    };
+  }, [aiVoiceEnabled]);
 
   // Load campuses + courses + intakes + timetable when university changes
   useEffect(() => {
@@ -360,6 +378,13 @@ export default function PublicApplicationPage() {
           </form>
         </CardContent>
       </Card>
+      {aiVoiceEnabled && (
+        <div
+          dangerouslySetInnerHTML={{
+            __html: '<elevenlabs-convai agent-id="agent_4501kmytq1bnekgs59jh6rzjwxw4"></elevenlabs-convai>',
+          }}
+        />
+      )}
     </div>
   );
 }
