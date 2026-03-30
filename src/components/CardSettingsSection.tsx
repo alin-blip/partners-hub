@@ -228,6 +228,12 @@ export default function CardSettingsSection() {
                     placeholder="john-doe"
                   />
                 </div>
+                {slugTaken && (
+                  <p className="text-xs text-destructive">Acest slug este deja luat. Încearcă altul, de ex. adaugă o terminație.</p>
+                )}
+                {checkingSlug && (
+                  <p className="text-xs text-muted-foreground">Se verifică disponibilitatea…</p>
+                )}
               </div>
               <div className="flex items-center gap-2 pb-1">
                 <Switch checked={isPublic} onCheckedChange={setIsPublic} />
