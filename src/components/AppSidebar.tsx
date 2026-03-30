@@ -129,6 +129,7 @@ export function AppSidebar() {
     { title: "Enrollments", url: `${prefix}/enrollments`, icon: ClipboardList },
     { title: "Messages", url: `${prefix}/messages`, icon: Mail, badge: unreadCount },
     { title: "Tasks", url: `${prefix}/tasks`, icon: ListTodo, badge: pendingTasksCount },
+    { title: "Universities", url: `${prefix}/universities`, icon: School },
   ];
 
 

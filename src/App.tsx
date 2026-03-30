@@ -106,6 +106,7 @@ const App = () => (
             <Route path="/agent/enroll" element={<EnrollStudent />} />
             <Route path="/agent/digital-card" element={<DigitalCardPage />} />
             <Route path="/agent/social-posts" element={<AgentSocialFeedPage />} />
+            <Route path="/agent/universities" element={<UniversitiesCoursesPage />} />
             <Route path="/agent/leads" element={<LeadsPage />} />
             <Route path="/agent/tasks" element={<TasksPage />} />
             
