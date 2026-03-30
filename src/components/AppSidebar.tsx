@@ -6,6 +6,7 @@ import {
   Settings,
   LogOut,
   GraduationCap,
+  UserPlus,
   PoundSterling,
   UserCircle,
   FolderOpen,
@@ -108,13 +109,18 @@ export function AppSidebar() {
 
   // Pending tasks count (not done)
   const { data: pendingTasksCount = 0 } = useQuery({
-    queryKey: ["pending-tasks-count", user?.id],
+    queryKey: ["pending-tasks-count", user?.id, role],
     queryFn: async () => {
       if (!user) return 0;
-      const { count, error } = await supabase
+      let query = supabase
         .from("tasks")
         .select("id", { count: "exact", head: true })
         .neq("status", "done");
+      // Agents only see their own tasks
+      if (role === "agent") {
+        query = query.or(`assigned_to.eq.${user.id},created_by.eq.${user.id}`);
+      }
+      const { count, error } = await query;
       if (error) return 0;
       return count || 0;
     },
@@ -134,6 +140,7 @@ export function AppSidebar() {
 
 
   const actionItems: NavItem[] = [
+    { title: "Enroll Student", url: `${prefix}/enroll`, icon: UserPlus },
     { title: "Social Posts", url: `${prefix}/social-posts`, icon: Share2 },
     { title: "Digital Card", url: `${prefix}/digital-card`, icon: CreditCard },
     { title: "Create Image", url: `${prefix}/create-image`, icon: ImageIcon },
