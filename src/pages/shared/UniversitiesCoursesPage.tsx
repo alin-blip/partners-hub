@@ -266,22 +266,6 @@ export default function UniversitiesCoursesPage() {
           </div>
         )}
 
-        {/* Course details dialog */}
-        <Dialog
-          open={!!detailsCourseId}
-          onOpenChange={(open) => !open && setDetailsCourseId(null)}
-        >
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>
-                {courses.find((c: any) => c.id === detailsCourseId)?.name || "Course Details"}
-              </DialogTitle>
-            </DialogHeader>
-            {detailsCourseId && (
-              <CourseDetailsInfoCard courseId={detailsCourseId} />
-            )}
-          </DialogContent>
-        </Dialog>
       </div>
     </DashboardLayout>
   );
