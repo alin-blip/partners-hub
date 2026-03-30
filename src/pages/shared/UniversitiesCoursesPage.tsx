@@ -8,12 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { CourseDetailsInfoCard } from "@/components/CourseDetailsInfoCard";
 import {
   Search,
@@ -243,22 +237,28 @@ export default function UniversitiesCoursesPage() {
                         variant="outline"
                         size="sm"
                         className="flex-1 border-slate-500 text-slate-300 hover:bg-slate-700 hover:text-white"
-                        onClick={() => setDetailsCourseId(course.id)}
+                        onClick={() => setDetailsCourseId(detailsCourseId === course.id ? null : course.id)}
                       >
-                        Details
+                        {detailsCourseId === course.id ? "Hide" : "Details"}
                       </Button>
                       <Button
                         size="sm"
                         className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
                         onClick={() =>
                           navigate(
-                            `/${currentRole}/enroll-student?university=${course.university_id}&course=${course.id}`
+                            `/${currentRole}/enroll?university=${course.university_id}&course=${course.id}`
                           )
                         }
                       >
                         Apply <ArrowRight className="h-3.5 w-3.5 ml-1" />
                       </Button>
                     </div>
+
+                    {detailsCourseId === course.id && (
+                      <div className="pt-3 border-t border-slate-600 mt-3">
+                        <CourseDetailsInfoCard courseId={course.id} compact />
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               );
@@ -266,22 +266,6 @@ export default function UniversitiesCoursesPage() {
           </div>
         )}
 
-        {/* Course details dialog */}
-        <Dialog
-          open={!!detailsCourseId}
-          onOpenChange={(open) => !open && setDetailsCourseId(null)}
-        >
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>
-                {courses.find((c: any) => c.id === detailsCourseId)?.name || "Course Details"}
-              </DialogTitle>
-            </DialogHeader>
-            {detailsCourseId && (
-              <CourseDetailsInfoCard courseId={detailsCourseId} />
-            )}
-          </DialogContent>
-        </Dialog>
       </div>
     </DashboardLayout>
   );

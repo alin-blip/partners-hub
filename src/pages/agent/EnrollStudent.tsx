@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { extractSignatureRgb } from "@/lib/signature-utils";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -36,14 +36,15 @@ function sanitizeName(name: string) {
 export default function EnrollStudent() {
   const { user, role } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
 
-  // Step 1
-  const [universityId, setUniversityId] = useState("");
+  // Step 1 — pre-fill from URL params if provided
+  const [universityId, setUniversityId] = useState(searchParams.get("university") || "");
   const [campusId, setCampusId] = useState("");
-  const [courseId, setCourseId] = useState("");
+  const [courseId, setCourseId] = useState(searchParams.get("course") || "");
   const [intakeId, setIntakeId] = useState("");
   const [studyPattern, setStudyPattern] = useState<string[]>([]);
 
