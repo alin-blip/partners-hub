@@ -81,9 +81,9 @@ export function SocialShareButtons({
 
         onShared?.();
         const name = platformNames[platform] || platform;
-        toast.success(`Imagine salvată și text copiat! Postează pe ${name} și lipește textul.`);
+        toast.success(`Image saved & text copied! Post on ${name} and paste the caption.`);
       } catch {
-        toast.error("Eroare la descărcare");
+        toast.error("Download failed");
       }
       return;
     }
