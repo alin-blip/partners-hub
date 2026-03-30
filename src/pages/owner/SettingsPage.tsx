@@ -293,6 +293,14 @@ function UniversityCommissionsSection({ universities }: { universities: any[] })
   const { toast } = useToast();
   const qc = useQueryClient();
 
+  const { data: tiers = [] } = useQuery({
+    queryKey: ["commission-tiers"],
+    queryFn: async () => {
+      const { data } = await supabase.from("commission_tiers").select("*").order("min_students");
+      return data || [];
+    },
+  });
+
   const { data: uniCommissions = [] } = useQuery({
     queryKey: ["university-commissions-settings"],
     queryFn: async () => {
@@ -304,11 +312,12 @@ function UniversityCommissionsSection({ universities }: { universities: any[] })
   });
 
   const upsert = useMutation({
-    mutationFn: async (d: { university_id: string; commission_per_student: number; label: string; is_highlighted: boolean; highlight_text: string }) => {
+    mutationFn: async (d: { university_id: string; commission_per_student: number; tier_id: string | null; label: string; is_highlighted: boolean; highlight_text: string }) => {
       const existing = uniCommissions.find((uc: any) => uc.university_id === d.university_id);
       if (existing) {
         const { error } = await (supabase as any).from("university_commissions").update({
           commission_per_student: d.commission_per_student,
+          tier_id: d.tier_id,
           label: d.label,
           is_highlighted: d.is_highlighted,
           highlight_text: d.highlight_text,
@@ -341,14 +350,53 @@ function UniversityCommissionsSection({ universities }: { universities: any[] })
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
+  const [selectedTierId, setSelectedTierId] = useState<string>("");
+  const [editTierId, setEditTierId] = useState<string>("");
 
   const uniMap = new Map(uniCommissions.map((uc: any) => [uc.university_id, uc]));
+
+  const getTierLabel = (tier: any) =>
+    `${tier.tier_name} (${tier.min_students}–${tier.max_students ?? "∞"} students → £${tier.commission_per_student})`;
+
+  const handleAddSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(e.currentTarget));
+    const tier = tiers.find((t: any) => t.id === selectedTierId);
+    upsert.mutate({
+      university_id: fd.university_id as string,
+      commission_per_student: tier ? Number(tier.commission_per_student) : Number(fd.commission_per_student),
+      tier_id: selectedTierId || null,
+      label: (fd.label as string) || "",
+      is_highlighted: fd.is_highlighted === "on",
+      highlight_text: (fd.highlight_text as string) || "",
+    });
+    setAddOpen(false);
+    setSelectedTierId("");
+  };
+
+  const handleEditSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(e.currentTarget));
+    const tier = tiers.find((t: any) => t.id === editTierId);
+    upsert.mutate({
+      university_id: editingItem.university_id,
+      commission_per_student: tier ? Number(tier.commission_per_student) : Number(fd.commission_per_student),
+      tier_id: editTierId || null,
+      label: (fd.label as string) || "",
+      is_highlighted: fd.is_highlighted === "on",
+      highlight_text: (fd.highlight_text as string) || "",
+    });
+    setEditOpen(false);
+  };
+
+  const selectedAddTier = tiers.find((t: any) => t.id === selectedTierId);
+  const selectedEditTier = tiers.find((t: any) => t.id === editTierId);
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <CardTitle className="text-base">University Commission Rates</CardTitle>
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <Dialog open={addOpen} onOpenChange={(open) => { setAddOpen(open); if (!open) setSelectedTierId(""); }}>
           <DialogTrigger asChild>
             <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90">
               <Plus className="w-3 h-3 mr-1" /> Add
@@ -356,21 +404,10 @@ function UniversityCommissionsSection({ universities }: { universities: any[] })
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Set University Commission</DialogTitle></DialogHeader>
-            <form className="space-y-4 pt-2" onSubmit={(e) => {
-              e.preventDefault();
-              const fd = Object.fromEntries(new FormData(e.currentTarget));
-              upsert.mutate({
-                university_id: fd.university_id as string,
-                commission_per_student: Number(fd.commission_per_student),
-                label: (fd.label as string) || "",
-                is_highlighted: fd.is_highlighted === "on",
-                highlight_text: (fd.highlight_text as string) || "",
-              });
-              setAddOpen(false);
-            }}>
+            <form className="space-y-4 pt-2" onSubmit={handleAddSubmit}>
               <div className="space-y-2">
                 <Label>University</Label>
-                <select name="university_id" required className="w-full h-10 rounded-md border px-3 text-sm">
+                <select name="university_id" required className="w-full h-10 rounded-md border bg-background px-3 text-sm">
                   <option value="">Select…</option>
                   {universities.filter((u: any) => !uniMap.has(u.id)).map((u: any) => (
                     <option key={u.id} value={u.id}>{u.name}</option>
@@ -378,9 +415,29 @@ function UniversityCommissionsSection({ universities }: { universities: any[] })
                 </select>
               </div>
               <div className="space-y-2">
-                <Label>Commission per Student (£)</Label>
-                <Input name="commission_per_student" type="number" required min={0} step="0.01" placeholder="e.g. 600" />
+                <Label>Commission Tier</Label>
+                <select
+                  value={selectedTierId}
+                  onChange={(e) => setSelectedTierId(e.target.value)}
+                  className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+                >
+                  <option value="">Select a tier…</option>
+                  {tiers.map((t: any) => (
+                    <option key={t.id} value={t.id}>{getTierLabel(t)}</option>
+                  ))}
+                </select>
+                {selectedAddTier && (
+                  <p className="text-xs text-muted-foreground">
+                    Commission: <span className="font-semibold text-foreground">£{selectedAddTier.commission_per_student}/student</span> ({selectedAddTier.min_students}–{selectedAddTier.max_students ?? "∞"} students)
+                  </p>
+                )}
               </div>
+              {!selectedTierId && (
+                <div className="space-y-2">
+                  <Label>Or Custom Commission per Student (£)</Label>
+                  <Input name="commission_per_student" type="number" min={0} step="0.01" placeholder="e.g. 600" />
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Label (optional)</Label>
                 <Input name="label" placeholder="e.g. Premium Partner" />
@@ -403,31 +460,36 @@ function UniversityCommissionsSection({ universities }: { universities: any[] })
           <TableHeader>
             <TableRow>
               <TableHead>University</TableHead>
+              <TableHead>Tier</TableHead>
               <TableHead className="text-right">£/Student</TableHead>
-              <TableHead>Label</TableHead>
               <TableHead>Dashboard</TableHead>
               <TableHead className="w-[80px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {uniCommissions.map((uc: any) => (
-              <TableRow key={uc.id}>
-                <TableCell className="font-medium">{uc.universities?.name}</TableCell>
-                <TableCell className="text-right tabular-nums">£{Number(uc.commission_per_student).toLocaleString()}</TableCell>
-                <TableCell className="text-muted-foreground">{uc.label || "—"}</TableCell>
-                <TableCell>{uc.is_highlighted ? "✅" : "—"}</TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => { setEditingItem(uc); setEditOpen(true); }}>
-                      <Pencil className="w-4 h-4 text-muted-foreground" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => deleteUniComm.mutate(uc.id)}>
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+            {uniCommissions.map((uc: any) => {
+              const tier = tiers.find((t: any) => t.id === uc.tier_id);
+              return (
+                <TableRow key={uc.id}>
+                  <TableCell className="font-medium">{uc.universities?.name}</TableCell>
+                  <TableCell className="text-muted-foreground text-sm">
+                    {tier ? `${tier.tier_name} (${tier.min_students}–${tier.max_students ?? "∞"})` : "Custom"}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums font-semibold">£{Number(uc.commission_per_student).toLocaleString()}</TableCell>
+                  <TableCell>{uc.is_highlighted ? "✅" : "—"}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => { setEditingItem(uc); setEditTierId(uc.tier_id || ""); setEditOpen(true); }}>
+                        <Pencil className="w-4 h-4 text-muted-foreground" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => deleteUniComm.mutate(uc.id)}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
             {uniCommissions.length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
@@ -443,26 +505,35 @@ function UniversityCommissionsSection({ universities }: { universities: any[] })
         <DialogContent>
           <DialogHeader><DialogTitle>Edit University Commission</DialogTitle></DialogHeader>
           {editingItem && (
-            <form className="space-y-4 pt-2" onSubmit={(e) => {
-              e.preventDefault();
-              const fd = Object.fromEntries(new FormData(e.currentTarget));
-              upsert.mutate({
-                university_id: editingItem.university_id,
-                commission_per_student: Number(fd.commission_per_student),
-                label: (fd.label as string) || "",
-                is_highlighted: fd.is_highlighted === "on",
-                highlight_text: (fd.highlight_text as string) || "",
-              });
-              setEditOpen(false);
-            }}>
+            <form className="space-y-4 pt-2" onSubmit={handleEditSubmit}>
               <div className="space-y-2">
                 <Label>University</Label>
                 <Input disabled value={editingItem.universities?.name} />
               </div>
               <div className="space-y-2">
-                <Label>Commission per Student (£)</Label>
-                <Input name="commission_per_student" type="number" required min={0} step="0.01" defaultValue={editingItem.commission_per_student} />
+                <Label>Commission Tier</Label>
+                <select
+                  value={editTierId}
+                  onChange={(e) => setEditTierId(e.target.value)}
+                  className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+                >
+                  <option value="">Custom (manual amount)</option>
+                  {tiers.map((t: any) => (
+                    <option key={t.id} value={t.id}>{getTierLabel(t)}</option>
+                  ))}
+                </select>
+                {selectedEditTier && (
+                  <p className="text-xs text-muted-foreground">
+                    Commission: <span className="font-semibold text-foreground">£{selectedEditTier.commission_per_student}/student</span> ({selectedEditTier.min_students}–{selectedEditTier.max_students ?? "∞"} students)
+                  </p>
+                )}
               </div>
+              {!editTierId && (
+                <div className="space-y-2">
+                  <Label>Custom Commission per Student (£)</Label>
+                  <Input name="commission_per_student" type="number" min={0} step="0.01" defaultValue={editingItem.commission_per_student} />
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Label (optional)</Label>
                 <Input name="label" defaultValue={editingItem.label || ""} />
