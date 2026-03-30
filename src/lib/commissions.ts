@@ -46,16 +46,23 @@ export function calcCommissionByEnrollments(
   uniCommissions: UniversityCommission[],
   tiers: CommissionTier[]
 ): number {
-  const uniMap = new Map(uniCommissions.map(uc => [uc.university_id, uc.commission_per_student]));
+  const uniMap = new Map(uniCommissions.map(uc => [uc.university_id, uc]));
+  const tierMap = new Map(tiers.map(t => [t.id, t]));
   let total = 0;
   
   // Count enrollments without a university-specific rate for tier fallback
   let tierCount = 0;
   
   for (const e of enrollments) {
-    const uniRate = uniMap.get(e.university_id);
-    if (uniRate !== undefined) {
-      total += Number(uniRate);
+    const uc = uniMap.get(e.university_id);
+    if (uc) {
+      // Dynamic lookup: if linked to a tier, use the tier's live rate
+      if (uc.tier_id) {
+        const linkedTier = tierMap.get(uc.tier_id);
+        total += linkedTier ? Number(linkedTier.commission_per_student) : Number(uc.commission_per_student);
+      } else {
+        total += Number(uc.commission_per_student);
+      }
     } else {
       tierCount++;
     }
