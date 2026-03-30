@@ -20,10 +20,14 @@ export function BrandedProfilePicture() {
   const [generating, setGenerating] = useState(false);
   const [generatingFrame, setGeneratingFrame] = useState(false);
 
-  // Use profile avatar as default
+  // Use profile avatar as default — convert to base64 to avoid CORS issues on canvas
   useEffect(() => {
-    if ((profile as any)?.avatar_url) {
-      setAvatarSrc((profile as any).avatar_url);
+    const avatarUrl = (profile as any)?.avatar_url;
+    if (avatarUrl && !avatarSrc) {
+      fetchImageAsBase64(avatarUrl).then(setAvatarSrc).catch(() => {
+        // Fallback: try using URL directly
+        setAvatarSrc(avatarUrl);
+      });
     }
   }, [profile]);
 
