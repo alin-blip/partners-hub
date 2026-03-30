@@ -35,8 +35,9 @@ function findCourseMatch(
   for (const c of courses) {
     const cWords = c.normalized.split(" ").filter((w) => w.length > 2);
     const matchCount = extWords.filter((w) => cWords.includes(w)).length;
-    const score = matchCount / Math.max(extWords.length, cWords.length);
-    if (score > bestScore && score >= 0.6) {
+    // Use smaller set as denominator so partial matches work better
+    const score = matchCount / Math.min(extWords.length, cWords.length);
+    if (score > bestScore && score >= 0.5 && matchCount >= 2) {
       bestScore = score;
       bestId = c.id;
     }
