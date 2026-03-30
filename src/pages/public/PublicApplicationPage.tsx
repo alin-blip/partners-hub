@@ -378,6 +378,13 @@ export default function PublicApplicationPage() {
           </form>
         </CardContent>
       </Card>
+      {aiVoiceEnabled && (
+        <div
+          dangerouslySetInnerHTML={{
+            __html: '<elevenlabs-convai agent-id="agent_4501kmytq1bnekgs59jh6rzjwxw4"></elevenlabs-convai>',
+          }}
+        />
+      )}
     </div>
   );
 }
