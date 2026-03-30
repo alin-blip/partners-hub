@@ -74,42 +74,42 @@ serve(async (req) => {
       console.error("Failed to fetch icon:", e);
     }
 
-    const prompt = `Create a 1080x1080 pixel circular profile picture frame overlay image.
+    const prompt = `Create a 1080x1080 pixel circular profile picture frame overlay PNG image with TRANSPARENT background.
 
-CRITICAL REQUIREMENTS:
-- The CENTER of the image must be COMPLETELY TRANSPARENT (alpha = 0) — this is a circular cutout where a photo will be placed underneath
-- The transparent circular cutout should be approximately 800px diameter, centered
-- Around this transparent center, create a PREMIUM decorative ring/border
+ABSOLUTE REQUIREMENT — TRANSPARENCY:
+- The ENTIRE background must be fully transparent (alpha = 0)
+- The CENTER circle must be COMPLETELY TRANSPARENT — this is where a photo will be composited underneath
+- Only the ring border, top badge, and bottom badge should have visible pixels
+- Everything else = transparent PNG
 
 RING DESIGN:
-- Luxurious gradient ring going from deep orange (#E8600A) to warm amber (#F2A03D) to subtle gold (#FFD700)
-- The ring should have depth: inner glow, subtle shine highlights, and soft outer shadow
-- Glass-morphism effect with subtle light reflections on the ring surface
-- Ring width approximately 120-140px
+- A THIN elegant circular ring/border, approximately 40-50px wide (NOT thick, keep it slim and refined)
+- The ring should be positioned at the OUTER EDGE of the 1080x1080 canvas, maximizing the transparent center
+- Inner radius approximately 490px from center (leaving maximum space for the photo)
+- Luxurious gradient from deep orange (#E8600A) to warm amber (#F2A03D) with subtle gold highlights
+- Subtle inner glow and soft shine — minimal, elegant, not overdone
+- The ring should feel thin, premium, and simple
 
 TOP BADGE — LOGO AREA:
-- At the top center of the ring, place a premium pill-shaped badge
-- Inside the badge: reproduce the EXACT icon from the attached reference image (orange pen with graduation cap) on the left side
-- Next to the icon, write "EduForYou" in a clean, bold, modern font
-- The pill badge should have a white/cream background with subtle shadow and rounded corners
-- The badge should overlap slightly onto the ring from outside
+- At the top center, overlapping the ring, place a compact pill-shaped badge
+- Inside: reproduce the EXACT icon from the attached reference image (orange pen with graduation cap) on the left
+- Next to the icon: "EduForYou" in clean, bold, modern font
+- White/cream background with subtle shadow, compact size
+- Should sit ON TOP of the ring, partially overlapping
 
 BOTTOM BADGE — CERTIFICATION:
-- At the bottom center of the ring, place a premium banner/badge
-- Text: "CERTIFIED AGENT" in elegant uppercase letters
-- Use a dark navy/charcoal background (#1A1A2E) with subtle metallic gold accents
-- Add a subtle gold star or shield icon on each side of the text
-- The banner should have premium styling: subtle gradient, thin gold border, rounded pill shape
-- Should overlap slightly onto the ring from outside
+- At the bottom center, overlapping the ring, a slim premium banner
+- Text: "CERTIFIED AGENT" in elegant uppercase
+- Dark navy background (#1A1A2E) with subtle gold star accents on each side
+- Thin, compact pill shape — not bulky
+- Should sit ON TOP of the ring, partially overlapping
 
 STYLE:
-- Ultra premium, luxury aesthetic — think LinkedIn Premium verified badge or exclusive membership
-- Subtle decorative particles or light bokeh effects around the ring (very subtle, not distracting)
-- Clean, professional, not cluttered
-- The overall feel should be "exclusive certification" and "trusted professional"
-- PNG format with transparency
+- Minimalist, clean, premium — think simple luxury, not busy
+- NO background fill, NO circular background — ONLY the ring line and two badges
+- The transparent center should be as LARGE as possible
+- PNG with alpha transparency is CRITICAL`;
 
-DO NOT include any photo or face inside — the center MUST be transparent for compositing.`;
 
     const messageContent: any[] = [
       { type: "text", text: prompt },
