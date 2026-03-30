@@ -9,6 +9,18 @@ import { supabase } from "@/integrations/supabase/client";
 const CANVAS_SIZE = 1080;
 const FRAME_STORAGE_URL_BASE = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/brand-assets/profile-frame-v1.png`;
 
+async function fetchImageAsBase64(url: string): Promise<string> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 export function BrandedProfilePicture() {
   const { profile } = useAuth();
   const { toast } = useToast();
@@ -20,10 +32,14 @@ export function BrandedProfilePicture() {
   const [generating, setGenerating] = useState(false);
   const [generatingFrame, setGeneratingFrame] = useState(false);
 
-  // Use profile avatar as default
+  // Use profile avatar as default — convert to base64 to avoid CORS issues on canvas
   useEffect(() => {
-    if ((profile as any)?.avatar_url) {
-      setAvatarSrc((profile as any).avatar_url);
+    const avatarUrl = (profile as any)?.avatar_url;
+    if (avatarUrl && !avatarSrc) {
+      fetchImageAsBase64(avatarUrl).then(setAvatarSrc).catch(() => {
+        // Fallback: try using URL directly
+        setAvatarSrc(avatarUrl);
+      });
     }
   }, [profile]);
 
@@ -78,12 +94,18 @@ export function BrandedProfilePicture() {
       canvas.height = CANVAS_SIZE;
 
       const center = CANVAS_SIZE / 2;
-      const photoRadius = 400; // slightly smaller than frame cutout
+      const photoRadius = 400;
 
       try {
+        // Convert URLs to base64 to avoid CORS canvas tainting
+        const [photoB64, frameB64] = await Promise.all([
+          photoSrc.startsWith("data:") ? photoSrc : fetchImageAsBase64(photoSrc),
+          frameSrc.startsWith("data:") ? frameSrc : fetchImageAsBase64(frameSrc),
+        ]);
+
         const [avatarImg, frameImg] = await Promise.all([
-          loadImage(photoSrc),
-          loadImage(frameSrc),
+          loadImage(photoB64),
+          loadImage(frameB64),
         ]);
 
         // Clear
