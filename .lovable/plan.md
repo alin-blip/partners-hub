@@ -1,60 +1,49 @@
 
 
-## Plan: Extract Missing Course Details for CECOS and Regent
+## Plan: Add ElevenLabs AI Voice Widget to Digital Card + Fix Romanian Text
 
-### Current Status
+Two changes: (1) add an ElevenLabs conversational AI widget to the public agent card page with a toggle in card settings, and (2) translate all remaining Romanian strings to English.
 
-| University | Total Courses | With Details | Missing |
-|-----------|--------------|-------------|---------|
-| Global Banking School | 21 | 21 | 0 |
-| QA (all) | 65 | 65 | 0 |
-| LSC | 2 | 2 | 0 |
-| UWTSD | 3 | 3 | 0 |
-| MLA College | 1 | 1 | 0 |
-| **CECOS** | 5 | 2 | **3** |
-| **Regent** | 40 | 31 | **9** |
+### 1. Database: Add `ai_voice_enabled` column to `agent_card_settings`
 
-### Courses Missing Details
+New boolean column `ai_voice_enabled` (default `false`) on `agent_card_settings`.
 
-**CECOS (3):**
-- BA Top Up in Business Management
-- Human Resource Management
-- Leadership Principles in Health & Social Care
+### 2. Card Settings UI (`CardSettingsSection.tsx`)
 
-**Regent (9):**
-- BEng (Hons) Electrical and Electronic Engineering (UOB)
-- BEng (Hons) Software Engineering (UOB)
-- BSc (Hons) Computing with FY
-- BSc (Hons) Health and Social Care - Top-Up
-- HNC Digital Technologies
-- HNC Engineering
-- HNC in Business Management
-- HNC in Health Care Practice (Integrated Health and Social Care)
-- MSc Psychology
+- Add state `aiVoiceEnabled` synced from settings
+- Add a new section "AI Voice Assistant" with a Switch toggle and description explaining it enables an AI chatbot on the public card
+- Include `ai_voice_enabled` in the save payload
 
-### Extraction Plan
+### 3. Public Agent Card (`AgentCardPage.tsx`)
 
-1. **Regent** — Use the existing `scrape-course-details` edge function with `https://www.rcl.ac.uk/`. The function will search for course pages via Firecrawl, extract details with AI, and upsert into `course_details`. This should work since Regent is already in the URL mapping.
+- Read `ai_voice_enabled` from the fetched card settings (already fetches `*`)
+- When enabled, inject the ElevenLabs widget using the provided agent ID:
+  - Load the script `https://elevenlabs.io/convai-widget/index.js` dynamically via `useEffect`
+  - Render `<elevenlabs-convai agent-id="agent_4501kmytq1bnekgs59jh6rzjwxw4" />` at the bottom of the card
+  - The widget is public (no API key needed client-side)
 
-2. **CECOS** — CECOS is NOT in the current `UNIVERSITY_URLS` mapping. We need to:
-   - Add CECOS URL to the mapping (need to identify their website)
-   - Or manually scrape their site if they have one
-   - Or populate manually if no public course pages exist
+### 4. Translate Romanian strings to English
 
-### Implementation
+Files with Romanian text to fix:
+| File | Romanian | English |
+|------|----------|---------|
+| `CardSettingsSection.tsx` | "Acest slug este deja folosit. Alege altul." | "This slug is already taken. Choose another." |
+| `SocialShareButtons.tsx` | "Imagine salvată și text copiat!..." | "Image saved and text copied!..." |
+| `AgentSocialFeedPage.tsx` | Same Romanian toasts | Same English translations |
+| `BrandedProfilePicture.tsx` | "Descărcat!", "Imaginea de profil a fost salvată." | "Downloaded!", "Profile picture saved." |
+| `FeedbackPage.tsx` | "Se încarcă...", "Niciun feedback încă." | "Loading...", "No feedback yet." |
+| `SettingsPage.tsx` | "Studentul își alege programul..." placeholder | English equivalent |
 
-| Step | Action |
-|------|--------|
-| 1 | Run `scrape-course-details` for Regent (9 courses) via the edge function |
-| 2 | Identify CECOS website URL and add to `UNIVERSITY_URLS` mapping |
-| 3 | Run `scrape-course-details` for CECOS (3 courses) |
-| 4 | For any courses the scraper misses, populate manually based on available info |
-
-### Files to Edit
+### Files to Create/Edit
 
 | File | Change |
 |------|--------|
-| `src/pages/shared/UniversitiesCoursesPage.tsx` | Add CECOS to `UNIVERSITY_URLS` mapping |
-
-The edge function is already deployed and ready. We just need to trigger it for the two universities with missing data and add CECOS to the URL map.
+| Migration SQL | Add `ai_voice_enabled boolean default false` to `agent_card_settings` |
+| `src/components/CardSettingsSection.tsx` | Add AI Voice toggle + fix Romanian |
+| `src/pages/public/AgentCardPage.tsx` | Load ElevenLabs widget when enabled |
+| `src/components/SocialShareButtons.tsx` | Translate Romanian toasts |
+| `src/pages/shared/AgentSocialFeedPage.tsx` | Translate Romanian toasts |
+| `src/components/BrandedProfilePicture.tsx` | Translate Romanian toast |
+| `src/pages/owner/FeedbackPage.tsx` | Translate Romanian strings |
+| `src/pages/owner/SettingsPage.tsx` | Translate Romanian placeholder |
 
