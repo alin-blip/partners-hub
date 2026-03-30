@@ -86,6 +86,7 @@ export default function CardSettingsSection() {
       setSocialFacebook((settings as any).social_facebook || "");
       setSocialLinkedin((settings as any).social_linkedin || "");
       setSocialTiktok((settings as any).social_tiktok || "");
+      setAiVoiceEnabled((settings as any).ai_voice_enabled || false);
     }
   }, [settings]);
 
