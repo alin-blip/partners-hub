@@ -118,8 +118,10 @@ export default function AgentCardPage() {
 
   const initials = profile.full_name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 
+  const cardPageUrl = `https://agentseduforyou.lovable.app/card/${slug}`;
+
   const handleVCard = () => {
-    const vcard = [
+    const lines = [
       "BEGIN:VCARD",
       "VERSION:3.0",
       `FN:${profile.full_name}`,
@@ -127,10 +129,18 @@ export default function AgentCardPage() {
       settings.company_name ? `ORG:${settings.company_name}` : "",
       settings.whatsapp ? `TEL;TYPE=CELL:${settings.whatsapp}` : "",
       profile.avatar_url ? `PHOTO;VALUE=URI:${profile.avatar_url}` : "",
+      `URL:${cardPageUrl}`,
+      settings.bio ? `NOTE:${settings.bio.replace(/\n/g, "\\n")}` : "",
+      settings.social_instagram ? `X-SOCIALPROFILE;TYPE=instagram:${settings.social_instagram}` : "",
+      settings.social_facebook ? `X-SOCIALPROFILE;TYPE=facebook:${settings.social_facebook}` : "",
+      settings.social_linkedin ? `X-SOCIALPROFILE;TYPE=linkedin:${settings.social_linkedin}` : "",
+      settings.social_youtube ? `X-SOCIALPROFILE;TYPE=youtube:${settings.social_youtube}` : "",
+      settings.social_tiktok ? `X-SOCIALPROFILE;TYPE=tiktok:${settings.social_tiktok}` : "",
+      settings.social_google ? `X-SOCIALPROFILE;TYPE=google:${settings.social_google}` : "",
       "END:VCARD",
     ].filter(Boolean).join("\n");
 
-    const blob = new Blob([vcard], { type: "text/vcard" });
+    const blob = new Blob([lines], { type: "text/vcard" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
