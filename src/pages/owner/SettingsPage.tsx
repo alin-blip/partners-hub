@@ -1733,7 +1733,7 @@ export default function SettingsPage() {
 
   const addCourse = useMutation({
     mutationFn: async (d: any) => {
-      const { error } = await supabase.from("courses").insert({ name: d.name, study_mode: d.study_mode || "blended", level: d.level || "undergraduate", university_id: d.university_id });
+      const { error } = await supabase.from("courses").insert({ name: d.name, study_mode: d.study_mode || "blended", level: d.level || "undergraduate", university_id: d.university_id, duration: d.duration || null, fees: d.fees || null } as any);
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["all-courses"] }); toast({ title: "Course added" }); },
