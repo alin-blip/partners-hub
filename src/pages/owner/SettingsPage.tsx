@@ -1741,7 +1741,9 @@ export default function SettingsPage() {
 
   const updateCourse = useMutation({
     mutationFn: async (d: any) => {
-      const { error } = await supabase.from("courses").update({ name: d.name, study_mode: d.study_mode || "blended", level: d.level || "undergraduate", university_id: d.university_id }).eq("id", d.id);
+      const updates: any = { name: d.name, study_mode: d.study_mode || "blended", level: d.level || "undergraduate", university_id: d.university_id, duration: d.duration || null, fees: d.fees || null };
+      if (d.is_active !== undefined) updates.is_active = d.is_active === "true" || d.is_active === true;
+      const { error } = await supabase.from("courses").update(updates).eq("id", d.id);
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["all-courses"] }); toast({ title: "Course updated" }); },
