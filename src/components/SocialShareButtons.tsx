@@ -58,8 +58,10 @@ export function SocialShareButtons({
 
     // For Facebook/LinkedIn: open URL synchronously to avoid popup blocking
     if (skipNativeSharePlatforms.includes(platform)) {
-      const fallbackUrl = cardUrl
-        ? platformFallbackUrls[platform]?.(shareText, cardUrl)
+      // Use og-share URL for Facebook/LinkedIn so crawlers get proper OG meta tags
+      const shareUrlForCrawler = ogShareUrl || cardUrl;
+      const fallbackUrl = shareUrlForCrawler
+        ? platformFallbackUrls[platform]?.(shareText, shareUrlForCrawler)
         : null;
       if (fallbackUrl) window.open(fallbackUrl, "_blank");
 

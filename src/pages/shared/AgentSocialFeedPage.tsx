@@ -105,7 +105,9 @@ export default function AgentSocialFeedPage() {
 
     // For Facebook/LinkedIn: open URL synchronously to avoid popup blocking
     if (skipNativeSharePlatforms.includes(platform)) {
-      const fallbackUrl = platformFallbackUrls[platform]?.(shareText, cardUrl!);
+      // Use og-share URL so Facebook/LinkedIn crawlers get proper OG meta tags
+      const ogUrl = ogShareBaseUrl ? `${ogShareBaseUrl}&post=${post.id}` : cardUrl!;
+      const fallbackUrl = platformFallbackUrls[platform]?.(shareText, ogUrl);
       if (fallbackUrl) window.open(fallbackUrl, "_blank");
 
       try {

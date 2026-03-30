@@ -96,6 +96,32 @@ export function BrandedProfilePicture() {
 
         ctx.drawImage(frameImg, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
         setIsReady(true);
+
+        // Upload branded canvas as avatar_url
+        if (user) {
+          canvas.toBlob(async (blob) => {
+            if (!blob) return;
+            try {
+              const brandedPath = `${user.id}/branded-avatar.png`;
+              const brandedFile = new File([blob], "branded-avatar.png", { type: "image/png" });
+              const { error: upErr } = await supabase.storage
+                .from("avatars")
+                .upload(brandedPath, brandedFile, { upsert: true });
+              if (upErr) throw upErr;
+
+              const { data: pub } = supabase.storage.from("avatars").getPublicUrl(brandedPath);
+              const brandedUrl = `${pub.publicUrl}?t=${Date.now()}`;
+
+              const { error: updateErr } = await supabase
+                .from("profiles")
+                .update({ avatar_url: brandedUrl } as any)
+                .eq("id", user.id);
+              if (updateErr) throw updateErr;
+            } catch (err: any) {
+              console.error("Branded avatar upload error:", err);
+            }
+          }, "image/png");
+        }
       } catch (e) {
         console.error("Canvas draw error:", e);
         toast({
