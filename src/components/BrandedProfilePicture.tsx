@@ -22,7 +22,7 @@ async function fetchImageAsBase64(url: string): Promise<string> {
 }
 
 export function BrandedProfilePicture() {
-  const { profile } = useAuth();
+  const { profile, role } = useAuth();
   const { toast } = useToast();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
