@@ -208,12 +208,10 @@ export default function UniversitiesCoursesPage() {
               </Label>
             </div>
           )}
-          {(role === "owner" || role === "admin") && effectiveUniId && (() => {
+           {(role === "owner" || role === "admin") && effectiveUniId && (() => {
             const uni = displayUniversities.find((u: any) => u.id === effectiveUniId);
             const uniName = uni?.name || "";
-            const hasUrl = Object.entries(UNIVERSITY_URLS).some(
-              ([key]) => uniName.toLowerCase().includes(key.toLowerCase()) || key.toLowerCase().includes(uniName.toLowerCase().split(" ")[0])
-            );
+            const hasUrl = !!getUniversityUrl(uniName);
             if (!hasUrl) return null;
             return (
               <Button
