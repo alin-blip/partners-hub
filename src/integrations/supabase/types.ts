@@ -1450,6 +1450,47 @@ export type Database = {
         }
         Relationships: []
       }
+      university_commissions: {
+        Row: {
+          commission_per_student: number
+          created_at: string
+          highlight_text: string | null
+          id: string
+          is_highlighted: boolean
+          label: string | null
+          university_id: string
+          updated_at: string
+        }
+        Insert: {
+          commission_per_student?: number
+          created_at?: string
+          highlight_text?: string | null
+          id?: string
+          is_highlighted?: boolean
+          label?: string | null
+          university_id: string
+          updated_at?: string
+        }
+        Update: {
+          commission_per_student?: number
+          created_at?: string
+          highlight_text?: string | null
+          id?: string
+          is_highlighted?: boolean
+          label?: string | null
+          university_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "university_commissions_university_id_fkey"
+            columns: ["university_id"]
+            isOneToOne: true
+            referencedRelation: "universities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
