@@ -1458,6 +1458,7 @@ export type Database = {
           id: string
           is_highlighted: boolean
           label: string | null
+          tier_id: string | null
           university_id: string
           updated_at: string
         }
@@ -1468,6 +1469,7 @@ export type Database = {
           id?: string
           is_highlighted?: boolean
           label?: string | null
+          tier_id?: string | null
           university_id: string
           updated_at?: string
         }
@@ -1478,10 +1480,18 @@ export type Database = {
           id?: string
           is_highlighted?: boolean
           label?: string | null
+          tier_id?: string | null
           university_id?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "university_commissions_tier_id_fkey"
+            columns: ["tier_id"]
+            isOneToOne: false
+            referencedRelation: "commission_tiers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "university_commissions_university_id_fkey"
             columns: ["university_id"]
