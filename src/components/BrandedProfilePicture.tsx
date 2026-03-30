@@ -116,13 +116,49 @@ export function BrandedProfilePicture() {
     }
   }, [avatarSrc, drawCanvas]);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !user) return;
 
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Fișier invalid", description: "Încarcă JPG sau PNG", variant: "destructive" });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "Prea mare", description: "Maximum 5MB", variant: "destructive" });
+      return;
+    }
+
+    // Show preview immediately
     const reader = new FileReader();
     reader.onload = () => setAvatarSrc(reader.result as string);
     reader.readAsDataURL(file);
+
+    // Also save as profile avatar
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `${user.id}/avatar.${ext}`;
+      const { error: uploadErr } = await supabase.storage
+        .from("avatars")
+        .upload(path, file, { upsert: true });
+      if (uploadErr) throw uploadErr;
+
+      const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+      const url = `${pub.publicUrl}?t=${Date.now()}`;
+
+      const { error: updateErr } = await supabase
+        .from("profiles")
+        .update({ avatar_url: url } as any)
+        .eq("id", user.id);
+      if (updateErr) throw updateErr;
+
+      toast({ title: "Poză salvată", description: "Poza de profil a fost actualizată." });
+    } catch (err: any) {
+      toast({ title: "Eroare upload", description: err.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleDownload = () => {
