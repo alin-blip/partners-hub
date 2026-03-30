@@ -6,6 +6,11 @@ export interface CommissionTier {
   commission_per_student: number;
 }
 
+export interface UniversityCommission {
+  university_id: string;
+  commission_per_student: number;
+}
+
 export function matchTier(
   activeStudentCount: number,
   tiers: CommissionTier[]
@@ -29,4 +34,37 @@ export function calcCommission(
   const tier = matchTier(activeStudentCount, tiers);
   if (!tier) return { tier: null, amount: 0 };
   return { tier, amount: activeStudentCount * tier.commission_per_student };
+}
+
+/**
+ * Calculate commission per enrollment using university-specific rates when available,
+ * falling back to global tier system.
+ */
+export function calcCommissionByEnrollments(
+  enrollments: { university_id: string }[],
+  uniCommissions: UniversityCommission[],
+  tiers: CommissionTier[]
+): number {
+  const uniMap = new Map(uniCommissions.map(uc => [uc.university_id, uc.commission_per_student]));
+  let total = 0;
+  
+  // Count enrollments without a university-specific rate for tier fallback
+  let tierCount = 0;
+  
+  for (const e of enrollments) {
+    const uniRate = uniMap.get(e.university_id);
+    if (uniRate !== undefined) {
+      total += Number(uniRate);
+    } else {
+      tierCount++;
+    }
+  }
+  
+  // Apply global tier for remaining enrollments
+  if (tierCount > 0) {
+    const { amount } = calcCommission(tierCount, tiers);
+    total += amount;
+  }
+  
+  return total;
 }

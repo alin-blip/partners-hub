@@ -286,8 +286,204 @@ function CommissionTiersSection({ deleteItem }: { deleteItem: any }) {
 }
 
 /* ──────────────────────────────────────────────────────── */
-/*  Brand Settings (already editable, no changes needed)   */
+/*  University Commission Rates                            */
 /* ──────────────────────────────────────────────────────── */
+
+function UniversityCommissionsSection({ universities }: { universities: any[] }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  const { data: uniCommissions = [] } = useQuery({
+    queryKey: ["university-commissions-settings"],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("university_commissions")
+        .select("*, universities(name)");
+      return data || [];
+    },
+  });
+
+  const upsert = useMutation({
+    mutationFn: async (d: { university_id: string; commission_per_student: number; label: string; is_highlighted: boolean; highlight_text: string }) => {
+      const existing = uniCommissions.find((uc: any) => uc.university_id === d.university_id);
+      if (existing) {
+        const { error } = await (supabase as any).from("university_commissions").update({
+          commission_per_student: d.commission_per_student,
+          label: d.label,
+          is_highlighted: d.is_highlighted,
+          highlight_text: d.highlight_text,
+        }).eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await (supabase as any).from("university_commissions").insert(d);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["university-commissions-settings"] });
+      qc.invalidateQueries({ queryKey: ["university-commission-offers"] });
+      toast({ title: "University commission saved" });
+    },
+  });
+
+  const deleteUniComm = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any).from("university_commissions").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["university-commissions-settings"] });
+      qc.invalidateQueries({ queryKey: ["university-commission-offers"] });
+      toast({ title: "University commission removed" });
+    },
+  });
+
+  const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<any>(null);
+
+  const uniMap = new Map(uniCommissions.map((uc: any) => [uc.university_id, uc]));
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-3">
+        <CardTitle className="text-base">University Commission Rates</CardTitle>
+        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90">
+              <Plus className="w-3 h-3 mr-1" /> Add
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Set University Commission</DialogTitle></DialogHeader>
+            <form className="space-y-4 pt-2" onSubmit={(e) => {
+              e.preventDefault();
+              const fd = Object.fromEntries(new FormData(e.currentTarget));
+              upsert.mutate({
+                university_id: fd.university_id as string,
+                commission_per_student: Number(fd.commission_per_student),
+                label: (fd.label as string) || "",
+                is_highlighted: fd.is_highlighted === "on",
+                highlight_text: (fd.highlight_text as string) || "",
+              });
+              setAddOpen(false);
+            }}>
+              <div className="space-y-2">
+                <Label>University</Label>
+                <select name="university_id" required className="w-full h-10 rounded-md border px-3 text-sm">
+                  <option value="">Select…</option>
+                  {universities.filter((u: any) => !uniMap.has(u.id)).map((u: any) => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Commission per Student (£)</Label>
+                <Input name="commission_per_student" type="number" required min={0} step="0.01" placeholder="e.g. 600" />
+              </div>
+              <div className="space-y-2">
+                <Label>Label (optional)</Label>
+                <Input name="label" placeholder="e.g. Premium Partner" />
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" name="is_highlighted" id="add_highlight" className="h-4 w-4" />
+                <Label htmlFor="add_highlight">Show on Dashboard</Label>
+              </div>
+              <div className="space-y-2">
+                <Label>Dashboard Text (optional)</Label>
+                <Input name="highlight_text" placeholder="e.g. Inscrie studenti la LSC!" />
+              </div>
+              <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">Save</Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </CardHeader>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>University</TableHead>
+              <TableHead className="text-right">£/Student</TableHead>
+              <TableHead>Label</TableHead>
+              <TableHead>Dashboard</TableHead>
+              <TableHead className="w-[80px]" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {uniCommissions.map((uc: any) => (
+              <TableRow key={uc.id}>
+                <TableCell className="font-medium">{uc.universities?.name}</TableCell>
+                <TableCell className="text-right tabular-nums">£{Number(uc.commission_per_student).toLocaleString()}</TableCell>
+                <TableCell className="text-muted-foreground">{uc.label || "—"}</TableCell>
+                <TableCell>{uc.is_highlighted ? "✅" : "—"}</TableCell>
+                <TableCell>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => { setEditingItem(uc); setEditOpen(true); }}>
+                      <Pencil className="w-4 h-4 text-muted-foreground" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => deleteUniComm.mutate(uc.id)}>
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+            {uniCommissions.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
+                  No university-specific rates set. Global tiers will be used.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit University Commission</DialogTitle></DialogHeader>
+          {editingItem && (
+            <form className="space-y-4 pt-2" onSubmit={(e) => {
+              e.preventDefault();
+              const fd = Object.fromEntries(new FormData(e.currentTarget));
+              upsert.mutate({
+                university_id: editingItem.university_id,
+                commission_per_student: Number(fd.commission_per_student),
+                label: (fd.label as string) || "",
+                is_highlighted: fd.is_highlighted === "on",
+                highlight_text: (fd.highlight_text as string) || "",
+              });
+              setEditOpen(false);
+            }}>
+              <div className="space-y-2">
+                <Label>University</Label>
+                <Input disabled value={editingItem.universities?.name} />
+              </div>
+              <div className="space-y-2">
+                <Label>Commission per Student (£)</Label>
+                <Input name="commission_per_student" type="number" required min={0} step="0.01" defaultValue={editingItem.commission_per_student} />
+              </div>
+              <div className="space-y-2">
+                <Label>Label (optional)</Label>
+                <Input name="label" defaultValue={editingItem.label || ""} />
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" name="is_highlighted" id="edit_highlight" className="h-4 w-4" defaultChecked={editingItem.is_highlighted} />
+                <Label htmlFor="edit_highlight">Show on Dashboard</Label>
+              </div>
+              <div className="space-y-2">
+                <Label>Dashboard Text (optional)</Label>
+                <Input name="highlight_text" defaultValue={editingItem.highlight_text || ""} />
+              </div>
+              <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">Save Changes</Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
 
 function BrandSettingsSection() {
   const { toast } = useToast();
@@ -1588,8 +1784,9 @@ export default function SettingsPage() {
             />
           </TabsContent>
 
-          <TabsContent value="commissions" className="mt-4">
+          <TabsContent value="commissions" className="mt-4 space-y-6">
             <CommissionTiersSection deleteItem={deleteItem} />
+            <UniversityCommissionsSection universities={universities} />
           </TabsContent>
 
           <TabsContent value="promotions" className="mt-4">

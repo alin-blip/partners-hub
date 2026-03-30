@@ -14,6 +14,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { format } from "date-fns";
+import { CommissionOfferCards } from "@/components/CommissionOfferCards";
 
 export default function AgentDashboard() {
   const { user } = useAuth();
@@ -65,6 +66,7 @@ export default function AgentDashboard() {
     <DashboardLayout allowedRoles={["agent"]}>
       <div className="space-y-6">
         <PromoBanner />
+        <CommissionOfferCards />
 
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold tracking-tight">My Dashboard</h1>
