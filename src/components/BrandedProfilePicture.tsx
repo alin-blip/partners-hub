@@ -94,7 +94,7 @@ export function BrandedProfilePicture() {
       canvas.height = CANVAS_SIZE;
 
       const center = CANVAS_SIZE / 2;
-      const photoRadius = 490; // maximize photo area, match thin ring inner edge
+      const photoRadius = CANVAS_SIZE / 2; // fill entire canvas with photo
 
       try {
         // Convert URLs to base64 to avoid CORS canvas tainting
