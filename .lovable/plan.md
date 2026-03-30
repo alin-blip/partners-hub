@@ -1,66 +1,58 @@
 
 
-## Plan: Premium Branded Profile Picture with AI-Generated Overlay
+## Plan: Universities & Courses Page (Read-Only for All Roles)
 
-### Problem
-The current canvas-drawn frame looks programmatic — flat gradient, basic pill shapes, emoji stars. It doesn't look like a professionally designed asset.
+### What We're Building
+A new **Universities & Courses** page accessible from the sidebar for all roles (Owner, Admin, Agent). This is a read-only reference page where users can browse all university/campus/course/intake/timetable data with full details. No CRUD — management stays in Owner Settings.
 
-### Approach
-Use Nano Banana (gemini-3.1-flash-image-preview) to generate a premium branded circular frame overlay, then composite it with the user's photo on canvas. The AI creates the artistic elements (gradient ring, logo placement, badge design) at a much higher quality than canvas drawing can achieve.
+### Data Sources (existing tables)
+- `universities` — name, is_active, timetable_available, timetable_message
+- `campuses` — name, city, university_id
+- `courses` — name, level, study_mode, university_id
+- `course_details` — entry_requirements, admission_test_info, interview_info, documents_required, personal_statement_guidelines, additional_info
+- `intakes` — label, start_date, application_deadline, university_id
+- `timetable_options` — label, university_id
+- `course_timetable_groups` — links courses to timetable_options per campus
 
-### How It Works
+All these tables already have RLS policies allowing authenticated users to SELECT.
 
-```text
-┌─────────────────────────────┐
-│  1. User uploads photo      │
-│  2. Canvas crops to circle  │
-│  3. Call AI to generate     │
-│     premium frame overlay   │
-│     (with EduForYou brand)  │
-│  4. Composite photo + frame │
-│  5. Cache frame in storage  │
-│     for instant reuse       │
-└─────────────────────────────┘
-```
+### Page Design
 
-### File Changes
+**Layout**: Accordion-based, one section per university. Each university expands to show:
 
-**1. New edge function: `supabase/functions/generate-profile-frame/index.ts`**
-- Accepts user auth + optional style variant
-- Calls Nano Banana with a detailed prompt for a 1080x1080 circular frame overlay:
-  - Premium gradient ring (orange-to-gold with subtle glow/shine effects)
-  - EduForYou logo + text rendered beautifully at the top
-  - "CERTIFIED AGENT" badge at the bottom with premium metallic/glass styling
-  - Transparent center (circular cutout) for the photo
-  - Subtle decorative elements (light particles, soft shadows, depth)
-- Sends the actual `eduforyou-icon.jpg` as a reference image so AI reproduces the real logo
-- Uploads result to `brand-assets` bucket as `profile-frame-v1.png`
-- Returns the public URL
-- Includes caching: if frame already exists in storage, returns it immediately without calling AI
+1. **University Header** — Name, active status badge, number of campuses/courses
+2. **Campuses** — Table with name and city
+3. **Courses** — Table with name, level, study_mode. Each course row is expandable (collapsible) to show:
+   - Course Details card (reuse `CourseDetailsInfoCard` component)
+   - Linked timetable options for that course
+4. **Intakes** — Table with label, start date, application deadline
+5. **Timetable Options** — List of available timetables for the university
 
-**2. Updated `src/components/BrandedProfilePicture.tsx`**
-- Remove all manual canvas drawing of ring, pill, banner, text
-- New flow:
-  1. Load user photo → crop to circle on canvas
-  2. Fetch cached frame from storage (or trigger generation if not exists)
-  3. Draw frame overlay on top of the circular photo
-  4. Result: photo composited under the AI-generated premium frame
-- Add a "Regenerate Frame" button for owners to refresh the cached frame
-- Loading state while frame generates (first time only, ~10s)
-- Keep download functionality identical
+**Features**:
+- Search bar to filter universities by name
+- Filter by active/inactive status
+- Course count summary per university
 
-### AI Prompt Strategy
-The prompt will be highly specific about the design language:
-- "Create a 1080x1080 circular profile picture frame overlay with transparent center"
-- "Premium glass-morphism ring with orange-to-amber gradient, subtle inner glow"
-- "Top: EduForYou logo (use attached icon) with elegant white-on-dark pill badge"
-- "Bottom: 'CERTIFIED AGENT' in a premium metallic banner with subtle gold accents"
-- "High-end, luxury feel — think LinkedIn Premium or verified badge aesthetic"
-- Reference image: the actual `eduforyou-icon.jpg` for accurate logo reproduction
+### Files to Create/Edit
 
-### Why This Is Better
-- AI produces organic gradients, lighting, shadows, and textures that canvas primitives cannot
-- The logo is reproduced from the actual image reference, not drawn with `fillText`
-- Frame is cached — generated once, reused instantly for all agents
-- Looks like a professionally commissioned design asset, not code-drawn shapes
+1. **Create `src/pages/shared/UniversitiesCoursesPage.tsx`**
+   - Fetch all universities, campuses, courses, course_details, intakes, timetable_options
+   - Render accordion per university with sub-sections
+   - Search + filter controls
+   - Reuse `CourseDetailsInfoCard` for course requirement details
+
+2. **Edit `src/App.tsx`**
+   - Add route `/:role/universities` for owner, admin, and agent
+
+3. **Edit `src/components/AppSidebar.tsx`**
+   - Add "Universities & Courses" nav item with `GraduationCap` or `School` icon in the Main group, visible to all roles
+
+### Technical Details
+
+- All queries use existing RLS (all tables allow authenticated SELECT)
+- No database changes needed — all tables and policies exist
+- Use `Accordion` from shadcn for university sections
+- Use `Collapsible` for expandable course rows showing details
+- Use React Query with proper query keys for caching
+- Badge components for status indicators (active/inactive, level, study_mode)
 
