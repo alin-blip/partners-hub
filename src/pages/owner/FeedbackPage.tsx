@@ -122,9 +122,9 @@ export default function FeedbackPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="new">Nou</SelectItem>
-                            <SelectItem value="reviewed">Revizuit</SelectItem>
-                            <SelectItem value="done">Rezolvat</SelectItem>
+                             <SelectItem value="new">New</SelectItem>
+                             <SelectItem value="reviewed">Reviewed</SelectItem>
+                             <SelectItem value="done">Resolved</SelectItem>
                           </SelectContent>
                         </Select>
                       </TableCell>

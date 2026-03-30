@@ -174,7 +174,7 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
               <div className="space-y-2">
                 <Label>CRN (Customer Reference Number)</Label>
                 <Input value={editData.crn} onChange={(e) => setEditData({ ...editData, crn: e.target.value })} placeholder="e.g. 1234567890" />
-                <p className="text-xs text-muted-foreground">Numărul de referință SFE al studentului</p>
+                <p className="text-xs text-muted-foreground">Student's SFE reference number</p>
               </div>
             )}
             <div className="space-y-2">
