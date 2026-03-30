@@ -109,61 +109,7 @@ export default function ProfilePage() {
       <div className="space-y-6 max-w-2xl">
         <h1 className="text-2xl font-bold tracking-tight">My Profile</h1>
 
-        {/* Avatar / Photo Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Camera className="w-4 h-4" />
-              Profile Photo
-            </CardTitle>
-            <CardDescription>
-              This photo can be used in AI-generated marketing images
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-6">
-              <Avatar className="w-24 h-24">
-                {avatarUrl ? (
-                  <AvatarImage src={avatarUrl} alt={profile?.full_name} />
-                ) : null}
-                <AvatarFallback className="text-lg">{initials}</AvatarFallback>
-              </Avatar>
-              <div className="space-y-3">
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/jpeg,image/png"
-                  className="hidden"
-                  onChange={handleAvatarUpload}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={uploading}
-                >
-                  {uploading ? (
-                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                  ) : (
-                    <Upload className="w-4 h-4 mr-1" />
-                  )}
-                  {uploading ? "Uploading…" : "Upload Photo"}
-                </Button>
-                <div className="text-xs text-muted-foreground space-y-1">
-                  <p>📸 <strong>Guidelines for best results:</strong></p>
-                  <ul className="list-disc list-inside space-y-0.5 ml-2">
-                    <li>Clear headshot, JPG or PNG format</li>
-                    <li>Minimum 400×400px, max 5MB</li>
-                    <li>Face centered, well-lit</li>
-                    <li>Plain background recommended</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Branded Profile Picture Generator */}
+        {/* Branded Profile Picture — also saves avatar for Digital Card */}
         <BrandedProfilePicture />
 
         <Card>
