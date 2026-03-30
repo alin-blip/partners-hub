@@ -53,7 +53,7 @@ export default function PublicApplicationPage() {
     if (!slug) return;
     (async () => {
       const { data: prof } = await supabase
-        .from("public_agent_profiles" as any)
+        .from("public_agent_profiles")
         .select("id, full_name, avatar_url")
         .eq("slug", slug)
         .single() as { data: { id: string; full_name: string; avatar_url: string | null } | null; error: any };

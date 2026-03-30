@@ -167,7 +167,17 @@ export default function CardSettingsSection() {
     a.click();
   }, []);
 
-  if (isLoading) return null;
+  if (isLoading) return (
+    <div className="space-y-4">
+      <div className="rounded-lg border bg-card p-6 space-y-4">
+        <div className="h-5 w-48 bg-muted animate-pulse rounded" />
+        <div className="h-4 w-72 bg-muted animate-pulse rounded" />
+        <div className="space-y-3 pt-2">
+          {[1,2,3].map(i => <div key={i} className="h-10 bg-muted animate-pulse rounded" />)}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
