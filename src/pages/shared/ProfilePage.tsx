@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,24 +7,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Lock, Upload, Camera, Loader2, Eye, EyeOff } from "lucide-react";
+import { Save, Lock, Loader2, Eye, EyeOff } from "lucide-react";
 import { BrandedProfilePicture } from "@/components/BrandedProfilePicture";
 
 export default function ProfilePage() {
   const { user, profile } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
-  const fileRef = useRef<HTMLInputElement>(null);
   const [fullName, setFullName] = useState(profile?.full_name || "");
   const [phone, setPhone] = useState(profile?.phone || "");
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState((profile as any)?.avatar_url || "");
-  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (profile) {
