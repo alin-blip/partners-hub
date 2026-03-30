@@ -83,9 +83,9 @@ export default function FeedbackPage() {
         </div>
 
         {isLoading ? (
-          <p className="text-muted-foreground">Se încarcă...</p>
+          <p className="text-muted-foreground">Loading...</p>
         ) : feedbacks.length === 0 ? (
-          <p className="text-muted-foreground">Niciun feedback încă.</p>
+          <p className="text-muted-foreground">No feedback yet.</p>
         ) : (
           <div className="rounded-lg border bg-card">
             <Table>

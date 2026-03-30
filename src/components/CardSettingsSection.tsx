@@ -61,6 +61,7 @@ export default function CardSettingsSection() {
   const [socialFacebook, setSocialFacebook] = useState("");
   const [socialLinkedin, setSocialLinkedin] = useState("");
   const [socialTiktok, setSocialTiktok] = useState("");
+  const [aiVoiceEnabled, setAiVoiceEnabled] = useState(false);
 
   useEffect(() => {
     if (currentSlug) setSlug(currentSlug);

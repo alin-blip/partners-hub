@@ -143,7 +143,7 @@ export function SocialShareButtons({
       }
       onShared?.();
     } catch {
-      toast.error("Eroare la descărcare");
+      toast.error("Download failed");
     }
   };
 
