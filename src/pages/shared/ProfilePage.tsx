@@ -26,7 +26,6 @@ export default function ProfilePage() {
     if (profile) {
       setFullName(profile.full_name || "");
       setPhone(profile.phone || "");
-      setAvatarUrl(profile.avatar_url || "");
     }
   }, [profile]);
 
@@ -56,49 +55,6 @@ export default function ProfilePage() {
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
-
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast({ title: "Invalid file", description: "Please upload a JPG or PNG image", variant: "destructive" });
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast({ title: "File too large", description: "Maximum 5MB allowed", variant: "destructive" });
-      return;
-    }
-
-    setUploading(true);
-    try {
-      const ext = file.name.split(".").pop();
-      const path = `${user!.id}/avatar.${ext}`;
-
-      const { error: uploadErr } = await supabase.storage
-        .from("avatars")
-        .upload(path, file, { upsert: true });
-      if (uploadErr) throw uploadErr;
-
-      const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
-      const url = `${pub.publicUrl}?t=${Date.now()}`;
-
-      const { error: updateErr } = await supabase
-        .from("profiles")
-        .update({ avatar_url: url } as any)
-        .eq("id", user!.id);
-      if (updateErr) throw updateErr;
-
-      setAvatarUrl(url);
-      toast({ title: "Photo uploaded" });
-    } catch (err: any) {
-      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const initials = (profile?.full_name || "U").split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 
   return (
     <DashboardLayout>
