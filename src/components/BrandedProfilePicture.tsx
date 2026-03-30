@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Download, Upload, UserCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import frameOverlay from "@/assets/profile-frame-transparent.png";
+import frameAgent from "@/assets/profile-frame-transparent.png";
+import frameAdmin from "@/assets/profile-frame-admin.png";
 
 const CANVAS_SIZE = 1080;
 
@@ -21,7 +22,7 @@ async function fetchImageAsBase64(url: string): Promise<string> {
 }
 
 export function BrandedProfilePicture() {
-  const { profile } = useAuth();
+  const { profile, role } = useAuth();
   const { toast } = useToast();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -59,7 +60,7 @@ export function BrandedProfilePicture() {
         const safePhotoSrc = photoSrc.startsWith("data:") ? photoSrc : await fetchImageAsBase64(photoSrc);
         const [avatarImg, frameImg] = await Promise.all([
           loadImage(safePhotoSrc),
-          loadImage(frameOverlay),
+          loadImage(role === "admin" || role === "owner" ? frameAdmin : frameAgent),
         ]);
 
         ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
