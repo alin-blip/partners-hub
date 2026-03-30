@@ -130,16 +130,18 @@ Deno.serve(async (req) => {
     const coursesWithNorm = missingCourses.map((c) => ({ ...c, normalized: normalize(c.name) }));
     console.log(`Found ${missingCourses.length} courses without details`);
 
-    // Step 2: Use Firecrawl SEARCH with scrapeOptions to get content directly (no separate scrape step!)
-    // This is much faster than map + scrape separately
+    // Step 2: Use Firecrawl SEARCH to find relevant pages, then scrape top results
     const hostname = new URL(university_url).hostname;
     const scrapedContent: string[] = [];
+    const seenUrls = new Set<string>();
 
-    // Search in batches of 5 courses at a time
-    for (let i = 0; i < missingCourses.length; i += 5) {
-      const batch = missingCourses.slice(i, i + 5);
-      const courseNames = batch.map(c => c.name).join(", ");
-      
+    // Single broad search to find course pages
+    const searchQueries = [
+      `site:${hostname} courses entry requirements admission`,
+      `site:${hostname} ${missingCourses.slice(0, 3).map(c => normalize(c.name).split(" ").slice(0, 3).join(" ")).join(" OR ")}`,
+    ];
+
+    for (const query of searchQueries) {
       try {
         const res = await fetch("https://api.firecrawl.dev/v1/search", {
           method: "POST",
@@ -148,30 +150,23 @@ Deno.serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            query: `site:${hostname} ${courseNames} entry requirements admission`,
-            limit: Math.min(batch.length * 2, 10),
+            query,
+            limit: 10,
             scrapeOptions: { formats: ["markdown"] },
           }),
         });
 
         if (res.ok) {
           const data = await res.json();
-          const results = data?.data || [];
-          for (const r of results) {
-            const md = r?.markdown || "";
-            if (md.length > 200) {
-              // Keep only first 3000 chars per page to stay within limits
-              scrapedContent.push(`--- ${r.url || "page"} ---\n${md.slice(0, 3000)}`);
+          for (const r of (data?.data || [])) {
+            if (r?.url && !seenUrls.has(r.url) && (r?.markdown || "").length > 200) {
+              seenUrls.add(r.url);
+              scrapedContent.push(`--- ${r.url} ---\n${(r.markdown as string).slice(0, 3000)}`);
             }
           }
         }
       } catch (e) {
-        console.error(`Search batch error:`, e);
-      }
-
-      // Small delay between batches
-      if (i + 5 < missingCourses.length) {
-        await new Promise(r => setTimeout(r, 300));
+        console.error(`Search error:`, e);
       }
     }
 
