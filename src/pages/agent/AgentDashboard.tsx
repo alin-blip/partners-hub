@@ -17,6 +17,7 @@ import {
 import { format } from "date-fns";
 import { CommissionOfferCards } from "@/components/CommissionOfferCards";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
+import { DashboardSearchCard } from "@/components/DashboardSearchCard";
 
 export default function AgentDashboard() {
   const { user } = useAuth();
