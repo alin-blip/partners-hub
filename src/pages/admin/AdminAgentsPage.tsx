@@ -51,6 +51,8 @@ export default function AdminAgentsPage() {
           full_name: newName,
           role: "agent",
           admin_id: user!.id,
+          postcode: newPostcode || undefined,
+          address: newAddress || undefined,
         },
       });
       if (error) throw error;
