@@ -155,6 +155,7 @@ export function AppSidebar() {
     { title: "Knowledge Base", url: "/owner/knowledge-base", icon: Brain },
     { title: "AI Monitoring", url: "/owner/ai-monitoring", icon: MessageSquare },
     { title: "Feedback", url: "/owner/feedback", icon: MessageSquareHeart },
+    { title: "Audit Log", url: "/owner/audit-log", icon: Shield },
     { title: "Settings", url: "/owner/settings", icon: Settings },
   ] : [];
 
