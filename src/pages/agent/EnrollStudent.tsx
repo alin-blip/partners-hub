@@ -526,7 +526,7 @@ export default function EnrollStudent() {
                 <div className="space-y-2"><Label>Mobile No</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+44..." /></div>
                 <div className="space-y-2"><Label>UK Entry Date</Label><Input type="date" value={ukEntryDate} onChange={(e) => setUkEntryDate(e.target.value)} /></div>
               </div>
-              <div className="space-y-2"><Label>Full UK Address</Label><Textarea value={fullAddress} onChange={(e) => setFullAddress(e.target.value)} placeholder="Full address..." rows={2} /></div>
+              <AddressLookupInput postcode={postcode} address={fullAddress} onPostcodeChange={setPostcode} onAddressChange={setFullAddress} />
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Immigration Status</Label>
