@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Download, Trash2, FileText, RefreshCw, ShieldCheck, Eye, Archive, Send, Copy, Check, Loader2, ExternalLink } from "lucide-react";
+import { Upload, Download, Trash2, FileText, RefreshCw, ShieldCheck, Eye, Archive, Send, Copy, Check, Loader2, ExternalLink, Mail } from "lucide-react";
 import { format } from "date-fns";
 import { SignatureCanvas } from "@/components/SignatureCanvas";
 import { syncToDrive } from "@/lib/drive-sync";
@@ -53,6 +53,7 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
   const [sendingLink, setSendingLink] = useState(false);
   const [consentLink, setConsentLink] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [emailingLink, setEmailingLink] = useState(false);
 
   const nonMarketingClauses = CONSENT_CLAUSES.filter((c) => !c.isMarketing);
   const allConsentsChecked = nonMarketingClauses.every((c) => consentChecks[c.id]);
@@ -303,6 +304,47 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
     setTimeout(() => setLinkCopied(false), 2000);
   };
 
+  const handleEmailConsentLink = async () => {
+    if (!student.email) {
+      toast({ title: "No email address", description: "This student doesn't have an email address on file.", variant: "destructive" });
+      return;
+    }
+    setEmailingLink(true);
+    try {
+      // First create the token
+      const { data, error } = await supabase.functions.invoke("create-consent-token", {
+        body: { student_id: student.id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const signingUrl = data.signing_url;
+      const studentName = `${student.title ? student.title + " " : ""}${student.first_name} ${student.last_name}`;
+
+      // Send the email
+      const { error: emailError } = await supabase.functions.invoke("send-transactional-email", {
+        body: {
+          templateName: "consent-signing-link",
+          recipientEmail: student.email,
+          idempotencyKey: `consent-link-${data.token}`,
+          templateData: {
+            studentName,
+            agentName: agentProfile?.full_name || "EduForYou UK",
+            signingUrl,
+          },
+        },
+      });
+      if (emailError) throw emailError;
+
+      setConsentLink(signingUrl);
+      toast({ title: "Consent email sent", description: `Email sent to ${student.email} with the signing link.` });
+    } catch (err: any) {
+      toast({ title: "Failed to send email", description: err.message, variant: "destructive" });
+    } finally {
+      setEmailingLink(false);
+    }
+  };
+
   return (
     <>
       <Card>
@@ -316,9 +358,13 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
             )}
             {canEdit && (
               <>
-                <Button size="sm" variant="outline" onClick={handleSendConsentLink} disabled={sendingLink}>
+                <Button size="sm" variant="outline" onClick={handleSendConsentLink} disabled={sendingLink || emailingLink}>
                   {sendingLink ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
-                  Send Consent Link
+                  Get Link
+                </Button>
+                <Button size="sm" variant="outline" onClick={handleEmailConsentLink} disabled={emailingLink || sendingLink || !student.email}>
+                  {emailingLink ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Mail className="w-3 h-3 mr-1" />}
+                  Email Link
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => setConsentDialogOpen(true)}>
                   <RefreshCw className="w-3 h-3 mr-1" /> Re-generate Consent
