@@ -54,9 +54,7 @@ export function DashboardLayout({ children, allowedRoles }: DashboardLayoutProps
             {children}
           </main>
         </div>
-        <ConversationProvider>
-          <AIChatPanel />
-        </ConversationProvider>
+        <AIChatPanel />
       </div>
     </SidebarProvider>
   );
