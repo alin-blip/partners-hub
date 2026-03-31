@@ -17,6 +17,7 @@ import {
 import { format } from "date-fns";
 import { CommissionOfferCards } from "@/components/CommissionOfferCards";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
+import { DashboardSearchCard } from "@/components/DashboardSearchCard";
 
 export default function AgentDashboard() {
   const { user } = useAuth();
@@ -71,6 +72,8 @@ export default function AgentDashboard() {
         <div data-onboarding="step-promo">
           <PromoBanner />
         </div>
+        <DashboardSearchCard />
+
         <div data-onboarding="step-commissions">
           <CommissionOfferCards />
         </div>

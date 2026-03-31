@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -45,12 +45,19 @@ function getUniversityUrl(uniName: string): string | null {
 }
 
 export default function UniversitiesCoursesPage() {
-  const [search, setSearch] = useState("");
+  const [searchParams] = useSearchParams();
+  const initialSearch = searchParams.get("search") || "";
+  const [search, setSearch] = useState(initialSearch);
   const [showInactive, setShowInactive] = useState(false);
-  const [selectedUniId, setSelectedUniId] = useState<string | null>(null);
+  const [selectedUniId, setSelectedUniId] = useState<string | null>("all");
   const [detailsCourseId, setDetailsCourseId] = useState<string | null>(null);
   const [scanningUniId, setScanningUniId] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const s = searchParams.get("search");
+    if (s) setSearch(s);
+  }, [searchParams]);
   const { role } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -117,16 +124,30 @@ export default function UniversitiesCoursesPage() {
   const activeUniversities = universities.filter((u: any) => u.is_active);
   const displayUniversities = showInactive ? universities : activeUniversities;
 
-  // Auto-select first uni
+  const uniMap = new Map(universities.map((u: any) => [u.id, u.name]));
+
+  // Auto-select "all" or keep selection
   const effectiveUniId =
-    selectedUniId && displayUniversities.some((u: any) => u.id === selectedUniId)
-      ? selectedUniId
-      : displayUniversities[0]?.id || null;
+    selectedUniId === "all"
+      ? "all"
+      : selectedUniId && displayUniversities.some((u: any) => u.id === selectedUniId)
+        ? selectedUniId
+        : "all";
 
   const filteredCourses = courses.filter((c: any) => {
-    if (effectiveUniId && c.university_id !== effectiveUniId) return false;
+    if (effectiveUniId !== "all" && c.university_id !== effectiveUniId) return false;
     if (!showInactive && c.is_active === false) return false;
-    if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search) {
+      const term = search.toLowerCase();
+      const uniName = (uniMap.get(c.university_id) || "").toLowerCase();
+      return (
+        c.name.toLowerCase().includes(term) ||
+        uniName.includes(term) ||
+        c.level?.toLowerCase().includes(term) ||
+        c.study_mode?.toLowerCase().includes(term) ||
+        c.duration?.toLowerCase().includes(term)
+      );
+    }
     return true;
   });
 
@@ -153,6 +174,23 @@ export default function UniversitiesCoursesPage() {
         {/* University tabs */}
         <ScrollArea className="w-full">
           <div className="flex gap-2 pb-2">
+            <button
+              onClick={() => setSelectedUniId("all")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium whitespace-nowrap transition-colors ${
+                effectiveUniId === "all"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-card text-foreground border-border hover:bg-muted"
+              }`}
+            >
+              <GraduationCap className="h-4 w-4 shrink-0" />
+              All
+              <Badge
+                variant={effectiveUniId === "all" ? "secondary" : "outline"}
+                className="text-[10px] ml-1"
+              >
+                {courses.filter((c: any) => showInactive || c.is_active !== false).length}
+              </Badge>
+            </button>
             {displayUniversities.map((uni: any) => {
               const courseCount = courses.filter(
                 (c: any) => c.university_id === uni.id && (showInactive || c.is_active !== false)
@@ -209,7 +247,7 @@ export default function UniversitiesCoursesPage() {
               </Label>
             </div>
           )}
-           {(role === "owner" || role === "admin") && effectiveUniId && (() => {
+           {(role === "owner" || role === "admin") && effectiveUniId && effectiveUniId !== "all" && (() => {
             const uni = displayUniversities.find((u: any) => u.id === effectiveUniId);
             const uniName = uni?.name || "";
             const hasUrl = !!getUniversityUrl(uniName);
@@ -255,9 +293,17 @@ export default function UniversitiesCoursesPage() {
                   <CardContent className="p-5 flex flex-col gap-3 h-full">
                     <div className="flex-1 space-y-3">
                       <div className="flex items-start justify-between gap-2">
-                        <h3 className="font-semibold text-base leading-tight">
-                          {course.name}
-                        </h3>
+                        <div>
+                          <h3 className="font-semibold text-base leading-tight">
+                            {course.name}
+                          </h3>
+                          {effectiveUniId === "all" && (
+                            <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                              <Building2 className="h-3 w-3" />
+                              {uniMap.get(course.university_id) || "Unknown"}
+                            </p>
+                          )}
+                        </div>
                         {course.is_active === false && (
                           <Badge variant="secondary" className="text-[9px] shrink-0">
                             Inactive
