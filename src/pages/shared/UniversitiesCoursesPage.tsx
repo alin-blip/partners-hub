@@ -174,6 +174,23 @@ export default function UniversitiesCoursesPage() {
         {/* University tabs */}
         <ScrollArea className="w-full">
           <div className="flex gap-2 pb-2">
+            <button
+              onClick={() => setSelectedUniId("all")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium whitespace-nowrap transition-colors ${
+                effectiveUniId === "all"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-card text-foreground border-border hover:bg-muted"
+              }`}
+            >
+              <GraduationCap className="h-4 w-4 shrink-0" />
+              All
+              <Badge
+                variant={effectiveUniId === "all" ? "secondary" : "outline"}
+                className="text-[10px] ml-1"
+              >
+                {courses.filter((c: any) => showInactive || c.is_active !== false).length}
+              </Badge>
+            </button>
             {displayUniversities.map((uni: any) => {
               const courseCount = courses.filter(
                 (c: any) => c.university_id === uni.id && (showInactive || c.is_active !== false)
