@@ -110,6 +110,12 @@ export default function AdminAgentsPage() {
                   <Label>Password</Label>
                   <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Min 6 characters" />
                 </div>
+                <AddressLookupInput
+                  postcode={newPostcode}
+                  address={newAddress}
+                  onPostcodeChange={setNewPostcode}
+                  onAddressChange={setNewAddress}
+                />
                 <Button
                   className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
                   onClick={() => createAgent.mutate()}

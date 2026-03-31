@@ -145,6 +145,12 @@ export default function AgentsPage() {
                     </Select>
                   </div>
                 )}
+                <AddressLookupInput
+                  postcode={newPostcode}
+                  address={newAddress}
+                  onPostcodeChange={setNewPostcode}
+                  onAddressChange={setNewAddress}
+                />
                 <Button
                   className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
                   onClick={() => createUser.mutate()}
