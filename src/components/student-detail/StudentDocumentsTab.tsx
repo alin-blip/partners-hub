@@ -302,9 +302,10 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
 
   return (
     <>
+      <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-3">
           <CardTitle className="text-base">Documents</CardTitle>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {documents.length > 0 && (
               <Button size="sm" variant="outline" onClick={handleDownloadAll} disabled={downloadingAll}>
                 <Archive className="w-3 h-3 mr-1" /> {downloadingAll ? "Zipping…" : "Download All"}
@@ -312,6 +313,10 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
             )}
             {canEdit && (
               <>
+                <Button size="sm" variant="outline" onClick={handleSendConsentLink} disabled={sendingLink}>
+                  {sendingLink ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
+                  Send Consent Link
+                </Button>
                 <Button size="sm" variant="outline" onClick={() => setConsentDialogOpen(true)}>
                   <RefreshCw className="w-3 h-3 mr-1" /> Re-generate Consent
                 </Button>
