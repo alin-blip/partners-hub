@@ -78,6 +78,30 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
     },
   });
 
+  // Cancelled documents query (owner/admin only)
+  const { data: cancelledDocs = [], refetch: refetchCancelled } = useQuery({
+    queryKey: ["student-documents-cancelled", student.id],
+    queryFn: async () => {
+      const { data } = await supabase.from("student_documents").select("*").eq("student_id", student.id).not("cancelled_at" as any, "is", null).order("cancelled_at" as any, { ascending: false });
+      return data || [];
+    },
+    enabled: role === "owner" || role === "admin",
+  });
+
+  const handleRestoreDoc = async (doc: any) => {
+    const { error } = await supabase.from("student_documents").update({
+      cancelled_at: null,
+      cancelled_by: null,
+    } as any).eq("id", doc.id);
+    if (error) {
+      toast({ title: "Restore failed", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Document restored" });
+      refetchDocs();
+      refetchCancelled();
+    }
+  };
+
   const { data: agentProfile } = useQuery({
     queryKey: ["agent-profile", student.agent_id],
     queryFn: async () => {
