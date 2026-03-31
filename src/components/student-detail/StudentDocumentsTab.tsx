@@ -358,9 +358,13 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
             )}
             {canEdit && (
               <>
-                <Button size="sm" variant="outline" onClick={handleSendConsentLink} disabled={sendingLink}>
+                <Button size="sm" variant="outline" onClick={handleSendConsentLink} disabled={sendingLink || emailingLink}>
                   {sendingLink ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
-                  Send Consent Link
+                  Get Link
+                </Button>
+                <Button size="sm" variant="outline" onClick={handleEmailConsentLink} disabled={emailingLink || sendingLink || !student.email}>
+                  {emailingLink ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Mail className="w-3 h-3 mr-1" />}
+                  Email Link
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => setConsentDialogOpen(true)}>
                   <RefreshCw className="w-3 h-3 mr-1" /> Re-generate Consent
