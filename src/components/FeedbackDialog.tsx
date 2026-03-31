@@ -10,10 +10,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
 const categories = [
-  { value: "suggestion", label: "Sugestie" },
-  { value: "bug", label: "Bug / Problemă" },
-  { value: "simplify", label: "Simplificare" },
-  { value: "feature", label: "Funcție nouă" },
+  { value: "suggestion", label: "Suggestion" },
+  { value: "bug", label: "Bug / Issue" },
+  { value: "simplify", label: "Simplification" },
+  { value: "feature", label: "New Feature" },
 ];
 
 export function FeedbackDialog({ children }: { children?: React.ReactNode }) {
@@ -34,9 +34,9 @@ export function FeedbackDialog({ children }: { children?: React.ReactNode }) {
     });
     setLoading(false);
     if (error) {
-      toast({ title: "Eroare", description: "Nu s-a putut trimite feedback-ul.", variant: "destructive" });
+      toast({ title: "Error", description: "Could not send feedback.", variant: "destructive" });
     } else {
-      toast({ title: "Mulțumim!", description: "Feedback-ul tău a fost trimis." });
+      toast({ title: "Thank you!", description: "Your feedback has been sent." });
       setMessage("");
       setCategory("suggestion");
       setOpen(false);
@@ -49,18 +49,18 @@ export function FeedbackDialog({ children }: { children?: React.ReactNode }) {
         {children || (
           <Button variant="ghost" size="sm" className="w-full justify-start text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent">
             <MessageSquareHeart className="h-4 w-4 mr-2" />
-            Ajută-ne să îmbunătățim
+            Help us improve
           </Button>
         )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Ajută-ne să îmbunătățim platforma</DialogTitle>
-          <DialogDescription>Spune-ne ce putem îmbunătăți, simplifica sau adăuga.</DialogDescription>
+          <DialogTitle>Help us improve the platform</DialogTitle>
+          <DialogDescription>Tell us what we can improve, simplify or add.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>Categorie</Label>
+            <Label>Category</Label>
             <Select value={category} onValueChange={setCategory}>
               <SelectTrigger>
                 <SelectValue />
@@ -73,9 +73,9 @@ export function FeedbackDialog({ children }: { children?: React.ReactNode }) {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Mesaj</Label>
+            <Label>Message</Label>
             <Textarea
-              placeholder="Descrie ideea sau problema ta..."
+              placeholder="Describe your idea or issue..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               rows={4}
@@ -85,7 +85,7 @@ export function FeedbackDialog({ children }: { children?: React.ReactNode }) {
         </div>
         <DialogFooter>
           <Button onClick={handleSubmit} disabled={loading || !message.trim()}>
-            {loading ? "Se trimite..." : "Trimite feedback"}
+            {loading ? "Sending..." : "Send feedback"}
           </Button>
         </DialogFooter>
       </DialogContent>
