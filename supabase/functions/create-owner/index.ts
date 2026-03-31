@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  const { email, password, full_name, role = "owner", admin_id } = await req.json();
+  const { email, password, full_name, role = "owner", admin_id, postcode, address } = await req.json();
 
   // Validate role value
   const validRoles = ["owner", "admin", "agent"];
