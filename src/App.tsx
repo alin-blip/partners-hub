@@ -81,6 +81,7 @@ const App = () => (
             <Route path="/owner/leaderboard" element={<LeaderboardPage />} />
             
             <Route path="/owner/feedback" element={<FeedbackPage />} />
+            <Route path="/owner/audit-log" element={<AuditLogPage />} />
             
             {/* Admin routes */}
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
