@@ -60,6 +60,10 @@ export default function AgentsPage() {
           full_name: newName,
           role: newRole,
           admin_id: newRole === "agent" && newAdminId ? newAdminId : undefined,
+          postcode: newPostcode || undefined,
+          address: newAddress || undefined,
+          role: newRole,
+          admin_id: newRole === "agent" && newAdminId ? newAdminId : undefined,
         },
       });
       if (error) throw error;
