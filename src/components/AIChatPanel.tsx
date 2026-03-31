@@ -4,16 +4,26 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Bot, Send, Loader2, Plus, MessageSquare, ChevronLeft, Mic, MicOff, Volume2 } from "lucide-react";
+import { Bot, Send, Loader2, Plus, MessageSquare, ChevronLeft, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
-import { useConversation } from "@elevenlabs/react";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
+const TTS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`;
+
+// Browser Speech Recognition types
+interface SpeechRecognitionEvent {
+  results: SpeechRecognitionResultList;
+  resultIndex: number;
+}
+
+interface SpeechRecognitionErrorEvent {
+  error: string;
+}
 
 async function streamChat({
   messages,
@@ -48,7 +58,6 @@ async function streamChat({
     return;
   }
 
-  // Get conversation ID from response header
   const newConvId = resp.headers.get("X-Conversation-Id");
   if (newConvId) onConversationId(newConvId);
 
@@ -84,7 +93,43 @@ async function streamChat({
   onDone();
 }
 
+async function playTTS(text: string): Promise<HTMLAudioElement | null> {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData?.session?.access_token;
+
+    const response = await fetch(TTS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      },
+      body: JSON.stringify({ text: text.slice(0, 3000) }),
+    });
+
+    if (!response.ok) {
+      console.error("TTS failed:", response.status);
+      return null;
+    }
+
+    const audioBlob = await response.blob();
+    const audioUrl = URL.createObjectURL(audioBlob);
+    const audio = new Audio(audioUrl);
+    await audio.play();
+    return audio;
+  } catch (err) {
+    console.error("TTS playback error:", err);
+    return null;
+  }
+}
+
 type Conversation = { id: string; title: string; updated_at: string };
+
+// Get browser SpeechRecognition
+function getSpeechRecognition(): (new () => any) | null {
+  const w = window as any;
+  return w.SpeechRecognition || w.webkitSpeechRecognition || null;
+}
 
 export function AIChatPanel() {
   const [open, setOpen] = useState(false);
@@ -93,39 +138,13 @@ export function AIChatPanel() {
   const [loading, setLoading] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
-  const [voiceActive, setVoiceActive] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const [autoSpeak, setAutoSpeak] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const queryClient = useQueryClient();
-
-  const conversation = useConversation({
-    onConnect: () => {
-      setVoiceActive(true);
-      toast.success("Conversație vocală activă");
-    },
-    onDisconnect: () => {
-      setVoiceActive(false);
-    },
-    onError: (error) => {
-      console.error("Voice error:", error);
-      toast.error("Eroare la conexiunea vocală");
-      setVoiceActive(false);
-    },
-  });
-
-  const toggleVoice = useCallback(async () => {
-    if (voiceActive) {
-      await conversation.endSession();
-      return;
-    }
-    try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
-      await conversation.startSession({
-        agentId: "agent_4501kmytq1bnekgs59jh6rzjwxw4",
-      });
-    } catch (err) {
-      toast.error("Permite accesul la microfon pentru a folosi vocea.");
-    }
-  }, [voiceActive, conversation]);
 
   const { data: conversations = [] } = useQuery({
     queryKey: ["ai-conversations"],
@@ -146,6 +165,82 @@ export function AIChatPanel() {
     }
   }, [messages]);
 
+  // Cleanup recognition on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+      }
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+      }
+    };
+  }, []);
+
+  const stopAudio = useCallback(() => {
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+      setSpeaking(false);
+    }
+  }, []);
+
+  const toggleListening = useCallback(() => {
+    if (listening) {
+      recognitionRef.current?.stop();
+      setListening(false);
+      return;
+    }
+
+    const SpeechRecognition = getSpeechRecognition();
+    if (!SpeechRecognition) {
+      toast.error("Browserul tău nu suportă recunoașterea vocală. Folosește Chrome sau Edge.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "ro-RO";
+    recognition.interimResults = true;
+    recognition.continuous = false;
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let transcript = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      setInput(transcript);
+      
+      // If final result, auto-send
+      if (event.results[event.results.length - 1]?.isFinal) {
+        setListening(false);
+        if (transcript.trim()) {
+          // Small delay to let state update
+          setTimeout(() => {
+            const form = document.getElementById("ai-chat-form") as HTMLFormElement;
+            form?.requestSubmit();
+          }, 100);
+        }
+      }
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      console.error("Speech recognition error:", event.error);
+      setListening(false);
+      if (event.error === "not-allowed") {
+        toast.error("Permite accesul la microfon pentru a folosi vocea.");
+      }
+    };
+
+    recognition.onend = () => {
+      setListening(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setListening(true);
+    stopAudio(); // Stop any playing audio
+  }, [listening, stopAudio]);
+
   const loadConversation = useCallback(async (convId: string) => {
     const { data } = await supabase
       .from("ai_messages")
@@ -163,6 +258,7 @@ export function AIChatPanel() {
     setMessages([]);
     setActiveConversationId(null);
     setShowHistory(false);
+    stopAudio();
   };
 
   const send = async () => {
@@ -174,6 +270,7 @@ export function AIChatPanel() {
     setMessages(newMessages);
     setInput("");
     setLoading(true);
+    stopAudio();
 
     let assistantSoFar = "";
 
@@ -192,9 +289,24 @@ export function AIChatPanel() {
       messages: newMessages,
       conversationId: activeConversationId,
       onDelta: upsert,
-      onDone: () => {
+      onDone: async () => {
         setLoading(false);
         queryClient.invalidateQueries({ queryKey: ["ai-conversations"] });
+        
+        // Auto-play TTS if enabled and there's a response
+        if (autoSpeak && assistantSoFar.trim()) {
+          setSpeaking(true);
+          const audio = await playTTS(assistantSoFar);
+          if (audio) {
+            currentAudioRef.current = audio;
+            audio.onended = () => {
+              setSpeaking(false);
+              currentAudioRef.current = null;
+            };
+          } else {
+            setSpeaking(false);
+          }
+        }
       },
       onError: (err) => {
         toast.error(err);
@@ -232,6 +344,15 @@ export function AIChatPanel() {
             <div className="flex items-center gap-1">
               {!showHistory && (
                 <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setAutoSpeak(!autoSpeak)}
+                    title={autoSpeak ? "Dezactivează vocea" : "Activează vocea"}
+                  >
+                    {autoSpeak ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                  </Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowHistory(true)} title="History">
                     <MessageSquare className="h-4 w-4" />
                   </Button>
@@ -279,6 +400,7 @@ export function AIChatPanel() {
                   <div>
                     <p className="text-sm font-medium">Hi! I'm the EduForYou AI Assistant.</p>
                     <p className="text-xs mt-1">Ask me about enrollment processes, commissions, visa guidance, or anything about the platform.</p>
+                    <p className="text-xs mt-2 text-primary/70">🎙️ Apasă microfonul pentru a vorbi</p>
                   </div>
                 </div>
               )}
@@ -308,14 +430,21 @@ export function AIChatPanel() {
                   </div>
                 </div>
               )}
-              {voiceActive && (
+              {listening && (
                 <div className="flex items-center justify-center gap-3 py-4">
-                  <div className={`h-3 w-3 rounded-full ${conversation.isSpeaking ? "bg-primary animate-pulse" : "bg-green-500 animate-pulse"}`} />
-                  <span className="text-sm text-muted-foreground">
-                    {conversation.isSpeaking ? "AI vorbește…" : "Te ascultă…"}
-                  </span>
-                  <Button variant="destructive" size="sm" onClick={toggleVoice}>
+                  <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
+                  <span className="text-sm text-muted-foreground">Te ascultă…</span>
+                  <Button variant="destructive" size="sm" onClick={toggleListening}>
                     <MicOff className="h-4 w-4 mr-1" /> Oprește
+                  </Button>
+                </div>
+              )}
+              {speaking && (
+                <div className="flex items-center justify-center gap-3 py-2">
+                  <div className="h-3 w-3 rounded-full bg-primary animate-pulse" />
+                  <span className="text-sm text-muted-foreground">AI vorbește…</span>
+                  <Button variant="outline" size="sm" onClick={stopAudio}>
+                    <VolumeX className="h-4 w-4 mr-1" /> Stop
                   </Button>
                 </div>
               )}
@@ -324,24 +453,26 @@ export function AIChatPanel() {
             {/* Input */}
             <div className="border-t px-4 py-3 shrink-0">
               <form
+                id="ai-chat-form"
                 onSubmit={(e) => { e.preventDefault(); send(); }}
                 className="flex gap-2"
               >
                 <Input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Type your question…"
+                  placeholder={listening ? "Ascultă…" : "Type your question…"}
                   disabled={loading}
                   className="flex-1"
                 />
                 <Button
                   type="button"
                   size="icon"
-                  variant={voiceActive ? "destructive" : "outline"}
-                  onClick={toggleVoice}
-                  title={voiceActive ? "Oprește vocea" : "Pornește vocea"}
+                  variant={listening ? "destructive" : "outline"}
+                  onClick={toggleListening}
+                  title={listening ? "Oprește ascultarea" : "Pornește microfonul"}
+                  disabled={loading}
                 >
-                  {voiceActive ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                  {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                 </Button>
                 <Button type="submit" size="icon" disabled={loading || !input.trim()}>
                   <Send className="h-4 w-4" />
