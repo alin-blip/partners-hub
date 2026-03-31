@@ -308,6 +308,17 @@ export function AIChatPanel() {
                   </div>
                 </div>
               )}
+              {voiceActive && (
+                <div className="flex items-center justify-center gap-3 py-4">
+                  <div className={`h-3 w-3 rounded-full ${conversation.isSpeaking ? "bg-primary animate-pulse" : "bg-green-500 animate-pulse"}`} />
+                  <span className="text-sm text-muted-foreground">
+                    {conversation.isSpeaking ? "AI vorbește…" : "Te ascultă…"}
+                  </span>
+                  <Button variant="destructive" size="sm" onClick={toggleVoice}>
+                    <MicOff className="h-4 w-4 mr-1" /> Oprește
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Input */}
@@ -323,6 +334,15 @@ export function AIChatPanel() {
                   disabled={loading}
                   className="flex-1"
                 />
+                <Button
+                  type="button"
+                  size="icon"
+                  variant={voiceActive ? "destructive" : "outline"}
+                  onClick={toggleVoice}
+                  title={voiceActive ? "Oprește vocea" : "Pornește vocea"}
+                >
+                  {voiceActive ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </Button>
                 <Button type="submit" size="icon" disabled={loading || !input.trim()}>
                   <Send className="h-4 w-4" />
                 </Button>
