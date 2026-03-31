@@ -695,6 +695,66 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Owner delete confirmation */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete document permanently?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete <strong>{deleteTarget?.file_name}</strong> from storage. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleOwnerDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Admin delete code verification */}
+      <Dialog open={deleteCodeDialogOpen} onOpenChange={setDeleteCodeDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="w-4 h-4 text-destructive" />
+              Delete requires owner approval
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              To delete <strong>{deleteTarget?.file_name}</strong>, you need a confirmation code from the owner.
+            </p>
+            {!codeRequested ? (
+              <Button onClick={handleRequestDeleteCode} disabled={requestingCode} className="w-full">
+                {requestingCode ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Mail className="w-4 h-4 mr-2" />}
+                {requestingCode ? "Sending…" : "Request code from owner"}
+              </Button>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-green-600 font-medium">✓ Code sent to owner. Enter it below:</p>
+                <Input
+                  placeholder="Enter 6-character code"
+                  value={deleteCode}
+                  onChange={(e) => setDeleteCode(e.target.value.toUpperCase())}
+                  maxLength={6}
+                  className="text-center text-lg tracking-widest font-mono"
+                />
+                <Button
+                  onClick={handleVerifyDeleteCode}
+                  disabled={verifyingCode || deleteCode.length < 6}
+                  className="w-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {verifyingCode ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                  {verifyingCode ? "Verifying…" : "Confirm delete"}
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
