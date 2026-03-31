@@ -33,6 +33,7 @@ import AgentSocialFeedPage from "./pages/shared/AgentSocialFeedPage";
 import UniversitiesCoursesPage from "./pages/shared/UniversitiesCoursesPage";
 
 import FeedbackPage from "./pages/owner/FeedbackPage";
+import AuditLogPage from "./pages/owner/AuditLogPage";
 import LeadsPage from "./pages/shared/LeadsPage";
 import TasksPage from "./pages/shared/TasksPage";
 import LeaderboardPage from "./pages/shared/LeaderboardPage";
