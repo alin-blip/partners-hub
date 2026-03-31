@@ -78,6 +78,30 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
     },
   });
 
+  // Cancelled documents query (owner/admin only)
+  const { data: cancelledDocs = [], refetch: refetchCancelled } = useQuery({
+    queryKey: ["student-documents-cancelled", student.id],
+    queryFn: async () => {
+      const { data } = await supabase.from("student_documents").select("*").eq("student_id", student.id).not("cancelled_at" as any, "is", null).order("cancelled_at" as any, { ascending: false });
+      return data || [];
+    },
+    enabled: role === "owner" || role === "admin",
+  });
+
+  const handleRestoreDoc = async (doc: any) => {
+    const { error } = await supabase.from("student_documents").update({
+      cancelled_at: null,
+      cancelled_by: null,
+    } as any).eq("id", doc.id);
+    if (error) {
+      toast({ title: "Restore failed", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Document restored" });
+      refetchDocs();
+      refetchCancelled();
+    }
+  };
+
   const { data: agentProfile } = useQuery({
     queryKey: ["agent-profile", student.agent_id],
     queryFn: async () => {
@@ -556,6 +580,44 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
           )}
         </CardContent>
       </Card>
+
+      {/* Cancelled Documents Section — owner/admin only */}
+      {(role === "owner" || role === "admin") && cancelledDocs.length > 0 && (
+        <Card className="border-orange-200 bg-orange-50/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2 text-orange-700">
+              <Archive className="w-4 h-4" />
+              Cancelled Documents ({cancelledDocs.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {cancelledDocs.map((doc: any) => (
+              <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg border border-orange-200 bg-background/80">
+                <div className="flex items-center gap-3">
+                  <FileText className="w-4 h-4 text-muted-foreground opacity-50" />
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">{doc.doc_type}</p>
+                    <p className="text-xs text-muted-foreground">{doc.file_name}</p>
+                    <p className="text-xs text-orange-600">
+                      Cancelled {doc.cancelled_at ? format(new Date(doc.cancelled_at), "dd MMM yyyy HH:mm") : ""}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => handleRestoreDoc(doc)}>
+                    <RefreshCw className="w-3 h-3" /> Restore
+                  </Button>
+                  {role === "owner" && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDeleteTarget(doc); setDeleteDialogOpen(true); }}>
+                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {consentLink && (
         <Card className="border-accent/50">
