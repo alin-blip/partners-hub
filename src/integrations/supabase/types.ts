@@ -1264,8 +1264,10 @@ export type Database = {
           file_path: string
           file_size: number | null
           id: string
+          is_current: boolean
           student_id: string
           uploaded_by: string | null
+          version: number
         }
         Insert: {
           agent_id: string
@@ -1275,8 +1277,10 @@ export type Database = {
           file_path: string
           file_size?: number | null
           id?: string
+          is_current?: boolean
           student_id: string
           uploaded_by?: string | null
+          version?: number
         }
         Update: {
           agent_id?: string
@@ -1286,8 +1290,10 @@ export type Database = {
           file_path?: string
           file_size?: number | null
           id?: string
+          is_current?: boolean
           student_id?: string
           uploaded_by?: string | null
+          version?: number
         }
         Relationships: [
           {

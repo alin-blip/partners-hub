@@ -73,7 +73,7 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
   const { data: documents = [], refetch: refetchDocs } = useQuery({
     queryKey: ["student-documents", student.id],
     queryFn: async () => {
-      const { data } = await supabase.from("student_documents").select("*").eq("student_id", student.id).is("cancelled_at" as any, null).order("created_at", { ascending: false });
+      const { data } = await supabase.from("student_documents").select("*").eq("student_id", student.id).eq("is_current", true).is("cancelled_at" as any, null).order("created_at", { ascending: false });
       return data || [];
     },
   });
@@ -175,9 +175,32 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
       const storagePath = `${student.id}/${selectedDocType}_${Date.now()}.${ext}`;
       const { error: uploadError } = await supabase.storage.from("student-documents").upload(storagePath, file);
       if (uploadError) throw uploadError;
+
+      // Mark previous versions of same doc type as not current
+      const { data: existingDocs } = await supabase
+        .from("student_documents")
+        .select("id, version")
+        .eq("student_id", student.id)
+        .eq("doc_type", selectedDocType)
+        .eq("is_current", true);
+      
+      const nextVersion = existingDocs && existingDocs.length > 0
+        ? Math.max(...existingDocs.map((d: any) => d.version)) + 1
+        : 1;
+
+      if (existingDocs && existingDocs.length > 0) {
+        await supabase
+          .from("student_documents")
+          .update({ is_current: false } as any)
+          .eq("student_id", student.id)
+          .eq("doc_type", selectedDocType)
+          .eq("is_current", true);
+      }
+
       const { error: dbError } = await supabase.from("student_documents").insert({
         student_id: student.id, agent_id: student.agent_id, doc_type: selectedDocType,
         file_name: file.name, file_path: storagePath, file_size: file.size, uploaded_by: user.id,
+        version: nextVersion, is_current: true,
       });
       if (dbError) throw dbError;
       toast({ title: "Document uploaded" });
@@ -556,7 +579,7 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
                       <FileText className="w-4 h-4 text-muted-foreground" />
                     )}
                     <div>
-                      <p className="text-sm font-medium">{doc.doc_type}</p>
+                      <p className="text-sm font-medium">{doc.doc_type} {doc.version > 1 && <span className="text-xs text-muted-foreground font-normal ml-1">v{doc.version}</span>}</p>
                       <p className="text-xs text-muted-foreground">{doc.file_name} {doc.file_size ? `• ${(doc.file_size / 1024).toFixed(0)} KB` : ""}</p>
                       <p className="text-xs text-muted-foreground">{format(new Date(doc.created_at), "dd MMM yyyy HH:mm")}</p>
                     </div>
