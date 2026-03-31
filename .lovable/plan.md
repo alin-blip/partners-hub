@@ -1,32 +1,54 @@
 
 
-## Plan: Export Knowledge Base Documents for ElevenLabs Agent
+## Plan: Hybrid Voice Assistant — ElevenLabs Voice + Internal AI Brain
 
-I will generate formatted text documents from all your platform's knowledge base data, course details, and admission requirements — ready to upload directly to the ElevenLabs agent's Knowledge Base section.
+### The Idea
 
-### Documents to Generate
-
-| # | Document | Content |
-|---|----------|---------|
-| 1 | `01_Platform_Guide.txt` | How agents use the platform: enrollment wizard, statuses, navigation, features |
-| 2 | `02_GBS_Courses_Admissions.txt` | All GBS courses, fees, timetables, campus addresses, admission process (OPT, interviews) |
-| 3 | `03_GBS_Documents_Required.txt` | Standard and non-standard route document requirements for GBS |
-| 4 | `04_CECOS_Courses_Requirements.txt` | CECOS courses, entry requirements, tests, personal statements, interview info |
-| 5 | `05_Regent_Courses_Requirements.txt` | All Regent university partner courses with detailed entry/test/PS requirements |
-| 6 | `06_LSC_MLA_Courses_Requirements.txt` | LSC and MLA College course details |
-| 7 | `07_UWTSD_QA_Courses_Requirements.txt` | UWTSD and QA partner courses and admission details |
-| 8 | `08_Campuses_All_Universities.txt` | All campus locations per university |
-| 9 | `09_Commission_Structure.txt` | How commissions work, tiers, university-specific rates |
-| 10 | `10_Enrollment_Statuses_Funding.txt` | All enrollment and funding statuses explained |
+Instead of using ElevenLabs as the AI brain (which requires uploading knowledge separately), we use ElevenLabs **only for the voice** (text-to-speech) and keep the AI brain as your existing `ai-chat` edge function that already has access to all platform data, knowledge base, user context, and role-based information.
 
 ### How It Works
 
-1. I'll extract all data from your database (already queried above)
-2. Format each document as clean, structured text optimized for AI knowledge retrieval
-3. Save all files to `/mnt/documents/` for download
-4. You upload them to ElevenLabs agent → Knowledge Base section
+```text
+User speaks → Browser Speech Recognition (STT) → text
+                                                    ↓
+                                          ai-chat edge function
+                                          (existing, knows everything)
+                                                    ↓
+                                          AI response text
+                                                    ↓
+                                    ElevenLabs TTS edge function → audio
+                                                    ↓
+                                          User hears the answer
+```
 
-### After Upload
+### Why This Is Better
 
-Once you've created the agent and uploaded these documents, give me the new Agent ID and I'll integrate it into the platform's AI Assistant (separate from the public card agent).
+- **No duplicate knowledge base** — the ai-chat function already has all platform data, courses, admission requirements, and user-specific context
+- **Role-aware** — the AI knows if you're an agent, admin, or owner and adapts
+- **Real-time data** — can reference actual student records, enrollment statuses, commissions
+- **Single source of truth** — update knowledge base once, both text and voice use it
+
+### Technical Changes
+
+| Step | What | Details |
+|------|------|---------|
+| 1 | **Add ElevenLabs API key** | You'll need to provide your ElevenLabs API key (for TTS only). The STT is free via browser. |
+| 2 | **Create `elevenlabs-tts` edge function** | Takes text + voice ID, calls ElevenLabs TTS API, returns audio. Simple proxy to protect the API key. |
+| 3 | **Update `AIChatPanel.tsx`** | Replace the ElevenLabs conversation agent with a hybrid mode: browser `SpeechRecognition` for listening → send to existing `ai-chat` → play response via ElevenLabs TTS. Remove `@elevenlabs/react` dependency (no longer needed). Remove `ConversationProvider` wrapper from `DashboardLayout.tsx`. |
+| 4 | **Voice UI in chat panel** | Mic button starts listening. User's speech appears as text message. AI responds with text + auto-plays audio. Visual indicators for listening/speaking states. |
+
+### What You Need To Provide
+
+- **ElevenLabs API key** — from your ElevenLabs account (Settings → API Keys)
+- **Voice preference** — which ElevenLabs voice to use (e.g., "Rachel", "Josh", or a custom/cloned voice)
+
+### Cost Comparison
+
+- **Browser Speech Recognition**: Free (built into Chrome, Edge, Safari)
+- **ElevenLabs TTS**: ~$0.30 per 1,000 characters (depends on your plan)
+- **No ElevenLabs Conversational AI costs** — we're not using their agent anymore
+
+### Alternative: Fully Free (No ElevenLabs at all)
+
+If you want zero cost, we can use the browser's built-in `SpeechSynthesis` API for TTS too. The voice quality is lower but it's completely free and requires no API key. We can always upgrade to ElevenLabs TTS later.
 
