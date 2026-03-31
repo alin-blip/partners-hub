@@ -1,29 +1,44 @@
 
 
-## Plan: Fix ElevenLabs Voice in AI Chat Panel
+## Plan: UK Postcode Address Lookup for Agent Registration
 
-### Problem Analysis
+### What We're Building
 
-The backend is working — both `elevenlabs-tts` and `elevenlabs-scribe-token` edge functions return 200 successfully. The `@elevenlabs/react` package is installed. The issue is likely on the client side:
+A reusable address lookup component that lets you type a UK postcode, fetch matching addresses from the free **postcodes.io** API (no API key needed), and select the correct one. This will be added to the agent creation dialogs on both the Owner and Admin pages.
 
-1. **Browser autoplay policy**: `audio.play()` can be blocked by browsers if there hasn't been a recent user gesture. The TTS call happens inside the `onDone` callback of `streamChat`, which is async and far from the original user click — browsers may reject it silently.
+### Steps
 
-2. **Error swallowed silently**: The `playTTS` function catches errors and only logs to console — no user-facing feedback when TTS fails.
+| # | What | Details |
+|---|------|---------|
+| 1 | **Add address/postcode columns to profiles** | Migration: add `postcode VARCHAR(10)` and `address TEXT` columns to the `profiles` table |
+| 2 | **Create `AddressLookupInput` component** | New `src/components/AddressLookupInput.tsx` — a postcode input field + "Find Address" button. Calls `https://api.postcodes.io/postcodes/{postcode}` to validate the postcode, then shows the formatted address. User can also manually edit the address field. |
+| 3 | **Add to Owner AgentsPage** | Add postcode + address fields to the "Create New User" dialog, save to profiles on creation via the `create-owner` edge function |
+| 4 | **Add to Admin AdminAgentsPage** | Same fields added to the "Create New Agent" dialog |
+| 5 | **Update `create-owner` edge function** | Accept `postcode` and `address` params, save them to the profiles table after user creation |
 
-3. **Markdown stripping**: The raw AI response with markdown (`**bold**`, `# headers`, `- lists`, etc.) is sent directly to TTS, making the voice read out markdown syntax characters.
+### How the Component Works
 
-### Changes
+1. User types a UK postcode (e.g. "SW1A 1AA")
+2. Clicks "Find Address" or presses Enter
+3. Component calls `postcodes.io` — returns ward, parish, admin district, region etc.
+4. Displays the resolved location (e.g. "Westminster, London, SW1A 1AA")
+5. Address is stored in an editable text field so the user can refine it
+6. Both `postcode` and `address` values are passed up via `onChange` callbacks
 
-| File | Change |
+### Why postcodes.io
+
+- Completely free, no API key required
+- UK-specific (perfect for this use case)
+- Returns structured location data (admin_district, region, country)
+- No rate limit concerns for typical usage
+
+### Files Changed
+
+| File | Action |
 |------|--------|
-| `src/components/AIChatPanel.tsx` | 1. Strip markdown from text before sending to TTS (remove `#`, `**`, `*`, `` ` ``, `[]()`, etc.) |
-| | 2. Add better error handling with user-visible toast when TTS fails |
-| | 3. Pre-create an `AudioContext` on user interaction (send button click) to unlock browser audio, ensuring `audio.play()` works in the async callback |
-| | 4. Add a fallback: if ElevenLabs TTS fails, show a toast "Voice unavailable" instead of silent failure |
-
-### Technical Detail
-
-The core fix is ensuring the browser's autoplay policy is satisfied. When the user clicks "Send", we'll call `audioContext.resume()` (or create a short silent audio interaction) to "unlock" audio playback. This way, when the async TTS response arrives later, `audio.play()` will be permitted.
-
-Additionally, a `stripMarkdown` utility will clean the AI response text before passing it to the TTS endpoint, removing headers, bold/italic markers, code blocks, links, and bullet points for natural speech.
+| `src/components/AddressLookupInput.tsx` | **New** — reusable postcode lookup component |
+| `src/pages/owner/AgentsPage.tsx` | Add address fields to create dialog |
+| `src/pages/admin/AdminAgentsPage.tsx` | Add address fields to create dialog |
+| `supabase/functions/create-owner/index.ts` | Accept & save postcode/address |
+| Database migration | Add `postcode` and `address` to `profiles` |
 
