@@ -29,6 +29,8 @@ export default function AgentsPage() {
   const [newRole, setNewRole] = useState<string>("agent");
   const [newPassword, setNewPassword] = useState("");
   const [newAdminId, setNewAdminId] = useState("");
+  const [newPostcode, setNewPostcode] = useState("");
+  const [newAddress, setNewAddress] = useState("");
 
   const { data: profiles = [] } = useQuery({
     queryKey: ["all-profiles"],
