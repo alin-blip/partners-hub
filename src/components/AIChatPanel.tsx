@@ -4,11 +4,12 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Bot, Send, Loader2, Plus, MessageSquare, ChevronLeft } from "lucide-react";
+import { Bot, Send, Loader2, Plus, MessageSquare, ChevronLeft, Mic, MicOff, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
+import { useConversation } from "@elevenlabs/react";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
