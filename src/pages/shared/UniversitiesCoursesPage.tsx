@@ -293,9 +293,17 @@ export default function UniversitiesCoursesPage() {
                   <CardContent className="p-5 flex flex-col gap-3 h-full">
                     <div className="flex-1 space-y-3">
                       <div className="flex items-start justify-between gap-2">
-                        <h3 className="font-semibold text-base leading-tight">
-                          {course.name}
-                        </h3>
+                        <div>
+                          <h3 className="font-semibold text-base leading-tight">
+                            {course.name}
+                          </h3>
+                          {effectiveUniId === "all" && (
+                            <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                              <Building2 className="h-3 w-3" />
+                              {uniMap.get(course.university_id) || "Unknown"}
+                            </p>
+                          )}
+                        </div>
                         {course.is_active === false && (
                           <Badge variant="secondary" className="text-[9px] shrink-0">
                             Inactive
