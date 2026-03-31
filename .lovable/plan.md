@@ -1,40 +1,29 @@
 
 
-## Plan: Onboarding Wizard with Section Highlighting
+## Plan: Fix ElevenLabs Voice in AI Chat Panel
 
-Build a step-by-step onboarding tour that overlays the Agent Dashboard, highlighting each section with a glowing border and showing an explanation tooltip/card for each step.
+### Problem Analysis
 
-### Approach
+The backend is working — both `elevenlabs-tts` and `elevenlabs-scribe-token` edge functions return 200 successfully. The `@elevenlabs/react` package is installed. The issue is likely on the client side:
 
-Use a custom `OnboardingWizard` component (no external library) that renders a spotlight overlay with a floating explanation card. Each step targets a DOM element via `data-onboarding` attributes.
+1. **Browser autoplay policy**: `audio.play()` can be blocked by browsers if there hasn't been a recent user gesture. The TTS call happens inside the `onDone` callback of `streamChat`, which is async and far from the original user click — browsers may reject it silently.
 
-### Steps to Highlight
+2. **Error swallowed silently**: The `playTTS` function catches errors and only logs to console — no user-facing feedback when TTS fails.
 
-| Step | Target | Title | Description |
-|------|--------|-------|-------------|
-| 1 | Sidebar | Navigation | "Use the sidebar to access Students, Enrollments, Messages, Tasks and more." |
-| 2 | Promo Banner | Promotions | "Track active promotions and bonuses. Hit your targets to earn extra rewards." |
-| 3 | Commission Cards | Commission Offers | "See university-specific commission rates. Each card shows what you earn per student." |
-| 4 | Metric Cards | Your Stats | "Quick overview of your students, active enrollments, and current commission tier." |
-| 5 | Monthly Target | Monthly Target | "Track your monthly enrollment progress against your target." |
-| 6 | Enrollments Table | Enrollments | "View all your student enrollments, their status, university and course details." |
-| 7 | New Student Button | Enroll Students | "Click here to start enrolling a new student." |
+3. **Markdown stripping**: The raw AI response with markdown (`**bold**`, `# headers`, `- lists`, etc.) is sent directly to TTS, making the voice read out markdown syntax characters.
 
-### Technical Implementation
+### Changes
 
 | File | Change |
 |------|--------|
-| `src/components/OnboardingWizard.tsx` | **New** — renders overlay with spotlight cutout around the active element, floating card with title/description, Next/Back/Skip buttons, step dots indicator |
-| `src/pages/agent/AgentDashboard.tsx` | Add `data-onboarding="step-N"` attributes to each section; render `<OnboardingWizard />` |
-| `src/contexts/AuthContext.tsx` | No change — use `localStorage` key `onboarding-completed` to track if wizard was shown |
+| `src/components/AIChatPanel.tsx` | 1. Strip markdown from text before sending to TTS (remove `#`, `**`, `*`, `` ` ``, `[]()`, etc.) |
+| | 2. Add better error handling with user-visible toast when TTS fails |
+| | 3. Pre-create an `AudioContext` on user interaction (send button click) to unlock browser audio, ensuring `audio.play()` works in the async callback |
+| | 4. Add a fallback: if ElevenLabs TTS fails, show a toast "Voice unavailable" instead of silent failure |
 
-### Wizard Behavior
+### Technical Detail
 
-- Shows automatically on first login (checks `localStorage`)
-- Calculates target element position with `getBoundingClientRect()` and renders a dark overlay with a cutout
-- Active section gets a pulsing border highlight (ring animation)
-- Floating card positioned dynamically next to the highlighted element
-- "Skip", "Back", "Next", "Finish" buttons
-- On finish/skip, sets `localStorage` flag so it doesn't show again
-- A "Restart Tour" button in the dashboard header to re-trigger it
+The core fix is ensuring the browser's autoplay policy is satisfied. When the user clicks "Send", we'll call `audioContext.resume()` (or create a short silent audio interaction) to "unlock" audio playback. This way, when the async TTS response arrives later, `audio.play()` will be permitted.
+
+Additionally, a `stripMarkdown` utility will clean the AI response text before passing it to the TTS endpoint, removing headers, bold/italic markers, code blocks, links, and bullet points for natural speech.
 
