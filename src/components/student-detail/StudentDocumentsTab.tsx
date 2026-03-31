@@ -579,7 +579,7 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
                       <FileText className="w-4 h-4 text-muted-foreground" />
                     )}
                     <div>
-                      <p className="text-sm font-medium">{doc.doc_type}</p>
+                      <p className="text-sm font-medium">{doc.doc_type} {doc.version > 1 && <span className="text-xs text-muted-foreground font-normal ml-1">v{doc.version}</span>}</p>
                       <p className="text-xs text-muted-foreground">{doc.file_name} {doc.file_size ? `• ${(doc.file_size / 1024).toFixed(0)} KB` : ""}</p>
                       <p className="text-xs text-muted-foreground">{format(new Date(doc.created_at), "dd MMM yyyy HH:mm")}</p>
                     </div>
