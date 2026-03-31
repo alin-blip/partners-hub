@@ -110,6 +110,9 @@ async function streamChat({
 
 async function playTTS(text: string): Promise<HTMLAudioElement | null> {
   try {
+    const cleanText = stripMarkdown(text);
+    if (!cleanText) return null;
+
     const { data: sessionData } = await supabase.auth.getSession();
     const accessToken = sessionData?.session?.access_token;
 
@@ -119,11 +122,12 @@ async function playTTS(text: string): Promise<HTMLAudioElement | null> {
         "Content-Type": "application/json",
         Authorization: `Bearer ${accessToken || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
       },
-      body: JSON.stringify({ text: text.slice(0, 3000) }),
+      body: JSON.stringify({ text: cleanText.slice(0, 3000) }),
     });
 
     if (!response.ok) {
       console.error("TTS failed:", response.status);
+      toast.error("Vocea nu este disponibilă momentan.");
       return null;
     }
 
@@ -134,6 +138,7 @@ async function playTTS(text: string): Promise<HTMLAudioElement | null> {
     return audio;
   } catch (err) {
     console.error("TTS playback error:", err);
+    toast.error("Eroare la redarea vocii.");
     return null;
   }
 }
