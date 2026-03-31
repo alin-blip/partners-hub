@@ -178,10 +178,77 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
   };
 
   const handleDeleteDoc = async (doc: any) => {
-    await supabase.storage.from("student-documents").remove([doc.file_path]);
-    const { error } = await supabase.from("student_documents").delete().eq("id", doc.id);
+    if (role === "agent") {
+      // Agent can only cancel (soft-delete)
+      const { error } = await supabase.from("student_documents").update({
+        cancelled_at: new Date().toISOString(),
+        cancelled_by: user?.id,
+      } as any).eq("id", doc.id);
+      if (error) toast({ title: "Cancel failed", description: error.message, variant: "destructive" });
+      else { toast({ title: "Document cancelled" }); refetchDocs(); }
+      return;
+    }
+
+    if (role === "admin") {
+      // Admin needs code from owner
+      setDeleteTarget(doc);
+      setDeleteCodeDialogOpen(true);
+      setDeleteCode("");
+      setCodeRequested(false);
+      return;
+    }
+
+    // Owner: direct delete
+    setDeleteTarget(doc);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleOwnerDelete = async () => {
+    if (!deleteTarget) return;
+    await supabase.storage.from("student-documents").remove([deleteTarget.file_path]);
+    const { error } = await supabase.from("student_documents").delete().eq("id", deleteTarget.id);
     if (error) toast({ title: "Delete failed", description: error.message, variant: "destructive" });
     else { toast({ title: "Document deleted" }); refetchDocs(); }
+    setDeleteDialogOpen(false);
+    setDeleteTarget(null);
+  };
+
+  const handleRequestDeleteCode = async () => {
+    if (!deleteTarget) return;
+    setRequestingCode(true);
+    try {
+      const { error } = await supabase.functions.invoke("request-delete-code", {
+        body: { entity_type: "document", entity_id: deleteTarget.id },
+      });
+      if (error) throw error;
+      setCodeRequested(true);
+      toast({ title: "Code requested", description: "A deletion code has been sent to the owner." });
+    } catch (err: any) {
+      toast({ title: "Request failed", description: err.message, variant: "destructive" });
+    } finally {
+      setRequestingCode(false);
+    }
+  };
+
+  const handleVerifyDeleteCode = async () => {
+    if (!deleteTarget || !deleteCode) return;
+    setVerifyingCode(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("verify-delete-code", {
+        body: { entity_id: deleteTarget.id, code: deleteCode },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({ title: "Document deleted" });
+      refetchDocs();
+      setDeleteCodeDialogOpen(false);
+      setDeleteTarget(null);
+      setDeleteCode("");
+    } catch (err: any) {
+      toast({ title: "Verification failed", description: err.message, variant: "destructive" });
+    } finally {
+      setVerifyingCode(false);
+    }
   };
 
   const [downloadingAll, setDownloadingAll] = useState(false);
