@@ -1,50 +1,33 @@
 
 
-## Plan: Fix QR Codes + Add Digital Business Card Features
+## Plan: Add Voice Conversation to AI Assistant Panel
 
-### Problem 1: QR Codes Point to Wrong URL
+### Overview
 
-The QR codes use `window.location.origin` which resolves to the Lovable preview URL (e.g. `id-preview--...lovable.app`) instead of the published domain (`agentseduforyou.lovable.app`). Need to hardcode the production base URL or use the published URL.
+Add a voice button to the EduForYou AI Assistant chat panel that enables real-time voice conversation using ElevenLabs Conversational AI, the same technology already used on the public agent card pages.
 
-**Fix**: Use the published URL `https://agentseduforyou.lovable.app` as the base for QR codes and shareable links, with a fallback to `window.location.origin` for dev.
+### Approach
 
-**File**: `src/components/CardSettingsSection.tsx`
-- Add constant: `const BASE_URL = import.meta.env.PROD ? "https://agentseduforyou.lovable.app" : window.location.origin`
-- Update `cardUrl` and `applyFormUrl` to use `BASE_URL`
+Use the `@elevenlabs/react` SDK with the `useConversation` hook for a native, integrated voice experience inside the chat panel. This connects to the same ElevenLabs agent (`agent_4501kmytq1bnekgs59jh6rzjwxw4`) already configured for the platform — no additional API keys needed since it's a public agent.
 
----
+### How It Will Work
 
-### Problem 2: Digital Business Card (vCard Enhancement)
+1. A **microphone button** appears next to the text input in the AI Assistant panel
+2. Tapping it starts a live voice session — the user speaks and the AI responds with voice
+3. A visual indicator shows when the AI is speaking vs listening
+4. The user can end the voice session and return to text chat at any time
 
-A basic vCard download already exists in `AgentCardPage.tsx`. It needs enrichment to include email, website URL, social links, and photo — so when saved on iPhone it creates a rich contact card.
+### Technical Changes
 
-**File**: `src/pages/public/AgentCardPage.tsx`
-- Enhance `handleVCard()` to include:
-  - `URL:` (link to the agent's card page)
-  - `EMAIL:` (from profile or card settings)
-  - `NOTE:` (bio text)
-  - All social links as `X-SOCIALPROFILE` fields
+| Step | File | Change |
+|------|------|--------|
+| 1 | `package.json` | Install `@elevenlabs/react` |
+| 2 | `src/components/AIChatPanel.tsx` | Add `useConversation` hook with the existing agent ID. Add a mic toggle button next to the Send button. Show voice status (connected/speaking/listening) in the chat area when active. |
 
-This vCard file is natively supported by iOS — tapping it opens "Add to Contacts" directly. No Apple Wallet certificate needed.
+### Key Details
 
----
-
-### About Apple Wallet (.pkpass) and NFC
-
-| Feature | Feasibility | Complexity |
-|---------|------------|------------|
-| **vCard (.vcf)** | Works now on all phones | Already implemented, just needs enrichment |
-| **Apple Wallet (.pkpass)** | Requires Apple Developer certificate + server-side signing | High — needs Apple Developer Program enrollment + edge function |
-| **NFC** | Physical hardware (NFC tags/cards) programmed with the card URL | Not a software feature — agents buy NFC cards and program them with their `/card/slug` URL |
-
-**Recommendation**: Enhance the vCard for now. Apple Wallet passes can be added later if you get Apple Developer certificates. For NFC, agents simply buy NFC business cards and write their card URL to them.
-
----
-
-### Files to Edit
-
-| File | Change |
-|------|--------|
-| `src/components/CardSettingsSection.tsx` | Fix QR code base URL to use published domain |
-| `src/pages/public/AgentCardPage.tsx` | Enrich vCard with URL, social profiles, and note |
+- **No API key needed** — the ElevenLabs agent is public (same as on `/card/:slug` pages)
+- **Connection type**: WebRTC (lower latency)
+- **User must grant microphone permission** — handled with a friendly toast if denied
+- The text chat remains fully functional alongside voice
 
