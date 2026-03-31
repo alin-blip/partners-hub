@@ -171,8 +171,8 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
                 <SelectContent>{TITLE_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-2"><Label>First Name</Label><Input value={editData.first_name} onChange={(e) => setEditData({ ...editData, first_name: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Last Name</Label><Input value={editData.last_name} onChange={(e) => setEditData({ ...editData, last_name: e.target.value })} /></div>
+            <div className="space-y-2"><Label>First Name {role === "agent" && <span className="text-xs text-muted-foreground">(locked)</span>}</Label><Input value={editData.first_name} onChange={(e) => setEditData({ ...editData, first_name: e.target.value })} disabled={role === "agent"} /></div>
+            <div className="space-y-2"><Label>Last Name {role === "agent" && <span className="text-xs text-muted-foreground">(locked)</span>}</Label><Input value={editData.last_name} onChange={(e) => setEditData({ ...editData, last_name: e.target.value })} disabled={role === "agent"} /></div>
             <div className="space-y-2"><Label>Nationality</Label><Input value={editData.nationality} onChange={(e) => setEditData({ ...editData, nationality: e.target.value })} /></div>
             <div className="space-y-2">
               <Label>Gender</Label>
