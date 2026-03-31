@@ -1,10 +1,11 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Users, ClipboardList, Trophy, PoundSterling } from "lucide-react";
+import { Users, ClipboardList, Trophy, PoundSterling, HelpCircle } from "lucide-react";
 import { PromoBanner } from "@/components/PromoBanner";
 import { calcCommission } from "@/lib/commissions";
 import { Button } from "@/components/ui/button";
@@ -15,10 +16,12 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 import { CommissionOfferCards } from "@/components/CommissionOfferCards";
+import { OnboardingWizard } from "@/components/OnboardingWizard";
 
 export default function AgentDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [showTour, setShowTour] = useState(false);
 
   const { data: students = [] } = useQuery({
     queryKey: ["agent-students", user?.id],
@@ -65,26 +68,46 @@ export default function AgentDashboard() {
   return (
     <DashboardLayout allowedRoles={["agent"]}>
       <div className="space-y-6">
-        <PromoBanner />
-        <CommissionOfferCards />
-
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight">My Dashboard</h1>
-          <Button
-            className="bg-accent text-accent-foreground hover:bg-accent/90 active:scale-[0.98] transition-all"
-            onClick={() => navigate("/agent/enroll")}
-          >
-            + New Student Enrollment
-          </Button>
+        <div data-onboarding="step-promo">
+          <PromoBanner />
+        </div>
+        <div data-onboarding="step-commissions">
+          <CommissionOfferCards />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold tracking-tight">My Dashboard</h1>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                localStorage.removeItem("onboarding-completed");
+                setShowTour(true);
+              }}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <HelpCircle className="h-4 w-4 mr-1" />
+              Tour
+            </Button>
+          </div>
+          <div data-onboarding="step-new-student">
+            <Button
+              className="bg-accent text-accent-foreground hover:bg-accent/90 active:scale-[0.98] transition-all"
+              onClick={() => navigate("/agent/enroll")}
+            >
+              + New Student Enrollment
+            </Button>
+          </div>
+        </div>
+
+        <div data-onboarding="step-stats" className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <MetricCard title="My Students" value={students.length} icon={Users} />
           <MetricCard title="Active Enrollments" value={activeEnrollments} icon={ClipboardList} />
           <MetricCard title="Commission Tier" value={currentTier?.tier_name || "—"} icon={Trophy} description={`£${commissionAmount.toLocaleString()} earned`} />
         </div>
 
-        <div className="rounded-lg border bg-card p-5">
+        <div data-onboarding="step-target" className="rounded-lg border bg-card p-5">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium">Monthly Target</span>
             <span className="text-sm text-muted-foreground">{thisMonthStudents}/{monthlyTarget} students</span>
@@ -92,7 +115,7 @@ export default function AgentDashboard() {
           <Progress value={(thisMonthStudents / monthlyTarget) * 100} className="h-2" />
         </div>
 
-        <div className="space-y-4">
+        <div data-onboarding="step-enrollments" className="space-y-4">
           <h2 className="text-lg font-semibold">My Enrollments</h2>
           <div className="rounded-lg border bg-card">
             <Table>
@@ -127,6 +150,11 @@ export default function AgentDashboard() {
           </div>
         </div>
       </div>
+
+      <OnboardingWizard
+        forceOpen={showTour}
+        onClose={() => setShowTour(false)}
+      />
     </DashboardLayout>
   );
 }

@@ -161,7 +161,7 @@ export function AppSidebar() {
   ] : [];
 
   return (
-    <Sidebar collapsible="icon" className="border-r-0">
+    <Sidebar collapsible="icon" className="border-r-0" data-onboarding="step-sidebar">
       <SidebarContent className="bg-sidebar text-sidebar-foreground">
         {/* Brand header */}
         <SidebarGroup>
