@@ -1,59 +1,117 @@
 
 
-## Populate GBS Course Details from PDF Documents
+## Security Audit: What Exists vs What's Missing
 
-### Overview
-Update `course_details` for all 21 GBS courses + 1 MLA College course using the operational data extracted from the 9 uploaded PDFs. The PDFs contain agent-facing details (document checklists, interview booking process, campus-specific info) organized by awarding university (UOS, OBU, CCCU, BSU, Pearson, MLA).
+### Current Security Posture (What We Have)
 
-### Data Mapping from PDFs to Courses
+| Area | Status | Details |
+|------|--------|---------|
+| Role-based access (RBAC) | ✅ Done | Owner/Admin/Agent roles via `user_roles` table + `has_role()` security definer |
+| RLS on all tables | ✅ Done | Every table has role-appropriate policies |
+| No public signup | ✅ Done | Accounts created only via `create-owner` edge function |
+| Agent sees own data only | ✅ Done | RLS restricts agents to own students/enrollments |
+| Admin sees team data | ✅ Done | Admin can see agents under their `admin_id` |
+| Document delete protection | ✅ Done | Agent can only "cancel" (soft-delete); admin needs owner code to hard-delete |
+| Student reassignment (owner only) | ✅ Done | Only owner can reassign students between agents |
+| Export CSV restricted | ✅ Done | Only owner/admin see Export CSV button |
+| Anti-copy (watermark, shortcuts) | ✅ Done | Email watermark, blocked Ctrl+P/C/U/S, disabled right-click |
+| Status changes restricted | ✅ Done | Only owner/admin can change enrollment status (UI-level) |
+| Commission visibility | ✅ Partial | Agents see their own commission card, not tier structure |
+| Login tracking (XP) | ✅ Done | Daily login events recorded in `agent_xp_events` |
 
-The PDFs organize courses by awarding body. Here's the mapping:
+### Critical Gaps (What's Missing)
 
-| PDF | Awarding Body | Courses |
-|-----|--------------|---------|
-| GBS-UOS | University of Suffolk | BA Global Business (Business Mgmt) with FY; BA Global Business & Entrepreneurship with FY |
-| GBS-OBU | Oxford Brookes University | BA Global Business & Entrepreneurship with FY; BSc Health, Wellbeing & Social Care with FY |
-| GBS-CCCU | Canterbury Christ Church | BSc Accounting & Financial Mgmt; BSc Business & Tourism Mgmt |
-| GBS-BSU (x3) | Bath Spa University | BSc Computing with FY; BSc Construction Mgmt with FY; BSc Project Mgmt with FY; BSc Psychology with Counselling with FY; BSc Psychology with Counselling Integrated FY; MSc Global Business; MSc Counselling & Psychotherapy; MSc Project Mgmt |
-| GBS-Pearson (x2) | Pearson | HND Business; HND Construction Mgmt; HND Digital Technologies; HND/BTEC Health & Social Care |
-| GBS-MLA | MLA College | MSc Global Sustainable Development |
+**Priority 1 — Data Integrity (Points 1, 2)**
 
-### What Gets Updated (per course)
+Currently agents can edit ALL student fields (name, DOB, immigration status) after submission. No fields are locked. No RLS prevents agents from updating sensitive columns.
 
-**1. `documents_required`** — Full Standard Route + Non-Standard Route document lists:
-- Standard (under 21): Passport/ID, Diploma+Transcript, Proof of address, Share Code, NINo, SFE Screenshot Proof, Ask33 Consent Form, Immigration Status Document
-- Non-Standard (21+): Same minus Diploma+Transcript (replaced by work experience for Pearson courses)
-- Pearson-specific: Non-Standard adds 2 Years work experience, HMRC work history OR P60s/tax calculations
+- **Need**: Lock sensitive fields (first_name, last_name, date_of_birth, immigration_status) for agents after student creation
+- **Need**: Enrollment status workflow locks — agents can't move status backwards; certain statuses lock the enrollment entirely
+- **Need**: Server-side enforcement via RLS UPDATE policies with column checks or a validation trigger
 
-**2. `interview_info`** — Enhance existing with operational booking details:
-- Interview on campus only (Campus Assessment)
-- Booking: Agent finds available day/time, leaves message on platform (Mon-Fri 10AM-3PM)
-- Date format: dd/mm and hour hh:mm
-- SFE Proofs tutorial link reference
+**Priority 2 — Audit Trail (Point 10)**
 
-**3. `admission_test_info`** — Standardize per awarding body:
-- All: OPT 81 score required (exceptions depend on previous qualifications)
-- UOS: English Test 2 questions totalling 350 words
-- CCCU: English Test 3 questions ~250 words (80 words each); Math Test ONLY for Accounting & Financial Mgmt
-- BSU: English Test 3 questions totalling 350 words
-- Pearson: English Test 2-3 questions totalling 350 words; NOTE: Pearson classes 9:45-15:15
+No `audit_log` table exists. Changes to students, enrollments, and documents are not tracked. If fraud occurs, there's no way to trace who did what.
 
-**4. `additional_info`** — Campus addresses, qualification proof requirements:
-- ID/Passport must be valid 6+ months
-- Qualification proof rules (UK vs non-UK obtained)
-- Course-specific campus addresses (Stratford/Bow Road/Greenford/Leeds/Birmingham/Manchester)
-- Top-Up courses: exclusively for GBS HND graduates
-- MLA: self-learning, part-time/unemployed only, awarded by University of Plymouth
+- **Need**: `audit_log` table with: `user_id`, `action`, `table_name`, `record_id`, `old_values`, `new_values`, `created_at`
+- **Need**: Database triggers on `students`, `enrollments`, `student_documents` that auto-log changes
 
-### Implementation
-- Use the database insert tool (which supports UPDATE) to upsert all 22 course_details records
-- Batch by awarding body groups to keep data consistent
-- Preserve existing `entry_requirements` data (already good from website scrape) — only update if currently NULL
-- Overwrite `documents_required`, `admission_test_info`, `interview_info`, `additional_info` with comprehensive PDF data
+**Priority 3 — Session Timeout (Point 12)**
+
+No auto-logout on inactivity. An agent could walk away and someone else could access the system.
+
+- **Need**: Client-side idle timer (e.g. 30 min inactivity → auto sign-out)
+- **Need**: Warning dialog at 25 min before logout
+
+**Priority 4 — Document Version History (Point 4)**
+
+When a document is re-uploaded, the old version is overwritten with no history.
+
+- **Need**: `version` column on `student_documents` + keep old versions with `is_current` flag
+- **Need**: Upload log showing who uploaded what and when (partially covered by `created_at` + `uploaded_by`)
+
+**Priority 5 — Agent Restrictions on Edit After Status (Point 2)**
+
+No workflow control exists. An agent can currently edit a student even after "enrolled" status.
+
+- **Need**: Check enrollment status before allowing student edits
+- **Need**: Block student overview edits if any enrollment is in `enrolled`, `active` status (for agents)
+
+### Implementation Plan
+
+**Phase 1: Immediate Security (this session)**
+
+1. **Create `audit_log` table** + database triggers on `students`, `enrollments`, `student_documents` to auto-record all INSERT/UPDATE/DELETE with old/new values and user ID
+
+2. **Add idle timeout** to `AuthContext.tsx` — 30-minute inactivity timer with a 5-minute warning dialog, then auto sign-out
+
+3. **Lock agent edits on sensitive fields** — In `StudentOverviewTab.tsx`, when role is `agent`, make `first_name`, `last_name`, `date_of_birth`, `immigration_status` read-only (non-editable). Only admin/owner can change these.
+
+4. **Enrollment workflow locks** — In `StudentEnrollmentsTab.tsx` and the RLS/UI, prevent agents from changing status. Add UI locks: if enrollment status is `enrolled` or `active`, disable the edit button on student overview for agents.
+
+5. **Remove agent access to Export CSV** — Already done (only owner/admin see it). Verify no other export paths exist.
+
+**Phase 2: Enhanced (next session)**
+
+6. Document version history table
+7. 2FA setup via backend auth settings
+8. Rate limiting on login attempts
 
 ### Technical Details
-- 22 UPDATE statements via the insert tool against `course_details` table
-- Each update uses the course_id as the key
-- No schema changes needed — all fields already exist
-- No code changes needed — the `CourseDetailsInfoCard` component already renders all these fields
+
+**Audit log trigger (SQL)**:
+```text
+audit_log table:
+  id, user_id, action (INSERT/UPDATE/DELETE),
+  table_name, record_id, old_values (jsonb),
+  new_values (jsonb), ip_address, created_at
+
+Triggers on: students, enrollments, student_documents, student_notes
+Uses current_setting('request.jwt.claims') to extract user_id
+```
+
+**Idle timeout (AuthContext)**:
+```text
+- Track mouse/keyboard/touch events
+- Reset 30-min timer on activity
+- Show warning dialog at 25 min
+- Call signOut() at 30 min
+- Clean up event listeners on unmount
+```
+
+**Agent field locks (StudentOverviewTab)**:
+```text
+- When role === "agent" and editing:
+  - first_name, last_name → disabled inputs
+  - date_of_birth → disabled
+  - immigration_status → disabled select
+  - Show "(locked)" label next to disabled fields
+```
+
+**Enrollment workflow control**:
+```text
+- Agent cannot edit student if any enrollment status in
+  [enrolled, active, rejected, withdrawn]
+- Show "Student is locked" message instead of Edit button
+```
 
