@@ -911,6 +911,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          address: string | null
           admin_id: string | null
           avatar_url: string | null
           created_at: string
@@ -919,10 +920,12 @@ export type Database = {
           id: string
           is_active: boolean
           phone: string | null
+          postcode: string | null
           slug: string | null
           updated_at: string
         }
         Insert: {
+          address?: string | null
           admin_id?: string | null
           avatar_url?: string | null
           created_at?: string
@@ -931,10 +934,12 @@ export type Database = {
           id: string
           is_active?: boolean
           phone?: string | null
+          postcode?: string | null
           slug?: string | null
           updated_at?: string
         }
         Update: {
+          address?: string | null
           admin_id?: string | null
           avatar_url?: string | null
           created_at?: string
@@ -943,6 +948,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           phone?: string | null
+          postcode?: string | null
           slug?: string | null
           updated_at?: string
         }
