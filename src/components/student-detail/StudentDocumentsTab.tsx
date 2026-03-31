@@ -31,7 +31,7 @@ interface Props {
 }
 
 export function StudentDocumentsTab({ student, canEdit }: Props) {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
