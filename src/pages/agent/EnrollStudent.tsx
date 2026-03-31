@@ -59,6 +59,7 @@ export default function EnrollStudent() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [fullAddress, setFullAddress] = useState("");
+  const [postcode, setPostcode] = useState("");
   const [ukEntryDate, setUkEntryDate] = useState("");
   const [immigrationStatus, setImmigrationStatus] = useState("");
   const [shareCode, setShareCode] = useState("");
