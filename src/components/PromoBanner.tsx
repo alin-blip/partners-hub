@@ -194,10 +194,10 @@ function PromoBannerCard({
             <PartyPopper className="w-6 h-6" />
           </div>
           <div>
-            <h3 className="font-bold text-lg">🎉 Felicitări! Ai atins targetul!</h3>
+            <h3 className="font-bold text-lg">🎉 Congratulations! Target reached!</h3>
             <p className="text-sm mt-1 opacity-90">
-              {isTeam ? "Echipa ta a adus" : "Ai adus"} {qualifyingCount}/{target} studenți. Bonusul tău: £{promo.bonus_amount}
-              {promo.bonus_percentage ? ` + ${promo.bonus_percentage}% comision` : ""}
+              {isTeam ? "Your team enrolled" : "You enrolled"} {qualifyingCount}/{target} students. Your bonus: £{promo.bonus_amount}
+              {promo.bonus_percentage ? ` + ${promo.bonus_percentage}% commission` : ""}
             </p>
           </div>
         </div>
