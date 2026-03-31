@@ -100,6 +100,19 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const reassignStudent = useMutation({
+    mutationFn: async (newAgentId: string) => {
+      const { error } = await supabase.from("students").update({ agent_id: newAgentId }).eq("id", student.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["student-detail", student.id] });
+      setReassigning(false);
+      toast({ title: "Student reassigned successfully" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   const startEdit = () => {
     setEditData({
       title: student.title || "", first_name: student.first_name || "", last_name: student.last_name || "",
