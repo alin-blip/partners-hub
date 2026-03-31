@@ -87,9 +87,8 @@ serve(async (req) => {
 
     if (tokenError) throw tokenError;
 
-    // Build the signing URL
-    const origin = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/$/, "") || "";
-    const signingUrl = `${origin}/sign-consent/${tokenData.token}`;
+    // Build the signing URL using the production domain
+    const signingUrl = `https://agents-eduforyou.co.uk/sign-consent/${tokenData.token}`;
 
     return new Response(JSON.stringify({ 
       token: tokenData.token,
