@@ -227,7 +227,7 @@ function PromoBannerCard({
 
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-sm font-medium">
-              <span>🎯 {qualifyingCount}/{target} {label} · Mai {remaining === 1 ? "e" : "sunt"} {remaining}</span>
+              <span>🎯 {qualifyingCount}/{target} {label} · {remaining} remaining</span>
               <span>💰 £{promo.bonus_amount}{promo.bonus_percentage ? ` + ${promo.bonus_percentage}%` : ""}</span>
             </div>
             <Progress value={progressPct} className="h-2 bg-white/20" />
