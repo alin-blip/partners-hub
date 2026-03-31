@@ -84,7 +84,7 @@ export function DashboardLayout({ children, allowedRoles }: DashboardLayoutProps
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full protected-content">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 flex items-center justify-between border-b bg-card px-4 shrink-0">
@@ -104,6 +104,18 @@ export function DashboardLayout({ children, allowedRoles }: DashboardLayoutProps
           </main>
         </div>
         <AIChatPanel />
+        {watermarkItems && (
+          <div className="watermark-overlay" aria-hidden="true">
+            {watermarkItems.items.map((item) => (
+              <span
+                key={item.key}
+                style={{ top: `${item.top}%`, left: `${item.left}%` }}
+              >
+                {watermarkItems.email}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </SidebarProvider>
   );
