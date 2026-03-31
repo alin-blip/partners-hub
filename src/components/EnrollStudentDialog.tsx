@@ -657,6 +657,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
               <span className="text-muted-foreground">Name</span><span className="font-medium">{title ? `${title} ` : ""}{firstName} {lastName}</span>
               {email && (<><span className="text-muted-foreground">Email</span><span className="font-medium">{email}</span></>)}
               {phone && (<><span className="text-muted-foreground">Mobile</span><span className="font-medium">{phone}</span></>)}
+              {fullAddress && (<><span className="text-muted-foreground">Address</span><span className="font-medium">{fullAddress}</span></>)}
             </div>
 
             {docFiles.length > 0 && (

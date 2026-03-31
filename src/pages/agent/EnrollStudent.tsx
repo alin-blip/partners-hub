@@ -789,6 +789,7 @@ export default function EnrollStudent() {
                 {dob && (<><span className="text-muted-foreground">Date of Birth</span><span className="font-medium">{dob}</span></>)}
                 {email && (<><span className="text-muted-foreground">Email</span><span className="font-medium">{email}</span></>)}
                 {phone && (<><span className="text-muted-foreground">Mobile</span><span className="font-medium">{phone}</span></>)}
+                {fullAddress && (<><span className="text-muted-foreground">Address</span><span className="font-medium">{fullAddress}</span></>)}
                 {immigrationStatus && (<><span className="text-muted-foreground">Immigration</span><span className="font-medium">{immigrationStatus}</span></>)}
                 {crn && (<><span className="text-muted-foreground">CRN</span><span className="font-medium">{crn}</span></>)}
               </div>
