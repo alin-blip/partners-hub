@@ -134,7 +134,7 @@ export function AIChatPanel() {
   // ElevenLabs Scribe v2 Realtime
   const scribe = useScribe({
     modelId: "scribe_v2_realtime",
-    commitStrategy: "vad",
+    commitStrategy: CommitStrategy.VAD,
     onPartialTranscript: (data) => {
       if (listening) {
         setInput(data.text);
