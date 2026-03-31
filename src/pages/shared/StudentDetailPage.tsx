@@ -78,7 +78,8 @@ export default function StudentDetailPage() {
     return <DashboardLayout><div className="flex items-center justify-center py-20 text-muted-foreground">Student not found</div></DashboardLayout>;
   }
 
-  const canEdit = role === "owner" || role === "admin" || (role === "agent" && student.agent_id === user?.id);
+  const isAgentLocked = role === "agent" && hasLockedEnrollment === true;
+  const canEdit = !isAgentLocked && (role === "owner" || role === "admin" || (role === "agent" && student.agent_id === user?.id));
   const canChangeStatus = role === "owner" || role === "admin";
 
   return (
