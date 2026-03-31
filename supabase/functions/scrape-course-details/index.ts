@@ -141,11 +141,6 @@ Deno.serve(async (req) => {
 
     // Step 2: Use Firecrawl SEARCH to find relevant pages, then scrape top results
     const hostname = new URL(university_url).hostname;
-    const scrapedContent: string[] = [];
-    const seenUrls = new Set<string>();
-
-    // Single broad search + per-course searches for better coverage
-    const hostname = new URL(university_url).hostname;
     const searchQueries = [
       `site:${hostname} courses entry requirements admission`,
     ];
@@ -155,7 +150,6 @@ Deno.serve(async (req) => {
     for (let i = 0; i < missingCourses.length; i += batchSize) {
       const batch = missingCourses.slice(i, i + batchSize);
       const courseTerms = batch.map(c => {
-        // Extract key words from course name for search
         const key = normalize(c.name).split(" ").filter(w => w.length > 3).slice(0, 4).join(" ");
         return `"${key}"`;
       }).join(" OR ");
