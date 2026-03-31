@@ -1,5 +1,4 @@
 import { ReactNode } from "react";
-import { ConversationProvider } from "@elevenlabs/react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -55,9 +54,7 @@ export function DashboardLayout({ children, allowedRoles }: DashboardLayoutProps
             {children}
           </main>
         </div>
-        <ConversationProvider>
-          <AIChatPanel />
-        </ConversationProvider>
+        <AIChatPanel />
       </div>
     </SidebarProvider>
   );
