@@ -26,6 +26,8 @@ export default function AdminAgentsPage() {
   const [newEmail, setNewEmail] = useState("");
   const [newName, setNewName] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [newPostcode, setNewPostcode] = useState("");
+  const [newAddress, setNewAddress] = useState("");
 
   const { data: agents = [] } = useQuery({
     queryKey: ["admin-agents", user?.id],
