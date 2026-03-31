@@ -362,6 +362,23 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
         </CardContent>
       </Card>
 
+      {consentLink && (
+        <Card className="border-accent/50">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium mb-1">Consent Signing Link</p>
+                <p className="text-xs text-muted-foreground truncate">{consentLink}</p>
+              </div>
+              <Button size="sm" variant="outline" onClick={handleCopyLink}>
+                {linkCopied ? <Check className="w-3 h-3 mr-1" /> : <Copy className="w-3 h-3 mr-1" />}
+                {linkCopied ? "Copied" : "Copy"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Re-generate Consent Form Dialog */}
       <Dialog open={consentDialogOpen} onOpenChange={(o) => { if (!o) { setPreviewUrl(null); } setConsentDialogOpen(o); }}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
