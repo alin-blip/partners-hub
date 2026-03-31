@@ -49,6 +49,11 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
 
+  // Consent link state
+  const [sendingLink, setSendingLink] = useState(false);
+  const [consentLink, setConsentLink] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+
   const nonMarketingClauses = CONSENT_CLAUSES.filter((c) => !c.isMarketing);
   const allConsentsChecked = nonMarketingClauses.every((c) => consentChecks[c.id]);
   const canSubmitConsent = allConsentsChecked && consentSignature.trim().length > 0 && !!signatureDataUrl;
