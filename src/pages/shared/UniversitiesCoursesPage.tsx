@@ -117,16 +117,30 @@ export default function UniversitiesCoursesPage() {
   const activeUniversities = universities.filter((u: any) => u.is_active);
   const displayUniversities = showInactive ? universities : activeUniversities;
 
-  // Auto-select first uni
+  const uniMap = new Map(universities.map((u: any) => [u.id, u.name]));
+
+  // Auto-select "all" or keep selection
   const effectiveUniId =
-    selectedUniId && displayUniversities.some((u: any) => u.id === selectedUniId)
-      ? selectedUniId
-      : displayUniversities[0]?.id || null;
+    selectedUniId === "all"
+      ? "all"
+      : selectedUniId && displayUniversities.some((u: any) => u.id === selectedUniId)
+        ? selectedUniId
+        : "all";
 
   const filteredCourses = courses.filter((c: any) => {
-    if (effectiveUniId && c.university_id !== effectiveUniId) return false;
+    if (effectiveUniId !== "all" && c.university_id !== effectiveUniId) return false;
     if (!showInactive && c.is_active === false) return false;
-    if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search) {
+      const term = search.toLowerCase();
+      const uniName = (uniMap.get(c.university_id) || "").toLowerCase();
+      return (
+        c.name.toLowerCase().includes(term) ||
+        uniName.includes(term) ||
+        c.level?.toLowerCase().includes(term) ||
+        c.study_mode?.toLowerCase().includes(term) ||
+        c.duration?.toLowerCase().includes(term)
+      );
+    }
     return true;
   });
 
