@@ -37,6 +37,7 @@ import LeadsPage from "./pages/shared/LeadsPage";
 import TasksPage from "./pages/shared/TasksPage";
 import LeaderboardPage from "./pages/shared/LeaderboardPage";
 import NotFound from "./pages/NotFound";
+import { IdleTimeoutDialog } from "./components/IdleTimeoutDialog";
 
 const queryClient = new QueryClient();
 

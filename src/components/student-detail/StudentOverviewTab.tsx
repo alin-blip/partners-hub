@@ -187,8 +187,8 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
             <div className="space-y-2 sm:col-span-2"><Label>Full UK Address</Label><Textarea value={editData.full_address} onChange={(e) => setEditData({ ...editData, full_address: e.target.value })} /></div>
             <div className="space-y-2"><Label>UK Entry Date</Label><Input type="date" value={editData.uk_entry_date} onChange={(e) => setEditData({ ...editData, uk_entry_date: e.target.value })} /></div>
             <div className="space-y-2">
-              <Label>Immigration Status</Label>
-              <Select value={editData.immigration_status} onValueChange={(v) => setEditData({ ...editData, immigration_status: v })}>
+              <Label>Immigration Status {role === "agent" && <span className="text-xs text-muted-foreground">(locked)</span>}</Label>
+              <Select value={editData.immigration_status} onValueChange={(v) => setEditData({ ...editData, immigration_status: v })} disabled={role === "agent"}>
                 <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
                 <SelectContent>{IMMIGRATION_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
               </Select>
