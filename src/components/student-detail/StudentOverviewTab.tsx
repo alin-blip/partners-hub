@@ -26,9 +26,21 @@ interface Props {
 
 export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
   const { toast } = useToast();
+  const { role } = useAuth();
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState<any>(null);
+  const [reassigning, setReassigning] = useState(false);
+
+  // Fetch all agents/admins for reassignment (owner only)
+  const { data: allAgents = [] } = useQuery({
+    queryKey: ["all-agents-for-reassign"],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("id, full_name, email").eq("is_active", true).order("full_name");
+      return data || [];
+    },
+    enabled: role === "owner",
+  });
 
   // Fetch enrollments to get course/campus for timetable lookup
   const { data: enrollments = [] } = useQuery({
