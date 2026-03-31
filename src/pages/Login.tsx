@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { GraduationCap, Eye, EyeOff } from "lucide-react";
 
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_MS = 60 * 1000; // 1 minute
+
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -16,11 +19,39 @@ export default function Login() {
   const [resetEmail, setResetEmail] = useState("");
   const [resetSent, setResetSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [lockedUntil, setLockedUntil] = useState<number | null>(null);
+  const attemptCount = useRef(0);
+  const firstAttemptTime = useRef(0);
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const isLocked = lockedUntil && Date.now() < lockedUntil;
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isLocked) {
+      const secsLeft = Math.ceil(((lockedUntil as number) - Date.now()) / 1000);
+      toast({ title: "Too many attempts", description: `Please wait ${secsLeft}s before trying again.`, variant: "destructive" });
+      return;
+    }
+
+    // Rate limiting logic
+    const now = Date.now();
+    if (now - firstAttemptTime.current > LOCKOUT_MS) {
+      attemptCount.current = 0;
+      firstAttemptTime.current = now;
+    }
+    if (attemptCount.current === 0) firstAttemptTime.current = now;
+    attemptCount.current++;
+
+    if (attemptCount.current > MAX_ATTEMPTS) {
+      const lockTime = firstAttemptTime.current + LOCKOUT_MS;
+      setLockedUntil(lockTime);
+      toast({ title: "Too many login attempts", description: "Account temporarily locked for 1 minute.", variant: "destructive" });
+      return;
+    }
+
     setLoading(true);
 
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -30,6 +61,9 @@ export default function Login() {
       setLoading(false);
       return;
     }
+
+    // Reset rate limit on success
+    attemptCount.current = 0;
 
     const { data } = await supabase.rpc("get_user_role", {
       _user_id: (await supabase.auth.getUser()).data.user?.id ?? "",
