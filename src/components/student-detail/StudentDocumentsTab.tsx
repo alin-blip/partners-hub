@@ -274,9 +274,34 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
     }
   };
 
+  const handleSendConsentLink = async () => {
+    setSendingLink(true);
+    setConsentLink(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-consent-token", {
+        body: { student_id: student.id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setConsentLink(data.signing_url);
+      toast({ title: "Consent link created", description: "Copy the link and send it to the student." });
+    } catch (err: any) {
+      toast({ title: "Failed to create link", description: err.message, variant: "destructive" });
+    } finally {
+      setSendingLink(false);
+    }
+  };
+
+  const handleCopyLink = () => {
+    if (!consentLink) return;
+    navigator.clipboard.writeText(consentLink);
+    setLinkCopied(true);
+    toast({ title: "Link copied to clipboard" });
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
+
   return (
     <>
-      <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-3">
           <CardTitle className="text-base">Documents</CardTitle>
           <div className="flex items-center gap-2">
