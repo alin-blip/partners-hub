@@ -6,7 +6,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, User, FileText, GraduationCap, DollarSign, MessageSquare, Sparkles, ShieldCheck, ShieldAlert } from "lucide-react";
+import { ArrowLeft, User, FileText, GraduationCap, DollarSign, MessageSquare, Sparkles, ShieldCheck, ShieldAlert, Lock } from "lucide-react";
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbSeparator, BreadcrumbPage } from "@/components/ui/breadcrumb";
 import { Link } from "react-router-dom";
 import { StudentOverviewTab } from "@/components/student-detail/StudentOverviewTab";
