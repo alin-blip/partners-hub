@@ -4,11 +4,12 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Bot, Send, Loader2, Plus, MessageSquare, ChevronLeft } from "lucide-react";
+import { Bot, Send, Loader2, Plus, MessageSquare, ChevronLeft, Mic, MicOff, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
+import { useConversation } from "@elevenlabs/react";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -92,8 +93,39 @@ export function AIChatPanel() {
   const [loading, setLoading] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [voiceActive, setVoiceActive] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
+
+  const conversation = useConversation({
+    onConnect: () => {
+      setVoiceActive(true);
+      toast.success("Conversație vocală activă");
+    },
+    onDisconnect: () => {
+      setVoiceActive(false);
+    },
+    onError: (error) => {
+      console.error("Voice error:", error);
+      toast.error("Eroare la conexiunea vocală");
+      setVoiceActive(false);
+    },
+  });
+
+  const toggleVoice = useCallback(async () => {
+    if (voiceActive) {
+      await conversation.endSession();
+      return;
+    }
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      await conversation.startSession({
+        agentId: "agent_4501kmytq1bnekgs59jh6rzjwxw4",
+      });
+    } catch (err) {
+      toast.error("Permite accesul la microfon pentru a folosi vocea.");
+    }
+  }, [voiceActive, conversation]);
 
   const { data: conversations = [] } = useQuery({
     queryKey: ["ai-conversations"],
@@ -276,6 +308,17 @@ export function AIChatPanel() {
                   </div>
                 </div>
               )}
+              {voiceActive && (
+                <div className="flex items-center justify-center gap-3 py-4">
+                  <div className={`h-3 w-3 rounded-full ${conversation.isSpeaking ? "bg-primary animate-pulse" : "bg-green-500 animate-pulse"}`} />
+                  <span className="text-sm text-muted-foreground">
+                    {conversation.isSpeaking ? "AI vorbește…" : "Te ascultă…"}
+                  </span>
+                  <Button variant="destructive" size="sm" onClick={toggleVoice}>
+                    <MicOff className="h-4 w-4 mr-1" /> Oprește
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Input */}
@@ -291,6 +334,15 @@ export function AIChatPanel() {
                   disabled={loading}
                   className="flex-1"
                 />
+                <Button
+                  type="button"
+                  size="icon"
+                  variant={voiceActive ? "destructive" : "outline"}
+                  onClick={toggleVoice}
+                  title={voiceActive ? "Oprește vocea" : "Pornește vocea"}
+                >
+                  {voiceActive ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                </Button>
                 <Button type="submit" size="icon" disabled={loading || !input.trim()}>
                   <Send className="h-4 w-4" />
                 </Button>
