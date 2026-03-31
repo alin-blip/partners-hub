@@ -18,6 +18,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Plus } from "lucide-react";
 import { format } from "date-fns";
+import { AddressLookupInput } from "@/components/AddressLookupInput";
 
 export default function AgentsPage() {
   const { toast } = useToast();

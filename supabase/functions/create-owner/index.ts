@@ -114,11 +114,16 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Set admin_id if provided (for agents assigned to an admin)
-  if (effectiveAdminId) {
+  // Update profile with admin_id, postcode, address
+  const profileUpdate: Record<string, unknown> = {};
+  if (effectiveAdminId) profileUpdate.admin_id = effectiveAdminId;
+  if (postcode) profileUpdate.postcode = postcode;
+  if (address) profileUpdate.address = address;
+
+  if (Object.keys(profileUpdate).length > 0) {
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
-      .update({ admin_id: effectiveAdminId })
+      .update(profileUpdate)
       .eq("id", authData.user.id);
 
     if (profileError) {
