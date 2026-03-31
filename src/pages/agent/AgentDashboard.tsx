@@ -72,6 +72,8 @@ export default function AgentDashboard() {
         <div data-onboarding="step-promo">
           <PromoBanner />
         </div>
+        <DashboardSearchCard />
+
         <div data-onboarding="step-commissions">
           <CommissionOfferCards />
         </div>

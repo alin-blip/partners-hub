@@ -198,6 +198,7 @@ export default function OwnerDashboard() {
     <DashboardLayout allowedRoles={["owner"]}>
       <div className="space-y-6">
         <PromoBanner />
+        <DashboardSearchCard />
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

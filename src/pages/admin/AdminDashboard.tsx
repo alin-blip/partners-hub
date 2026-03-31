@@ -55,6 +55,7 @@ export default function AdminDashboard() {
       <div className="space-y-6">
         <PromoBanner />
         <CommissionOfferCards />
+        <DashboardSearchCard />
         <h1 className="text-2xl font-bold tracking-tight">Team Dashboard</h1>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
