@@ -15,6 +15,7 @@ import { ArrowLeft, ArrowRight, Check, Calendar, Upload, FileText, X, ShieldChec
 import { CourseDetailsInfoCard } from "@/components/CourseDetailsInfoCard";
 import { SignatureCanvas } from "@/components/SignatureCanvas";
 import { syncToDrive } from "@/lib/drive-sync";
+import { AddressLookupInput } from "@/components/AddressLookupInput";
 
 const IMMIGRATION_OPTIONS = ["Pre-settled", "Settled", "British Citizen", "Visa Holder", "Refugee", "Other"];
 const TITLE_OPTIONS = ["Mr", "Mrs", "Ms", "Miss", "Dr", "Other"];
@@ -56,6 +57,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [fullAddress, setFullAddress] = useState("");
+  const [postcode, setPostcode] = useState("");
   const [ukEntryDate, setUkEntryDate] = useState("");
   const [immigrationStatus, setImmigrationStatus] = useState("");
   const [shareCode, setShareCode] = useState("");
@@ -91,7 +93,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
     setStep(1);
     setUniversityId(""); setCampusId(""); setCourseId(""); setIntakeId(""); setStudyPattern([]);
     setTitle(""); setFirstName(""); setLastName(""); setNationality(""); setGender("");
-    setDob(""); setEmail(""); setPhone(""); setFullAddress("");
+    setDob(""); setEmail(""); setPhone(""); setFullAddress(""); setPostcode("");
     setUkEntryDate(""); setImmigrationStatus(""); setShareCode(""); setNiNumber("");
     setPreviousFundingYears(""); setCrn(""); setQualifications(""); setNotes("");
     setNokName(""); setNokPhone(""); setNokRelationship("");
@@ -422,7 +424,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
               <div className="space-y-2"><Label>Mobile No</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+44..." /></div>
               <div className="space-y-2"><Label>UK Entry Date</Label><Input type="date" value={ukEntryDate} onChange={(e) => setUkEntryDate(e.target.value)} /></div>
             </div>
-            <div className="space-y-2"><Label>Full UK Address</Label><Textarea value={fullAddress} onChange={(e) => setFullAddress(e.target.value)} placeholder="Full address..." rows={2} /></div>
+            <AddressLookupInput postcode={postcode} address={fullAddress} onPostcodeChange={setPostcode} onAddressChange={setFullAddress} />
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2"><Label>Immigration Status</Label><Select value={immigrationStatus} onValueChange={setImmigrationStatus}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{IMMIGRATION_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select></div>
               <div className="space-y-2"><Label>Sharecode</Label><Input value={shareCode} onChange={(e) => setShareCode(e.target.value)} placeholder="Share code" /></div>
@@ -655,6 +657,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
               <span className="text-muted-foreground">Name</span><span className="font-medium">{title ? `${title} ` : ""}{firstName} {lastName}</span>
               {email && (<><span className="text-muted-foreground">Email</span><span className="font-medium">{email}</span></>)}
               {phone && (<><span className="text-muted-foreground">Mobile</span><span className="font-medium">{phone}</span></>)}
+              {fullAddress && (<><span className="text-muted-foreground">Address</span><span className="font-medium">{fullAddress}</span></>)}
             </div>
 
             {docFiles.length > 0 && (
