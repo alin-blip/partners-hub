@@ -54,6 +54,7 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
   const [consentLink, setConsentLink] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [emailingLink, setEmailingLink] = useState(false);
+  const [emailingRegent, setEmailingRegent] = useState(false);
 
   const nonMarketingClauses = CONSENT_CLAUSES.filter((c) => !c.isMarketing);
   const allConsentsChecked = nonMarketingClauses.every((c) => consentChecks[c.id]);
@@ -345,6 +346,35 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
     }
   };
 
+  const handleEmailRegentLink = async () => {
+    if (!student.email) {
+      toast({ title: "No email address", description: "This student doesn't have an email address on file.", variant: "destructive" });
+      return;
+    }
+    setEmailingRegent(true);
+    try {
+      const studentName = `${student.title ? student.title + " " : ""}${student.first_name} ${student.last_name}`;
+      const { error: emailError } = await supabase.functions.invoke("send-transactional-email", {
+        body: {
+          templateName: "regent-application-link",
+          recipientEmail: student.email,
+          idempotencyKey: `regent-app-${student.id}-${Date.now()}`,
+          templateData: {
+            studentName,
+            agentName: agentProfile?.full_name || "EduForYou UK",
+            applicationUrl: REGENT_APPLICATION_FORM_URL,
+          },
+        },
+      });
+      if (emailError) throw emailError;
+      toast({ title: "Regent form email sent", description: `Application form link sent to ${student.email}.` });
+    } catch (err: any) {
+      toast({ title: "Failed to send email", description: err.message, variant: "destructive" });
+    } finally {
+      setEmailingRegent(false);
+    }
+  };
+
   return (
     <>
       <Card>
@@ -383,21 +413,33 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
         </CardHeader>
         <CardContent className="space-y-3">
           {isRegentStudent && (
-            <a
-              href={REGENT_APPLICATION_FORM_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-between p-3 rounded-lg border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <FileText className="w-4 h-4 text-primary" />
+            <div className="flex items-center justify-between p-3 rounded-lg border border-primary/30 bg-primary/5">
+              <a
+                href={REGENT_APPLICATION_FORM_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 hover:opacity-80 transition-opacity flex-1 min-w-0"
+              >
+                <FileText className="w-4 h-4 text-primary shrink-0" />
                 <div>
                   <p className="text-sm font-medium">Regent Application Form</p>
                   <p className="text-xs text-muted-foreground">Complete the online application form for Regent University</p>
                 </div>
-              </div>
-              <ExternalLink className="w-4 h-4 text-primary shrink-0" />
-            </a>
+                <ExternalLink className="w-4 h-4 text-primary shrink-0" />
+              </a>
+              {canEdit && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="ml-3 shrink-0"
+                  onClick={handleEmailRegentLink}
+                  disabled={emailingRegent || !student.email}
+                >
+                  {emailingRegent ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Mail className="w-3 h-3 mr-1" />}
+                  Email Link
+                </Button>
+              )}
+            </div>
           )}
 
           {documents.length === 0 && !isRegentStudent ? (
