@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import Index from "./pages/Index";
 import AgentCardPage from "./pages/public/AgentCardPage";
 import PublicApplicationPage from "./pages/public/PublicApplicationPage";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -45,7 +46,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
             <Route path="/card/:slug" element={<AgentCardPage />} />
             <Route path="/apply/:slug" element={<PublicApplicationPage />} />
