@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { university_id, university_url } = await req.json();
+    const { university_id, university_url, force } = await req.json();
     if (!university_id || !university_url) {
       return new Response(
         JSON.stringify({ error: "university_id and university_url required" }),
