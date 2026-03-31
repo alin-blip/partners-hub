@@ -236,8 +236,8 @@ function PromoBannerCard({
 
         <div className="flex gap-2 sm:gap-3 flex-shrink-0">
           {[
-            { val: days, label: "Zile" },
-            { val: hours, label: "Ore" },
+            { val: days, label: "Days" },
+            { val: hours, label: "Hrs" },
             { val: mins, label: "Min" },
             { val: secs, label: "Sec" },
           ].map(({ val, label }) => (
