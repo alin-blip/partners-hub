@@ -35,6 +35,7 @@ import UniversitiesCoursesPage from "./pages/shared/UniversitiesCoursesPage";
 import FeedbackPage from "./pages/owner/FeedbackPage";
 import LeadsPage from "./pages/shared/LeadsPage";
 import TasksPage from "./pages/shared/TasksPage";
+import LeaderboardPage from "./pages/shared/LeaderboardPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
