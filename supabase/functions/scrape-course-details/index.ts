@@ -115,17 +115,25 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { data: existingDetails } = await adminClient
-      .from("course_details").select("course_id").in("course_id", allCourses.map((c) => c.id));
+    let missingCourses: typeof allCourses;
 
-    const existingIds = new Set((existingDetails || []).map((d) => d.course_id));
-    const missingCourses = allCourses.filter((c) => !existingIds.has(c.id));
+    if (force) {
+      // Force mode: re-scan ALL courses
+      missingCourses = allCourses;
+      console.log(`Force mode: scanning all ${allCourses.length} courses`);
+    } else {
+      const { data: existingDetails } = await adminClient
+        .from("course_details").select("course_id").in("course_id", allCourses.map((c) => c.id));
 
-    if (missingCourses.length === 0) {
-      return new Response(
-        JSON.stringify({ success: true, message: "All courses already have details", updated: 0 }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      const existingIds = new Set((existingDetails || []).map((d) => d.course_id));
+      missingCourses = allCourses.filter((c) => !existingIds.has(c.id));
+
+      if (missingCourses.length === 0) {
+        return new Response(
+          JSON.stringify({ success: true, message: "All courses already have details. Use force=true to rescan.", updated: 0 }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     const coursesWithNorm = missingCourses.map((c) => ({ ...c, normalized: normalize(c.name) }));
