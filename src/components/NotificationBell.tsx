@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Bell } from "lucide-react";
@@ -20,10 +20,29 @@ type NotificationItem = {
   link: string;
 };
 
+const STORAGE_KEY = "read-notification-ids";
+
+function getReadIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch { return new Set(); }
+}
+
+function markAsRead(id: string) {
+  const ids = getReadIds();
+  ids.add(id);
+  // Keep only last 200 to avoid bloat
+  const arr = [...ids].slice(-200);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+}
+
 export function NotificationBell() {
   const { user, role } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [readIds, setReadIds] = useState<Set<string>>(getReadIds);
   const prefix = role === "owner" ? "/owner" : role === "admin" ? "/admin" : "/agent";
 
   const { data: notifications = [] } = useQuery({
@@ -50,7 +69,6 @@ export function NotificationBell() {
           .limit(5);
 
         if (unreadMsgs) {
-          // Get sender names
           const senderIds = [...new Set(unreadMsgs.map((m: any) => m.sender_id))];
           const { data: senderProfiles } = await supabase
             .from("profiles")
@@ -117,7 +135,6 @@ export function NotificationBell() {
         });
       }
 
-      // Sort by time descending
       items.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
       return items.slice(0, 15);
     },
@@ -125,7 +142,19 @@ export function NotificationBell() {
     refetchInterval: 30000,
   });
 
-  const totalCount = notifications.length;
+  const unreadCount = notifications.filter((n) => !readIds.has(n.id)).length;
+
+  const handleClick = useCallback((notification: NotificationItem) => {
+    markAsRead(notification.id);
+    setReadIds(getReadIds());
+    setOpen(false);
+    navigate(notification.link);
+  }, [navigate]);
+
+  const handleMarkAllRead = useCallback(() => {
+    notifications.forEach((n) => markAsRead(n.id));
+    setReadIds(getReadIds());
+  }, [notifications]);
 
   const typeIcon: Record<string, string> = {
     message: "💬",
@@ -138,17 +167,24 @@ export function NotificationBell() {
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="w-4 h-4" />
-          {totalCount > 0 && (
+          {unreadCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold min-w-[16px] h-[16px] px-1">
-              {totalCount > 9 ? "9+" : totalCount}
+              {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="end">
-        <div className="px-4 py-3 border-b">
-          <h4 className="text-sm font-semibold">Notifications</h4>
-          <p className="text-xs text-muted-foreground">{totalCount} recent items</p>
+        <div className="px-4 py-3 border-b flex items-center justify-between">
+          <div>
+            <h4 className="text-sm font-semibold">Notifications</h4>
+            <p className="text-xs text-muted-foreground">{unreadCount} unread</p>
+          </div>
+          {unreadCount > 0 && (
+            <Button variant="ghost" size="sm" className="text-xs h-7" onClick={handleMarkAllRead}>
+              Mark all read
+            </Button>
+          )}
         </div>
         <ScrollArea className="max-h-[360px]">
           {notifications.length === 0 ? (
@@ -157,24 +193,30 @@ export function NotificationBell() {
             </div>
           ) : (
             <div className="divide-y">
-              {notifications.map((n) => (
-                <button
-                  key={n.id}
-                  className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors"
-                  onClick={() => { setOpen(false); navigate(n.link); }}
-                >
-                  <div className="flex gap-2">
-                    <span className="text-sm mt-0.5">{typeIcon[n.type]}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{n.title}</p>
-                      <p className="text-xs text-muted-foreground truncate">{n.description}</p>
-                      <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-                        {formatDistanceToNow(new Date(n.time), { addSuffix: true })}
-                      </p>
+              {notifications.map((n) => {
+                const isUnread = !readIds.has(n.id);
+                return (
+                  <button
+                    key={n.id}
+                    className={`w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors ${isUnread ? "bg-primary/5" : ""}`}
+                    onClick={() => handleClick(n)}
+                  >
+                    <div className="flex gap-2">
+                      <span className="text-sm mt-0.5">{typeIcon[n.type]}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className={`text-sm truncate ${isUnread ? "font-semibold" : "font-medium text-muted-foreground"}`}>{n.title}</p>
+                          {isUnread && <span className="shrink-0 w-2 h-2 rounded-full bg-primary" />}
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">{n.description}</p>
+                        <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                          {formatDistanceToNow(new Date(n.time), { addSuffix: true })}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           )}
         </ScrollArea>
