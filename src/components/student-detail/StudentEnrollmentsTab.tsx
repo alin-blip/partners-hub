@@ -5,12 +5,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { notifyAgentOfStatusChange } from "@/lib/enrollment-emails";
 import { CourseDetailsInfoCard } from "@/components/CourseDetailsInfoCard";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, ArrowRightLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const STATUSES = [
@@ -25,8 +27,19 @@ interface Props {
 
 export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
   const { toast } = useToast();
+  const { role } = useAuth();
   const qc = useQueryClient();
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Transfer dialog state
+  const [transferEnrollment, setTransferEnrollment] = useState<any>(null);
+  const [transferUniId, setTransferUniId] = useState("");
+  const [transferCampusId, setTransferCampusId] = useState("");
+  const [transferCourseId, setTransferCourseId] = useState("");
+  const [transferIntakeId, setTransferIntakeId] = useState("");
+  const [transferring, setTransferring] = useState(false);
+
+  const canTransfer = role === "owner" || role === "admin";
 
   const { data: profile } = useQuery({
     queryKey: ["my-profile-name"],
@@ -43,11 +56,64 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
     queryFn: async () => {
       const { data } = await supabase
         .from("enrollments")
-        .select("id, status, created_at, course_id, funding_status, funding_type, funding_reference, funding_notes, universities!inner(name), courses!inner(name)")
+        .select("id, status, created_at, course_id, university_id, campus_id, intake_id, funding_status, funding_type, funding_reference, funding_notes, universities!inner(name), courses!inner(name)")
         .eq("student_id", studentId)
         .order("created_at", { ascending: false });
       return data || [];
     },
+  });
+
+  // Universities, campuses, courses, intakes for transfer
+  const { data: universities = [] } = useQuery({
+    queryKey: ["universities-active"],
+    queryFn: async () => {
+      const { data } = await supabase.from("universities").select("id, name").eq("is_active", true).order("name");
+      return data || [];
+    },
+    enabled: !!transferEnrollment,
+  });
+
+  const { data: campuses = [] } = useQuery({
+    queryKey: ["campuses-for-uni", transferUniId],
+    queryFn: async () => {
+      const { data } = await supabase.from("campuses").select("id, name").eq("university_id", transferUniId).order("name");
+      return data || [];
+    },
+    enabled: !!transferUniId,
+  });
+
+  const { data: courses = [] } = useQuery({
+    queryKey: ["courses-for-campus", transferUniId, transferCampusId],
+    queryFn: async () => {
+      if (transferCampusId) {
+        // Get courses linked to this campus via course_timetable_groups
+        const { data: ctgs } = await supabase
+          .from("course_timetable_groups")
+          .select("course_id")
+          .eq("university_id", transferUniId)
+          .eq("campus_id", transferCampusId);
+        const courseIds = [...new Set((ctgs || []).map((c: any) => c.course_id))];
+        if (courseIds.length > 0) {
+          const { data } = await supabase.from("courses").select("id, name").in("id", courseIds).eq("is_active", true).order("name");
+          return data || [];
+        }
+        // Fallback: all courses for this uni
+        const { data } = await supabase.from("courses").select("id, name").eq("university_id", transferUniId).eq("is_active", true).order("name");
+        return data || [];
+      }
+      const { data } = await supabase.from("courses").select("id, name").eq("university_id", transferUniId).eq("is_active", true).order("name");
+      return data || [];
+    },
+    enabled: !!transferUniId,
+  });
+
+  const { data: intakes = [] } = useQuery({
+    queryKey: ["intakes-for-uni", transferUniId],
+    queryFn: async () => {
+      const { data } = await supabase.from("intakes").select("id, label").eq("university_id", transferUniId).order("start_date");
+      return data || [];
+    },
+    enabled: !!transferUniId,
   });
 
   const updateStatus = useMutation({
@@ -64,64 +130,192 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const openTransferDialog = (enrollment: any) => {
+    setTransferEnrollment(enrollment);
+    setTransferUniId("");
+    setTransferCampusId("");
+    setTransferCourseId("");
+    setTransferIntakeId("");
+  };
+
+  const handleTransfer = async () => {
+    if (!transferEnrollment || !transferUniId || !transferCourseId) return;
+    setTransferring(true);
+    try {
+      const { error } = await supabase.from("enrollments").update({
+        university_id: transferUniId,
+        campus_id: transferCampusId || null,
+        course_id: transferCourseId,
+        intake_id: transferIntakeId || null,
+        status: "applied",
+      }).eq("id", transferEnrollment.id);
+
+      if (error) throw error;
+
+      toast({ title: "Student transferred", description: "Enrollment updated to the new university/course." });
+      qc.invalidateQueries({ queryKey: ["student-enrollments", studentId] });
+      setTransferEnrollment(null);
+    } catch (err: any) {
+      toast({ title: "Transfer failed", description: err.message, variant: "destructive" });
+    } finally {
+      setTransferring(false);
+    }
+  };
+
   return (
-    <Card>
-      <CardHeader><CardTitle className="text-base">Enrollment History</CardTitle></CardHeader>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>University</TableHead>
-              <TableHead>Course</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead className="w-10" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {enrollments.map((e: any) => (
-              <React.Fragment key={e.id}>
-                <TableRow>
-                  <TableCell className="font-medium">{e.universities?.name}</TableCell>
-                  <TableCell>{e.courses?.name}</TableCell>
-                  <TableCell>
-                    {canChangeStatus ? (
-                      <Select value={e.status} onValueChange={(v) => updateStatus.mutate({ id: e.id, status: v, oldStatus: e.status })}>
-                        <SelectTrigger className="w-[180px] h-8">
-                          <StatusBadge status={e.status} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {STATUSES.map((s) => (
-                            <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <StatusBadge status={e.status} />
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{format(new Date(e.created_at), "dd MMM yyyy")}</TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpandedId(expandedId === e.id ? null : e.id)}>
-                      {expandedId === e.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </Button>
-                  </TableCell>
-                </TableRow>
-                {expandedId === e.id && e.course_id && (
+    <>
+      <Card>
+        <CardHeader><CardTitle className="text-base">Enrollment History</CardTitle></CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>University</TableHead>
+                <TableHead>Course</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead className="w-20" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {enrollments.map((e: any) => (
+                <React.Fragment key={e.id}>
                   <TableRow>
-                    <TableCell colSpan={5} className="p-2">
-                      <CourseDetailsInfoCard courseId={e.course_id} compact />
+                    <TableCell className="font-medium">{e.universities?.name}</TableCell>
+                    <TableCell>{e.courses?.name}</TableCell>
+                    <TableCell>
+                      {canChangeStatus ? (
+                        <Select value={e.status} onValueChange={(v) => updateStatus.mutate({ id: e.id, status: v, oldStatus: e.status })}>
+                          <SelectTrigger className="w-[180px] h-8">
+                            <StatusBadge status={e.status} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STATUSES.map((s) => (
+                              <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <StatusBadge status={e.status} />
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{format(new Date(e.created_at), "dd MMM yyyy")}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        {canTransfer && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Transfer to another university" onClick={() => openTransferDialog(e)}>
+                            <ArrowRightLeft className="w-4 h-4" />
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpandedId(expandedId === e.id ? null : e.id)}>
+                          {expandedId === e.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
+                  {expandedId === e.id && e.course_id && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="p-2">
+                        <CourseDetailsInfoCard courseId={e.course_id} compact />
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
+              ))}
+              {enrollments.length === 0 && (
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No enrollments</TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Transfer Enrollment Dialog */}
+      <Dialog open={!!transferEnrollment} onOpenChange={(o) => { if (!o) setTransferEnrollment(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowRightLeft className="w-5 h-5" />
+              Transfer Enrollment
+            </DialogTitle>
+          </DialogHeader>
+
+          {transferEnrollment && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Transfer from <strong>{transferEnrollment.universities?.name}</strong> — <strong>{transferEnrollment.courses?.name}</strong> to a new university/course. Status will be reset to <strong>Applied</strong>.
+              </p>
+
+              <div className="space-y-3">
+                <div>
+                  <Label>New University *</Label>
+                  <Select value={transferUniId} onValueChange={(v) => { setTransferUniId(v); setTransferCampusId(""); setTransferCourseId(""); setTransferIntakeId(""); }}>
+                    <SelectTrigger><SelectValue placeholder="Select university" /></SelectTrigger>
+                    <SelectContent>
+                      {universities.map((u: any) => (
+                        <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {transferUniId && campuses.length > 0 && (
+                  <div>
+                    <Label>Campus</Label>
+                    <Select value={transferCampusId} onValueChange={(v) => { setTransferCampusId(v); setTransferCourseId(""); }}>
+                      <SelectTrigger><SelectValue placeholder="Select campus" /></SelectTrigger>
+                      <SelectContent>
+                        {campuses.map((c: any) => (
+                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 )}
-              </React.Fragment>
-            ))}
-            {enrollments.length === 0 && (
-              <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No enrollments</TableCell></TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+
+                {transferUniId && (
+                  <div>
+                    <Label>New Course *</Label>
+                    <Select value={transferCourseId} onValueChange={setTransferCourseId}>
+                      <SelectTrigger><SelectValue placeholder="Select course" /></SelectTrigger>
+                      <SelectContent>
+                        {courses.map((c: any) => (
+                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {transferUniId && intakes.length > 0 && (
+                  <div>
+                    <Label>Intake</Label>
+                    <Select value={transferIntakeId} onValueChange={setTransferIntakeId}>
+                      <SelectTrigger><SelectValue placeholder="Select intake" /></SelectTrigger>
+                      <SelectContent>
+                        {intakes.map((i: any) => (
+                          <SelectItem key={i.id} value={i.id}>{i.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setTransferEnrollment(null)}>Cancel</Button>
+                <Button
+                  onClick={handleTransfer}
+                  disabled={!transferUniId || !transferCourseId || transferring}
+                  className="bg-accent text-accent-foreground hover:bg-accent/90"
+                >
+                  {transferring ? "Transferring…" : "Transfer Student"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
