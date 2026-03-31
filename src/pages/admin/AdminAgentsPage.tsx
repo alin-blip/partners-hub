@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Plus } from "lucide-react";
 import { format } from "date-fns";
+import { AddressLookupInput } from "@/components/AddressLookupInput";
 
 export default function AdminAgentsPage() {
   const { toast } = useToast();
@@ -25,6 +26,8 @@ export default function AdminAgentsPage() {
   const [newEmail, setNewEmail] = useState("");
   const [newName, setNewName] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [newPostcode, setNewPostcode] = useState("");
+  const [newAddress, setNewAddress] = useState("");
 
   const { data: agents = [] } = useQuery({
     queryKey: ["admin-agents", user?.id],
@@ -48,6 +51,8 @@ export default function AdminAgentsPage() {
           full_name: newName,
           role: "agent",
           admin_id: user!.id,
+          postcode: newPostcode || undefined,
+          address: newAddress || undefined,
         },
       });
       if (error) throw error;
@@ -61,6 +66,8 @@ export default function AdminAgentsPage() {
       setNewEmail("");
       setNewName("");
       setNewPassword("");
+      setNewPostcode("");
+      setNewAddress("");
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -103,6 +110,12 @@ export default function AdminAgentsPage() {
                   <Label>Password</Label>
                   <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Min 6 characters" />
                 </div>
+                <AddressLookupInput
+                  postcode={newPostcode}
+                  address={newAddress}
+                  onPostcodeChange={setNewPostcode}
+                  onAddressChange={setNewAddress}
+                />
                 <Button
                   className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
                   onClick={() => createAgent.mutate()}

@@ -18,6 +18,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Plus } from "lucide-react";
 import { format } from "date-fns";
+import { AddressLookupInput } from "@/components/AddressLookupInput";
 
 export default function AgentsPage() {
   const { toast } = useToast();
@@ -28,6 +29,8 @@ export default function AgentsPage() {
   const [newRole, setNewRole] = useState<string>("agent");
   const [newPassword, setNewPassword] = useState("");
   const [newAdminId, setNewAdminId] = useState("");
+  const [newPostcode, setNewPostcode] = useState("");
+  const [newAddress, setNewAddress] = useState("");
 
   const { data: profiles = [] } = useQuery({
     queryKey: ["all-profiles"],
@@ -57,6 +60,8 @@ export default function AgentsPage() {
           full_name: newName,
           role: newRole,
           admin_id: newRole === "agent" && newAdminId ? newAdminId : undefined,
+          postcode: newPostcode || undefined,
+          address: newAddress || undefined,
         },
       });
       if (error) throw error;
@@ -73,6 +78,8 @@ export default function AgentsPage() {
       setNewPassword("");
       setNewRole("agent");
       setNewAdminId("");
+      setNewPostcode("");
+      setNewAddress("");
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -138,6 +145,12 @@ export default function AgentsPage() {
                     </Select>
                   </div>
                 )}
+                <AddressLookupInput
+                  postcode={newPostcode}
+                  address={newAddress}
+                  onPostcodeChange={setNewPostcode}
+                  onAddressChange={setNewAddress}
+                />
                 <Button
                   className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
                   onClick={() => createUser.mutate()}
