@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 import { CommissionOfferCards } from "@/components/CommissionOfferCards";
+import { DashboardSearchCard } from "@/components/DashboardSearchCard";
 
 export default function AdminDashboard() {
   const { user } = useAuth();
