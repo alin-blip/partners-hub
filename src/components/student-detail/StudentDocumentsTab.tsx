@@ -413,21 +413,33 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
         </CardHeader>
         <CardContent className="space-y-3">
           {isRegentStudent && (
-            <a
-              href={REGENT_APPLICATION_FORM_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-between p-3 rounded-lg border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <FileText className="w-4 h-4 text-primary" />
+            <div className="flex items-center justify-between p-3 rounded-lg border border-primary/30 bg-primary/5">
+              <a
+                href={REGENT_APPLICATION_FORM_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 hover:opacity-80 transition-opacity flex-1 min-w-0"
+              >
+                <FileText className="w-4 h-4 text-primary shrink-0" />
                 <div>
                   <p className="text-sm font-medium">Regent Application Form</p>
                   <p className="text-xs text-muted-foreground">Complete the online application form for Regent University</p>
                 </div>
-              </div>
-              <ExternalLink className="w-4 h-4 text-primary shrink-0" />
-            </a>
+                <ExternalLink className="w-4 h-4 text-primary shrink-0" />
+              </a>
+              {canEdit && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="ml-3 shrink-0"
+                  onClick={handleEmailRegentLink}
+                  disabled={emailingRegent || !student.email}
+                >
+                  {emailingRegent ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Mail className="w-3 h-3 mr-1" />}
+                  Email Link
+                </Button>
+              )}
+            </div>
           )}
 
           {documents.length === 0 && !isRegentStudent ? (
