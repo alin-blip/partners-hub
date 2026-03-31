@@ -93,8 +93,39 @@ export function AIChatPanel() {
   const [loading, setLoading] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [voiceActive, setVoiceActive] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
+
+  const conversation = useConversation({
+    onConnect: () => {
+      setVoiceActive(true);
+      toast.success("Conversație vocală activă");
+    },
+    onDisconnect: () => {
+      setVoiceActive(false);
+    },
+    onError: (error) => {
+      console.error("Voice error:", error);
+      toast.error("Eroare la conexiunea vocală");
+      setVoiceActive(false);
+    },
+  });
+
+  const toggleVoice = useCallback(async () => {
+    if (voiceActive) {
+      await conversation.endSession();
+      return;
+    }
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      await conversation.startSession({
+        agentId: "agent_4501kmytq1bnekgs59jh6rzjwxw4",
+      });
+    } catch (err) {
+      toast.error("Permite accesul la microfon pentru a folosi vocea.");
+    }
+  }, [voiceActive, conversation]);
 
   const { data: conversations = [] } = useQuery({
     queryKey: ["ai-conversations"],
