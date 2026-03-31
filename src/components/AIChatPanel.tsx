@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
+import { useScribe, CommitStrategy } from "@elevenlabs/react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,16 +15,6 @@ type Msg = { role: "user" | "assistant"; content: string };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 const TTS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`;
-
-// Browser Speech Recognition types
-interface SpeechRecognitionEvent {
-  results: SpeechRecognitionResultList;
-  resultIndex: number;
-}
-
-interface SpeechRecognitionErrorEvent {
-  error: string;
-}
 
 async function streamChat({
   messages,
@@ -125,12 +116,6 @@ async function playTTS(text: string): Promise<HTMLAudioElement | null> {
 
 type Conversation = { id: string; title: string; updated_at: string };
 
-// Get browser SpeechRecognition
-function getSpeechRecognition(): (new () => any) | null {
-  const w = window as any;
-  return w.SpeechRecognition || w.webkitSpeechRecognition || null;
-}
-
 export function AIChatPanel() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -138,13 +123,40 @@ export function AIChatPanel() {
   const [loading, setLoading] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
-  const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(true);
+  const [listening, setListening] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const recognitionRef = useRef<any>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const pendingSubmitRef = useRef(false);
   const queryClient = useQueryClient();
+
+  // ElevenLabs Scribe v2 Realtime
+  const scribe = useScribe({
+    modelId: "scribe_v2_realtime",
+    commitStrategy: CommitStrategy.VAD,
+    onPartialTranscript: (data) => {
+      if (listening) {
+        setInput(data.text);
+      }
+    },
+    onCommittedTranscript: (data) => {
+      if (data.text.trim()) {
+        setInput(data.text.trim());
+        pendingSubmitRef.current = true;
+      }
+    },
+  });
+
+  // Auto-submit when committed transcript arrives
+  useEffect(() => {
+    if (pendingSubmitRef.current && input.trim() && !loading) {
+      pendingSubmitRef.current = false;
+      scribe.disconnect();
+      setListening(false);
+      send();
+    }
+  }, [input]);
 
   const { data: conversations = [] } = useQuery({
     queryKey: ["ai-conversations"],
@@ -165,14 +177,13 @@ export function AIChatPanel() {
     }
   }, [messages]);
 
-  // Cleanup recognition on unmount
   useEffect(() => {
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.abort();
-      }
       if (currentAudioRef.current) {
         currentAudioRef.current.pause();
+      }
+      if (scribe.isConnected) {
+        scribe.disconnect();
       }
     };
   }, []);
@@ -185,61 +196,36 @@ export function AIChatPanel() {
     }
   }, []);
 
-  const toggleListening = useCallback(() => {
-    if (listening) {
-      recognitionRef.current?.stop();
+  const toggleListening = useCallback(async () => {
+    if (listening || scribe.isConnected) {
+      scribe.disconnect();
       setListening(false);
       return;
     }
 
-    const SpeechRecognition = getSpeechRecognition();
-    if (!SpeechRecognition) {
-      toast.error("Browserul tău nu suportă recunoașterea vocală. Folosește Chrome sau Edge.");
-      return;
+    stopAudio();
+
+    try {
+      const { data, error } = await supabase.functions.invoke("elevenlabs-scribe-token");
+      if (error || !data?.token) {
+        toast.error("Nu s-a putut obține tokenul pentru recunoaștere vocală.");
+        return;
+      }
+
+      await scribe.connect({
+        token: data.token,
+        microphone: {
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      });
+      setListening(true);
+      setInput("");
+    } catch (err) {
+      console.error("Scribe connect error:", err);
+      toast.error("Eroare la pornirea microfonului. Verifică permisiunile.");
     }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = "ro-RO";
-    recognition.interimResults = true;
-    recognition.continuous = false;
-
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let transcript = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
-      }
-      setInput(transcript);
-      
-      // If final result, auto-send
-      if (event.results[event.results.length - 1]?.isFinal) {
-        setListening(false);
-        if (transcript.trim()) {
-          // Small delay to let state update
-          setTimeout(() => {
-            const form = document.getElementById("ai-chat-form") as HTMLFormElement;
-            form?.requestSubmit();
-          }, 100);
-        }
-      }
-    };
-
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      console.error("Speech recognition error:", event.error);
-      setListening(false);
-      if (event.error === "not-allowed") {
-        toast.error("Permite accesul la microfon pentru a folosi vocea.");
-      }
-    };
-
-    recognition.onend = () => {
-      setListening(false);
-    };
-
-    recognitionRef.current = recognition;
-    recognition.start();
-    setListening(true);
-    stopAudio(); // Stop any playing audio
-  }, [listening, stopAudio]);
+  }, [listening, scribe, stopAudio]);
 
   const loadConversation = useCallback(async (convId: string) => {
     const { data } = await supabase
@@ -293,7 +279,6 @@ export function AIChatPanel() {
         setLoading(false);
         queryClient.invalidateQueries({ queryKey: ["ai-conversations"] });
         
-        // Auto-play TTS if enabled and there's a response
         if (autoSpeak && assistantSoFar.trim()) {
           setSpeaking(true);
           const audio = await playTTS(assistantSoFar);
