@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -30,7 +31,7 @@ interface Props {
 }
 
 export function StudentDocumentsTab({ student, canEdit }: Props) {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -56,6 +57,15 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
   const [emailingLink, setEmailingLink] = useState(false);
   const [emailingRegent, setEmailingRegent] = useState(false);
 
+  // Delete confirmation state
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteCodeDialogOpen, setDeleteCodeDialogOpen] = useState(false);
+  const [deleteCode, setDeleteCode] = useState("");
+  const [requestingCode, setRequestingCode] = useState(false);
+  const [verifyingCode, setVerifyingCode] = useState(false);
+  const [codeRequested, setCodeRequested] = useState(false);
+
   const nonMarketingClauses = CONSENT_CLAUSES.filter((c) => !c.isMarketing);
   const allConsentsChecked = nonMarketingClauses.every((c) => consentChecks[c.id]);
   const canSubmitConsent = allConsentsChecked && consentSignature.trim().length > 0 && !!signatureDataUrl;
@@ -63,7 +73,7 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
   const { data: documents = [], refetch: refetchDocs } = useQuery({
     queryKey: ["student-documents", student.id],
     queryFn: async () => {
-      const { data } = await supabase.from("student_documents").select("*").eq("student_id", student.id).order("created_at", { ascending: false });
+      const { data } = await supabase.from("student_documents").select("*").eq("student_id", student.id).is("cancelled_at" as any, null).order("created_at", { ascending: false });
       return data || [];
     },
   });
@@ -168,10 +178,77 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
   };
 
   const handleDeleteDoc = async (doc: any) => {
-    await supabase.storage.from("student-documents").remove([doc.file_path]);
-    const { error } = await supabase.from("student_documents").delete().eq("id", doc.id);
+    if (role === "agent") {
+      // Agent can only cancel (soft-delete)
+      const { error } = await supabase.from("student_documents").update({
+        cancelled_at: new Date().toISOString(),
+        cancelled_by: user?.id,
+      } as any).eq("id", doc.id);
+      if (error) toast({ title: "Cancel failed", description: error.message, variant: "destructive" });
+      else { toast({ title: "Document cancelled" }); refetchDocs(); }
+      return;
+    }
+
+    if (role === "admin") {
+      // Admin needs code from owner
+      setDeleteTarget(doc);
+      setDeleteCodeDialogOpen(true);
+      setDeleteCode("");
+      setCodeRequested(false);
+      return;
+    }
+
+    // Owner: direct delete
+    setDeleteTarget(doc);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleOwnerDelete = async () => {
+    if (!deleteTarget) return;
+    await supabase.storage.from("student-documents").remove([deleteTarget.file_path]);
+    const { error } = await supabase.from("student_documents").delete().eq("id", deleteTarget.id);
     if (error) toast({ title: "Delete failed", description: error.message, variant: "destructive" });
     else { toast({ title: "Document deleted" }); refetchDocs(); }
+    setDeleteDialogOpen(false);
+    setDeleteTarget(null);
+  };
+
+  const handleRequestDeleteCode = async () => {
+    if (!deleteTarget) return;
+    setRequestingCode(true);
+    try {
+      const { error } = await supabase.functions.invoke("request-delete-code", {
+        body: { entity_type: "document", entity_id: deleteTarget.id },
+      });
+      if (error) throw error;
+      setCodeRequested(true);
+      toast({ title: "Code requested", description: "A deletion code has been sent to the owner." });
+    } catch (err: any) {
+      toast({ title: "Request failed", description: err.message, variant: "destructive" });
+    } finally {
+      setRequestingCode(false);
+    }
+  };
+
+  const handleVerifyDeleteCode = async () => {
+    if (!deleteTarget || !deleteCode) return;
+    setVerifyingCode(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("verify-delete-code", {
+        body: { entity_id: deleteTarget.id, code: deleteCode },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({ title: "Document deleted" });
+      refetchDocs();
+      setDeleteCodeDialogOpen(false);
+      setDeleteTarget(null);
+      setDeleteCode("");
+    } catch (err: any) {
+      toast({ title: "Verification failed", description: err.message, variant: "destructive" });
+    } finally {
+      setVerifyingCode(false);
+    }
   };
 
   const [downloadingAll, setDownloadingAll] = useState(false);
@@ -460,9 +537,18 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
                       <p className="text-xs text-muted-foreground">{format(new Date(doc.created_at), "dd MMM yyyy HH:mm")}</p>
                     </div>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 items-center">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownload(doc)}><Download className="w-3.5 h-3.5" /></Button>
-                    {canEdit && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteDoc(doc)}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>}
+                    {canEdit && role === "agent" && (
+                      <Button variant="ghost" size="sm" className="h-8 text-orange-600 hover:text-orange-700 text-xs gap-1" onClick={() => handleDeleteDoc(doc)}>
+                        <Archive className="w-3.5 h-3.5" /> Cancel
+                      </Button>
+                    )}
+                    {canEdit && (role === "owner" || role === "admin") && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteDoc(doc)}>
+                        <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -607,6 +693,66 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Owner delete confirmation */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete document permanently?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete <strong>{deleteTarget?.file_name}</strong> from storage. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleOwnerDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Admin delete code verification */}
+      <Dialog open={deleteCodeDialogOpen} onOpenChange={setDeleteCodeDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="w-4 h-4 text-destructive" />
+              Delete requires owner approval
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              To delete <strong>{deleteTarget?.file_name}</strong>, you need a confirmation code from the owner.
+            </p>
+            {!codeRequested ? (
+              <Button onClick={handleRequestDeleteCode} disabled={requestingCode} className="w-full">
+                {requestingCode ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Mail className="w-4 h-4 mr-2" />}
+                {requestingCode ? "Sending…" : "Request code from owner"}
+              </Button>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-green-600 font-medium">✓ Code sent to owner. Enter it below:</p>
+                <Input
+                  placeholder="Enter 6-character code"
+                  value={deleteCode}
+                  onChange={(e) => setDeleteCode(e.target.value.toUpperCase())}
+                  maxLength={6}
+                  className="text-center text-lg tracking-widest font-mono"
+                />
+                <Button
+                  onClick={handleVerifyDeleteCode}
+                  disabled={verifyingCode || deleteCode.length < 6}
+                  className="w-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {verifyingCode ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                  {verifyingCode ? "Verifying…" : "Confirm delete"}
+                </Button>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </>

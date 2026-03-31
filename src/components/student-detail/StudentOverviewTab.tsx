@@ -5,12 +5,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Pencil, Save, X } from "lucide-react";
+import { Pencil, Save, X, UserCog } from "lucide-react";
 import { format } from "date-fns";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const IMMIGRATION_OPTIONS = ["Pre-settled", "Settled", "British Citizen", "Visa Holder", "Refugee", "Other"];
 const TITLE_OPTIONS = ["Mr", "Mrs", "Ms", "Miss", "Dr", "Other"];
@@ -25,9 +26,21 @@ interface Props {
 
 export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
   const { toast } = useToast();
+  const { role } = useAuth();
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState<any>(null);
+  const [reassigning, setReassigning] = useState(false);
+
+  // Fetch all agents/admins for reassignment (owner only)
+  const { data: allAgents = [] } = useQuery({
+    queryKey: ["all-agents-for-reassign"],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("id, full_name, email").eq("is_active", true).order("full_name");
+      return data || [];
+    },
+    enabled: role === "owner",
+  });
 
   // Fetch enrollments to get course/campus for timetable lookup
   const { data: enrollments = [] } = useQuery({
@@ -83,6 +96,19 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
       qc.invalidateQueries({ queryKey: ["student-detail", student.id] });
       setEditing(false);
       toast({ title: "Student updated" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const reassignStudent = useMutation({
+    mutationFn: async (newAgentId: string) => {
+      const { error } = await supabase.from("students").update({ agent_id: newAgentId }).eq("id", student.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["student-detail", student.id] });
+      setReassigning(false);
+      toast({ title: "Student reassigned successfully" });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
@@ -253,7 +279,32 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
               {(student as any).crn && <div><p className="text-muted-foreground text-xs mb-0.5">CRN</p><p className="font-medium">{(student as any).crn}</p></div>}
               {student.study_pattern && <div><p className="text-muted-foreground text-xs mb-0.5">Study Pattern</p><p className="font-medium">{student.study_pattern}</p></div>}
               <div><p className="text-muted-foreground text-xs mb-0.5">Qualifications</p><p className="font-medium">{student.qualifications || "—"}</p></div>
-              <div><p className="text-muted-foreground text-xs mb-0.5">Agent</p><p className="font-medium">{agentName || "—"}</p></div>
+              <div>
+                <p className="text-muted-foreground text-xs mb-0.5">Agent</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium">{agentName || "—"}</p>
+                  {role === "owner" && !reassigning && (
+                    <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={() => setReassigning(true)}>
+                      <UserCog className="w-3 h-3" /> Reassign
+                    </Button>
+                  )}
+                </div>
+                {reassigning && role === "owner" && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <Select onValueChange={(v) => reassignStudent.mutate(v)}>
+                      <SelectTrigger className="h-8 text-xs w-[200px]"><SelectValue placeholder="Select agent…" /></SelectTrigger>
+                      <SelectContent>
+                        {allAgents.filter((a: any) => a.id !== student.agent_id).map((a: any) => (
+                          <SelectItem key={a.id} value={a.id}>{a.full_name} ({a.email})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button variant="ghost" size="sm" className="h-8" onClick={() => setReassigning(false)}>
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                )}
+              </div>
               <div><p className="text-muted-foreground text-xs mb-0.5">Created</p><p className="font-medium">{format(new Date(student.created_at), "dd MMM yyyy")}</p></div>
               {student.notes && <div className="col-span-full"><p className="text-muted-foreground text-xs mb-0.5">Notes</p><p className="font-medium whitespace-pre-wrap">{student.notes}</p></div>}
             </div>
