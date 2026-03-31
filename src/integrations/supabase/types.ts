@@ -310,6 +310,47 @@ export type Database = {
           },
         ]
       }
+      consent_signing_tokens: {
+        Row: {
+          agent_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          signed_at: string | null
+          status: string
+          student_id: string
+          token: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          signed_at?: string | null
+          status?: string
+          student_id: string
+          token?: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          signed_at?: string | null
+          status?: string
+          student_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consent_signing_tokens_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       course_details: {
         Row: {
           additional_info: string | null
