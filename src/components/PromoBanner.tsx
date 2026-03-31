@@ -178,7 +178,7 @@ function PromoBannerCard({
   const remaining = Math.max(0, target - qualifyingCount);
   const reached = qualifyingCount >= target;
   const progressPct = Math.min(100, (qualifyingCount / target) * 100);
-  const label = isTeam ? "echipă" : "studenți";
+  const label = isTeam ? "team" : "students";
 
   if (expired && !reached) return null;
 
