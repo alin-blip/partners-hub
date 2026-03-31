@@ -85,7 +85,7 @@ export function FeedbackDialog({ children }: { children?: React.ReactNode }) {
         </div>
         <DialogFooter>
           <Button onClick={handleSubmit} disabled={loading || !message.trim()}>
-            {loading ? "Se trimite..." : "Trimite feedback"}
+            {loading ? "Sending..." : "Send feedback"}
           </Button>
         </DialogFooter>
       </DialogContent>
