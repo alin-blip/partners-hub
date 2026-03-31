@@ -66,6 +66,8 @@ export default function AdminAgentsPage() {
       setNewEmail("");
       setNewName("");
       setNewPassword("");
+      setNewPostcode("");
+      setNewAddress("");
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });

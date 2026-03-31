@@ -80,6 +80,8 @@ export default function AgentsPage() {
       setNewPassword("");
       setNewRole("agent");
       setNewAdminId("");
+      setNewPostcode("");
+      setNewAddress("");
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
