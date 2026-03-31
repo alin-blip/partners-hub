@@ -34,9 +34,9 @@ export function FeedbackDialog({ children }: { children?: React.ReactNode }) {
     });
     setLoading(false);
     if (error) {
-      toast({ title: "Eroare", description: "Nu s-a putut trimite feedback-ul.", variant: "destructive" });
+      toast({ title: "Error", description: "Could not send feedback.", variant: "destructive" });
     } else {
-      toast({ title: "Mulțumim!", description: "Feedback-ul tău a fost trimis." });
+      toast({ title: "Thank you!", description: "Your feedback has been sent." });
       setMessage("");
       setCategory("suggestion");
       setOpen(false);
