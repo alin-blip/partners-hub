@@ -537,9 +537,18 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
                       <p className="text-xs text-muted-foreground">{format(new Date(doc.created_at), "dd MMM yyyy HH:mm")}</p>
                     </div>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 items-center">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownload(doc)}><Download className="w-3.5 h-3.5" /></Button>
-                    {canEdit && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteDoc(doc)}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>}
+                    {canEdit && role === "agent" && (
+                      <Button variant="ghost" size="sm" className="h-8 text-orange-600 hover:text-orange-700 text-xs gap-1" onClick={() => handleDeleteDoc(doc)}>
+                        <Archive className="w-3.5 h-3.5" /> Cancel
+                      </Button>
+                    )}
+                    {canEdit && (role === "owner" || role === "admin") && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteDoc(doc)}>
+                        <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
