@@ -304,6 +304,47 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
     setTimeout(() => setLinkCopied(false), 2000);
   };
 
+  const handleEmailConsentLink = async () => {
+    if (!student.email) {
+      toast({ title: "No email address", description: "This student doesn't have an email address on file.", variant: "destructive" });
+      return;
+    }
+    setEmailingLink(true);
+    try {
+      // First create the token
+      const { data, error } = await supabase.functions.invoke("create-consent-token", {
+        body: { student_id: student.id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const signingUrl = data.signing_url;
+      const studentName = `${student.title ? student.title + " " : ""}${student.first_name} ${student.last_name}`;
+
+      // Send the email
+      const { error: emailError } = await supabase.functions.invoke("send-transactional-email", {
+        body: {
+          templateName: "consent-signing-link",
+          recipientEmail: student.email,
+          idempotencyKey: `consent-link-${data.token}`,
+          templateData: {
+            studentName,
+            agentName: agentProfile?.full_name || "EduForYou UK",
+            signingUrl,
+          },
+        },
+      });
+      if (emailError) throw emailError;
+
+      setConsentLink(signingUrl);
+      toast({ title: "Consent email sent", description: `Email sent to ${student.email} with the signing link.` });
+    } catch (err: any) {
+      toast({ title: "Failed to send email", description: err.message, variant: "destructive" });
+    } finally {
+      setEmailingLink(false);
+    }
+  };
+
   return (
     <>
       <Card>
