@@ -46,7 +46,8 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <AuthProvider>
+         <AuthProvider>
+          <IdleTimeoutDialog />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
