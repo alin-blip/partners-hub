@@ -1,54 +1,40 @@
 
 
-## Plan: Hybrid Voice Assistant — ElevenLabs Voice + Internal AI Brain
+## Plan: Upgrade STT to ElevenLabs Scribe v2 Realtime
 
-### The Idea
+### Current vs Proposed
 
-Instead of using ElevenLabs as the AI brain (which requires uploading knowledge separately), we use ElevenLabs **only for the voice** (text-to-speech) and keep the AI brain as your existing `ai-chat` edge function that already has access to all platform data, knowledge base, user context, and role-based information.
-
-### How It Works
-
-```text
-User speaks → Browser Speech Recognition (STT) → text
-                                                    ↓
-                                          ai-chat edge function
-                                          (existing, knows everything)
-                                                    ↓
-                                          AI response text
-                                                    ↓
-                                    ElevenLabs TTS edge function → audio
-                                                    ↓
-                                          User hears the answer
-```
-
-### Why This Is Better
-
-- **No duplicate knowledge base** — the ai-chat function already has all platform data, courses, admission requirements, and user-specific context
-- **Role-aware** — the AI knows if you're an agent, admin, or owner and adapts
-- **Real-time data** — can reference actual student records, enrollment statuses, commissions
-- **Single source of truth** — update knowledge base once, both text and voice use it
+| Aspect | Current (Browser STT) | Proposed (ElevenLabs Scribe v2) |
+|--------|----------------------|-------------------------------|
+| Accuracy | Basic, inconsistent for Romanian | Professional-grade, 99+ languages |
+| Partial transcripts | Yes (basic) | Yes (high quality, low latency) |
+| Noise handling | None | echoCancellation + noiseSuppression |
+| VAD (Voice Activity Detection) | None — stops after silence | Built-in, auto-commits on pause |
+| Browser support | Chrome/Edge only | All browsers (WebSocket-based) |
+| Cost | Free | Uses ElevenLabs quota (already have API key) |
 
 ### Technical Changes
 
-| Step | What | Details |
-|------|------|---------|
-| 1 | **Add ElevenLabs API key** | You'll need to provide your ElevenLabs API key (for TTS only). The STT is free via browser. |
-| 2 | **Create `elevenlabs-tts` edge function** | Takes text + voice ID, calls ElevenLabs TTS API, returns audio. Simple proxy to protect the API key. |
-| 3 | **Update `AIChatPanel.tsx`** | Replace the ElevenLabs conversation agent with a hybrid mode: browser `SpeechRecognition` for listening → send to existing `ai-chat` → play response via ElevenLabs TTS. Remove `@elevenlabs/react` dependency (no longer needed). Remove `ConversationProvider` wrapper from `DashboardLayout.tsx`. |
-| 4 | **Voice UI in chat panel** | Mic button starts listening. User's speech appears as text message. AI responds with text + auto-plays audio. Visual indicators for listening/speaking states. |
+| Step | What |
+|------|------|
+| 1 | **Create `elevenlabs-scribe-token` edge function** — generates single-use tokens (15min expiry) so the API key stays server-side |
+| 2 | **Install `@elevenlabs/react`** — provides the `useScribe` hook for WebSocket-based realtime transcription |
+| 3 | **Update `AIChatPanel.tsx`** — replace browser `SpeechRecognition` with `useScribe` hook. Use `commitStrategy: "vad"` for automatic speech segmentation. Show partial transcript live in input field, auto-send on committed transcript |
 
-### What You Need To Provide
+### Flow After Upgrade
 
-- **ElevenLabs API key** — from your ElevenLabs account (Settings → API Keys)
-- **Voice preference** — which ElevenLabs voice to use (e.g., "Rachel", "Josh", or a custom/cloned voice)
+```text
+User clicks mic → scribe.connect(token, microphone)
+                → partial transcripts appear live in input
+                → VAD detects pause → committed transcript
+                → auto-sends to ai-chat → response streams
+                → ElevenLabs TTS plays audio response
+```
 
-### Cost Comparison
+### What Stays the Same
 
-- **Browser Speech Recognition**: Free (built into Chrome, Edge, Safari)
-- **ElevenLabs TTS**: ~$0.30 per 1,000 characters (depends on your plan)
-- **No ElevenLabs Conversational AI costs** — we're not using their agent anymore
-
-### Alternative: Fully Free (No ElevenLabs at all)
-
-If you want zero cost, we can use the browser's built-in `SpeechSynthesis` API for TTS too. The voice quality is lower but it's completely free and requires no API key. We can always upgrade to ElevenLabs TTS later.
+- The AI brain (`ai-chat` edge function) — unchanged
+- TTS output (`elevenlabs-tts` edge function) — unchanged
+- Chat history, conversation management — unchanged
+- Text input still works normally alongside voice
 
