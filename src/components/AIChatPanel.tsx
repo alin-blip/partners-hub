@@ -280,6 +280,8 @@ export function AIChatPanel() {
     const text = input.trim();
     if (!text || loading) return;
 
+    unlockAudio();
+
     const userMsg: Msg = { role: "user", content: text };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
