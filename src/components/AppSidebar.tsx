@@ -39,6 +39,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { SidebarXPWidget } from "@/components/SidebarXPWidget";
 
 type NavItem = { title: string; url: string; icon: React.ElementType; badge?: number };
 
@@ -177,6 +178,14 @@ export function AppSidebar() {
         <SidebarNavGroup label="Actions" items={actionItems} collapsed={collapsed} />
         <SidebarNavGroup label="Management" items={managementItems} collapsed={collapsed} />
         <SidebarNavGroup label="Team" items={teamItems} collapsed={collapsed} />
+        {/* XP Widget */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <div className="px-3 py-2">
+              <SidebarXPWidget collapsed={collapsed} />
+            </div>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter className="bg-sidebar text-sidebar-foreground border-t border-sidebar-border p-3">
