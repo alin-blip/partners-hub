@@ -1,31 +1,39 @@
 
 
-## Improve Course Details Text Formatting
+## Global Course Search + Dashboard Search Card
 
-### Problem
-The `formatDetailText` function in `CourseDetailsInfoCard.tsx` doesn't handle the actual data patterns. Real data uses:
-- **Semicolons** as list separators (e.g., entry requirements with `;` between items)
-- **Long sentences with periods** that should be split into separate bullet points
-- **Colons followed by content** that acts as sub-section headers (e.g., "Applicants Aged 21+: We welcome...")
-- **Mixed patterns** — some fields are comma-separated, others are semicolon-separated, others are paragraph-style
-
-Current comma-split logic works for `documents_required` but fails for `entry_requirements`, `interview_info`, and `admission_test_info`.
-
-### Solution
-Enhance `formatDetailText` in `src/components/CourseDetailsInfoCard.tsx` to:
-
-1. **Detect semicolon-separated lists** — split on `;` when 2+ items exist, render as bullet points
-2. **Detect sentence-based content** — when text has 2+ sentences (`. ` followed by uppercase), split into individual bullet points
-3. **Sub-section headers** — detect patterns like "Label:" at the start of a bullet and render the label bold
-4. **Smarter paragraph detection** — for long single blocks without clear delimiters, split on `. ` to create scannable items
-5. **Priority order**: newlines first → semicolons → commas → sentence splitting
+### What We're Building
+1. **"All" tab on Universities & Courses page** — an extra tab before university-specific tabs that shows courses from all universities, with search across course name, university name, study mode, level, etc.
+2. **Search card on Agent Dashboard** (and Owner/Admin dashboards) — a prominent search input that searches courses globally and shows inline results, linking to the Universities page or directly to enrollment.
 
 ### File Changes
-**`src/components/CourseDetailsInfoCard.tsx`** — Update the `formatDetailText` function:
-- Add semicolon splitting: `line.split(/;\s*/)` when 2+ segments, each rendered as `<li>`
-- Add sentence splitting: for lines >150 chars with no other delimiters, split on `. ` (followed by uppercase letter) into bullets
-- Keep existing comma, dash, and numbered list detection
-- Keep existing bold-before-colon logic
 
-No database changes. No other files affected.
+**1. `src/pages/shared/UniversitiesCoursesPage.tsx`**
+- Change `selectedUniId` default to `"all"` instead of auto-selecting first university
+- Add an "All" button before the university tabs with total course count badge
+- When `effectiveUniId === "all"`, skip the `university_id` filter so all courses show
+- Expand search to match against: course name, university name (via lookup), study mode, level, duration
+- Show university name on each course card when in "All" mode (small badge or subtitle)
+- Hide "Scan Details" button when "All" is selected
+
+**2. `src/components/DashboardSearchCard.tsx`** (new file)
+- A reusable card with a search input
+- Queries `courses` + `universities` tables, filters client-side by search term across course name, university name, level, study mode
+- Shows up to 6 matching results as compact list items (course name, university, level badge)
+- Each result has an "Apply" button navigating to enroll page and a click to go to Universities page with that university pre-selected
+- Empty state: "Search courses, universities, study modes..."
+
+**3. `src/pages/agent/AgentDashboard.tsx`**
+- Import and render `<DashboardSearchCard />` near the top, after promo/commission sections
+
+**4. `src/pages/owner/OwnerDashboard.tsx`**
+- Import and render `<DashboardSearchCard />` in the dashboard
+
+**5. `src/pages/admin/AdminDashboard.tsx`**
+- Import and render `<DashboardSearchCard />` in the dashboard
+
+### Technical Notes
+- Search is client-side since course data is already fetched via React Query with the same query keys
+- The dashboard search card will use its own small `useQuery` for courses + universities (cached by React Query)
+- Navigation from dashboard search results uses `navigate(`/${role}/universities?search=...`)` or direct enroll link
 
