@@ -247,7 +247,7 @@ export default function UniversitiesCoursesPage() {
               </Label>
             </div>
           )}
-           {(role === "owner" || role === "admin") && effectiveUniId && (() => {
+           {(role === "owner" || role === "admin") && effectiveUniId && effectiveUniId !== "all" && (() => {
             const uni = displayUniversities.find((u: any) => u.id === effectiveUniId);
             const uniName = uni?.name || "";
             const hasUrl = !!getUniversityUrl(uniName);
