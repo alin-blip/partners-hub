@@ -117,6 +117,13 @@ export default function StudentDetailPage() {
           ) : null}
         </div>
 
+        {isAgentLocked && (
+          <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            <Lock className="w-4 h-4 shrink-0" />
+            <span>This student's record is locked because an enrollment has reached a final status. Contact admin to make changes.</span>
+          </div>
+        )}
+
         <Tabs defaultValue="overview" className="w-full">
           <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview" className="gap-1.5"><User className="w-3.5 h-3.5" /> Overview</TabsTrigger>
