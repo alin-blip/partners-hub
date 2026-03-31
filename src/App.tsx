@@ -76,6 +76,7 @@ const App = () => (
             <Route path="/owner/digital-card" element={<DigitalCardPage />} />
             <Route path="/owner/social-posts" element={<SocialPostsPage />} />
             <Route path="/owner/universities" element={<UniversitiesCoursesPage />} />
+            <Route path="/owner/leaderboard" element={<LeaderboardPage />} />
             
             <Route path="/owner/feedback" element={<FeedbackPage />} />
             
