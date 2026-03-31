@@ -53,6 +53,7 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
   const [sendingLink, setSendingLink] = useState(false);
   const [consentLink, setConsentLink] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [emailingLink, setEmailingLink] = useState(false);
 
   const nonMarketingClauses = CONSENT_CLAUSES.filter((c) => !c.isMarketing);
   const allConsentsChecked = nonMarketingClauses.every((c) => consentChecks[c.id]);
