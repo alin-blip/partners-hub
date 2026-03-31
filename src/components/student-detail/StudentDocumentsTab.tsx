@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Download, Trash2, FileText, RefreshCw, ShieldCheck, Eye, Archive, Send, Copy, Check, Loader2 } from "lucide-react";
+import { Upload, Download, Trash2, FileText, RefreshCw, ShieldCheck, Eye, Archive, Send, Copy, Check, Loader2, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { SignatureCanvas } from "@/components/SignatureCanvas";
 import { syncToDrive } from "@/lib/drive-sync";
@@ -75,19 +75,22 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
     enabled: !!student.agent_id,
   });
 
-  // Fetch enrollments for consent PDF context
+  // Fetch enrollments for consent PDF context and Regent check
   const { data: enrollments = [] } = useQuery({
     queryKey: ["student-enrollments-for-consent", student.id],
     queryFn: async () => {
       const { data } = await supabase
         .from("enrollments")
-        .select("*, universities(name), courses(name)")
+        .select("*, universities(id, name), courses(name)")
         .eq("student_id", student.id)
-        .order("created_at", { ascending: false })
-        .limit(1);
+        .order("created_at", { ascending: false });
       return data || [];
     },
   });
+
+  const REGENT_UNIVERSITY_ID = "46b1ee8a-1371-42f1-854a-f2ff7f84c8af";
+  const REGENT_APPLICATION_FORM_URL = "https://forms.office.com/Pages/ResponsePage.aspx?id=v1F5UO4QvUicmtQlwrB3iVBDDnirEVBFnLkgzZ2NVK1UOUcxQURDQjg4QVBYV1FORTZKU0kyUERJNi4u";
+  const isRegentStudent = enrollments.some((e: any) => e.universities?.id === REGENT_UNIVERSITY_ID || e.university_id === REGENT_UNIVERSITY_ID);
 
   const getConsentPdfBody = async () => {
     const enrollment = enrollments[0] as any;
@@ -332,8 +335,26 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
             )}
           </div>
         </CardHeader>
-        <CardContent>
-          {documents.length === 0 ? (
+        <CardContent className="space-y-3">
+          {isRegentStudent && (
+            <a
+              href={REGENT_APPLICATION_FORM_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between p-3 rounded-lg border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <FileText className="w-4 h-4 text-primary" />
+                <div>
+                  <p className="text-sm font-medium">Regent Application Form</p>
+                  <p className="text-xs text-muted-foreground">Complete the online application form for Regent University</p>
+                </div>
+              </div>
+              <ExternalLink className="w-4 h-4 text-primary shrink-0" />
+            </a>
+          )}
+
+          {documents.length === 0 && !isRegentStudent ? (
             <p className="text-sm text-muted-foreground text-center py-6">No documents uploaded</p>
           ) : (
             <div className="space-y-2">
