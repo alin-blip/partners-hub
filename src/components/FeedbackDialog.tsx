@@ -49,7 +49,7 @@ export function FeedbackDialog({ children }: { children?: React.ReactNode }) {
         {children || (
           <Button variant="ghost" size="sm" className="w-full justify-start text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent">
             <MessageSquareHeart className="h-4 w-4 mr-2" />
-            Ajută-ne să îmbunătățim
+            Help us improve
           </Button>
         )}
       </DialogTrigger>
