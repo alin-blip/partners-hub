@@ -45,12 +45,19 @@ function getUniversityUrl(uniName: string): string | null {
 }
 
 export default function UniversitiesCoursesPage() {
-  const [search, setSearch] = useState("");
+  const [searchParams] = useSearchParams();
+  const initialSearch = searchParams.get("search") || "";
+  const [search, setSearch] = useState(initialSearch);
   const [showInactive, setShowInactive] = useState(false);
-  const [selectedUniId, setSelectedUniId] = useState<string | null>(null);
+  const [selectedUniId, setSelectedUniId] = useState<string | null>("all");
   const [detailsCourseId, setDetailsCourseId] = useState<string | null>(null);
   const [scanningUniId, setScanningUniId] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const s = searchParams.get("search");
+    if (s) setSearch(s);
+  }, [searchParams]);
   const { role } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
