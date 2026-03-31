@@ -52,6 +52,7 @@ const App = () => (
             <Route path="/card/:slug" element={<AgentCardPage />} />
             <Route path="/apply/:slug" element={<PublicApplicationPage />} />
             <Route path="/unsubscribe" element={<UnsubscribePage />} />
+            <Route path="/sign-consent/:token" element={<SignConsentPage />} />
             
             {/* Owner routes */}
             <Route path="/owner/dashboard" element={<OwnerDashboard />} />
