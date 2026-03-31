@@ -73,9 +73,9 @@ export function FeedbackDialog({ children }: { children?: React.ReactNode }) {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Mesaj</Label>
+            <Label>Message</Label>
             <Textarea
-              placeholder="Descrie ideea sau problema ta..."
+              placeholder="Describe your idea or issue..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               rows={4}
