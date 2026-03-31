@@ -14,6 +14,7 @@ import { template as newLeadNotification } from './new-lead-notification.tsx'
 import { template as enrollmentStatusChange } from './enrollment-status-change.tsx'
 import { template as newStudentAssigned } from './new-student-assigned.tsx'
 import { template as consentSigningLink } from './consent-signing-link.tsx'
+import { template as regentApplicationLink } from './regent-application-link.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'note-notification': noteNotification,
@@ -21,4 +22,5 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'enrollment-status-change': enrollmentStatusChange,
   'new-student-assigned': newStudentAssigned,
   'consent-signing-link': consentSigningLink,
+  'regent-application-link': regentApplicationLink,
 }
