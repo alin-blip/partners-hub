@@ -39,6 +39,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { SidebarXPWidget } from "@/components/SidebarXPWidget";
 
 type NavItem = { title: string; url: string; icon: React.ElementType; badge?: number };
 
