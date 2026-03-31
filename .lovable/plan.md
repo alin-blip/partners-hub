@@ -1,44 +1,51 @@
 
 
-## Plan: UK Postcode Address Lookup for Agent Registration
+## Plan: EduForYou Landing Page (Index)
 
-### What We're Building
+Build a high-converting landing page using Alex Hormozi's value-stack framework — leading with a bold offer, stacking benefits, showing social proof, and driving action. Styled with the EduForYou brand (navy primary, orange accent, Inter font).
 
-A reusable address lookup component that lets you type a UK postcode, fetch matching addresses from the free **postcodes.io** API (no API key needed), and select the correct one. This will be added to the agent creation dialogs on both the Owner and Admin pages.
+### Page Sections
 
-### Steps
+| # | Section | Content |
+|---|---------|---------|
+| 1 | **Navbar** | EduForYou logo (left), nav links (Features, How It Works, Pricing, Contact), Login + "Start Free" buttons |
+| 2 | **Hero** | Bold headline: "Manage Your Education Agency Like a Machine" / subheadline with pain-point solution / CTA "Get Started" + "Book a Demo" / AI-generated hero image (agent dashboard mockup or education visual) |
+| 3 | **Social Proof Bar** | Stats strip: "500+ Agents", "10,000+ Students Enrolled", "50+ Universities" |
+| 4 | **Problem/Agitate** | 3 pain points with icons: manual tracking chaos, commission disputes, scattered student data |
+| 5 | **Features Stack** | 6 feature cards with icons: Agent Management, Student Tracking, Enrollment Pipeline, Commission Engine, AI Assistant, Digital Agent Cards |
+| 6 | **How It Works** | 3 steps: Sign Up → Add Agents → Scale Enrollments (numbered steps with connecting line) |
+| 7 | **Value Stack (Hormozi)** | "Everything You Get" — list features with individual "value" prices, crossed out, then show one bundled price / "Contact Us" CTA |
+| 8 | **Testimonials** | 3 testimonial cards (placeholder data) |
+| 9 | **CTA Section** | Final dark section with "Ready to Scale?" headline + Contact form (name, email, message) or mailto/WhatsApp link |
+| 10 | **Footer** | Logo, links, copyright |
 
-| # | What | Details |
-|---|------|---------|
-| 1 | **Add address/postcode columns to profiles** | Migration: add `postcode VARCHAR(10)` and `address TEXT` columns to the `profiles` table |
-| 2 | **Create `AddressLookupInput` component** | New `src/components/AddressLookupInput.tsx` — a postcode input field + "Find Address" button. Calls `https://api.postcodes.io/postcodes/{postcode}` to validate the postcode, then shows the formatted address. User can also manually edit the address field. |
-| 3 | **Add to Owner AgentsPage** | Add postcode + address fields to the "Create New User" dialog, save to profiles on creation via the `create-owner` edge function |
-| 4 | **Add to Admin AdminAgentsPage** | Same fields added to the "Create New Agent" dialog |
-| 5 | **Update `create-owner` edge function** | Accept `postcode` and `address` params, save them to the profiles table after user creation |
+### Image Generation
 
-### How the Component Works
+Use Nano Banana (`google/gemini-2.5-flash-image`) via the `generate-image` edge function pattern to create 1-2 hero/section images. Store in Supabase storage `brand-assets` bucket. If generation is complex, use static gradients + icons instead.
 
-1. User types a UK postcode (e.g. "SW1A 1AA")
-2. Clicks "Find Address" or presses Enter
-3. Component calls `postcodes.io` — returns ward, parish, admin district, region etc.
-4. Displays the resolved location (e.g. "Westminster, London, SW1A 1AA")
-5. Address is stored in an editable text field so the user can refine it
-6. Both `postcode` and `address` values are passed up via `onChange` callbacks
+### Technical Changes
 
-### Why postcodes.io
-
-- Completely free, no API key required
-- UK-specific (perfect for this use case)
-- Returns structured location data (admin_district, region, country)
-- No rate limit concerns for typical usage
-
-### Files Changed
-
-| File | Action |
+| File | Change |
 |------|--------|
-| `src/components/AddressLookupInput.tsx` | **New** — reusable postcode lookup component |
-| `src/pages/owner/AgentsPage.tsx` | Add address fields to create dialog |
-| `src/pages/admin/AdminAgentsPage.tsx` | Add address fields to create dialog |
-| `supabase/functions/create-owner/index.ts` | Accept & save postcode/address |
-| Database migration | Add `postcode` and `address` to `profiles` |
+| `src/pages/Index.tsx` | **Replace entirely** — full landing page with all sections above |
+| `src/App.tsx` | Update route: `/` renders `Index` directly (not redirect to `/login`) |
+
+### Design Details
+
+- Navy gradient hero background with white text
+- Orange accent for all CTAs and highlights
+- Cards with subtle shadows and hover effects
+- Smooth scroll between sections
+- Responsive: mobile-first with stacked layout on small screens
+- Animations: fade-in on scroll using Tailwind + intersection observer or simple CSS animations
+- Login button in navbar links to `/login`
+- Contact section with a simple form or direct link
+
+### Hormozi Framework Applied
+
+1. **Dream Outcome**: "Manage hundreds of agents and thousands of students from one dashboard"
+2. **Perceived Likelihood**: Social proof + feature demonstration
+3. **Time Delay**: "Set up in minutes, not weeks"
+4. **Effort & Sacrifice**: "We handle the complexity — you focus on growing"
+5. **Value Stack**: Show individual feature values, then bundle price
 
