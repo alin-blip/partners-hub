@@ -66,7 +66,7 @@ export default function UniversitiesCoursesPage() {
     setScanningUniId(uniId);
     try {
       const { data, error } = await supabase.functions.invoke("scrape-course-details", {
-        body: { university_id: uniId, university_url: url },
+        body: { university_id: uniId, university_url: url, force: true },
       });
 
       if (error) throw error;

@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { university_id, university_url } = await req.json();
+    const { university_id, university_url, force } = await req.json();
     if (!university_id || !university_url) {
       return new Response(
         JSON.stringify({ error: "university_id and university_url required" }),
@@ -115,17 +115,25 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { data: existingDetails } = await adminClient
-      .from("course_details").select("course_id").in("course_id", allCourses.map((c) => c.id));
+    let missingCourses: typeof allCourses;
 
-    const existingIds = new Set((existingDetails || []).map((d) => d.course_id));
-    const missingCourses = allCourses.filter((c) => !existingIds.has(c.id));
+    if (force) {
+      // Force mode: re-scan ALL courses
+      missingCourses = allCourses;
+      console.log(`Force mode: scanning all ${allCourses.length} courses`);
+    } else {
+      const { data: existingDetails } = await adminClient
+        .from("course_details").select("course_id").in("course_id", allCourses.map((c) => c.id));
 
-    if (missingCourses.length === 0) {
-      return new Response(
-        JSON.stringify({ success: true, message: "All courses already have details", updated: 0 }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      const existingIds = new Set((existingDetails || []).map((d) => d.course_id));
+      missingCourses = allCourses.filter((c) => !existingIds.has(c.id));
+
+      if (missingCourses.length === 0) {
+        return new Response(
+          JSON.stringify({ success: true, message: "All courses already have details. Use force=true to rescan.", updated: 0 }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     const coursesWithNorm = missingCourses.map((c) => ({ ...c, normalized: normalize(c.name) }));
@@ -136,14 +144,30 @@ Deno.serve(async (req) => {
     const scrapedContent: string[] = [];
     const seenUrls = new Set<string>();
 
-    // Single broad search to find course pages
+    // Single broad search + per-course searches for better coverage
+    const hostname = new URL(university_url).hostname;
     const searchQueries = [
       `site:${hostname} courses entry requirements admission`,
-      `site:${hostname} ${missingCourses.slice(0, 3).map(c => normalize(c.name).split(" ").slice(0, 3).join(" ")).join(" OR ")}`,
     ];
+
+    // Add per-course searches (batch in groups of 2-3 course names)
+    const batchSize = 2;
+    for (let i = 0; i < missingCourses.length; i += batchSize) {
+      const batch = missingCourses.slice(i, i + batchSize);
+      const courseTerms = batch.map(c => {
+        // Extract key words from course name for search
+        const key = normalize(c.name).split(" ").filter(w => w.length > 3).slice(0, 4).join(" ");
+        return `"${key}"`;
+      }).join(" OR ");
+      searchQueries.push(`site:${hostname} ${courseTerms} entry requirements`);
+    }
+
+    const scrapedContent: string[] = [];
+    const seenUrls = new Set<string>();
 
     for (const query of searchQueries) {
       try {
+        console.log(`Searching: ${query.slice(0, 120)}`);
         const res = await fetch("https://api.firecrawl.dev/v1/search", {
           method: "POST",
           headers: {
@@ -152,7 +176,7 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({
             query,
-            limit: 10,
+            limit: 8,
             scrapeOptions: { formats: ["markdown"] },
           }),
         });
@@ -162,9 +186,11 @@ Deno.serve(async (req) => {
           for (const r of (data?.data || [])) {
             if (r?.url && !seenUrls.has(r.url) && (r?.markdown || "").length > 200) {
               seenUrls.add(r.url);
-              scrapedContent.push(`--- ${r.url} ---\n${(r.markdown as string).slice(0, 3000)}`);
+              scrapedContent.push(`--- ${r.url} ---\n${(r.markdown as string).slice(0, 4000)}`);
             }
           }
+        } else {
+          console.error(`Search failed (${res.status}):`, await res.text().catch(() => ""));
         }
       } catch (e) {
         console.error(`Search error:`, e);
