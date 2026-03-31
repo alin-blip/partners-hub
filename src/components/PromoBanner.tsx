@@ -178,7 +178,7 @@ function PromoBannerCard({
   const remaining = Math.max(0, target - qualifyingCount);
   const reached = qualifyingCount >= target;
   const progressPct = Math.min(100, (qualifyingCount / target) * 100);
-  const label = isTeam ? "echipă" : "studenți";
+  const label = isTeam ? "team" : "students";
 
   if (expired && !reached) return null;
 
@@ -194,10 +194,10 @@ function PromoBannerCard({
             <PartyPopper className="w-6 h-6" />
           </div>
           <div>
-            <h3 className="font-bold text-lg">🎉 Felicitări! Ai atins targetul!</h3>
+            <h3 className="font-bold text-lg">🎉 Congratulations! Target reached!</h3>
             <p className="text-sm mt-1 opacity-90">
-              {isTeam ? "Echipa ta a adus" : "Ai adus"} {qualifyingCount}/{target} studenți. Bonusul tău: £{promo.bonus_amount}
-              {promo.bonus_percentage ? ` + ${promo.bonus_percentage}% comision` : ""}
+              {isTeam ? "Your team enrolled" : "You enrolled"} {qualifyingCount}/{target} students. Your bonus: £{promo.bonus_amount}
+              {promo.bonus_percentage ? ` + ${promo.bonus_percentage}% commission` : ""}
             </p>
           </div>
         </div>
@@ -227,7 +227,7 @@ function PromoBannerCard({
 
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-sm font-medium">
-              <span>🎯 {qualifyingCount}/{target} {label} · Mai {remaining === 1 ? "e" : "sunt"} {remaining}</span>
+              <span>🎯 {qualifyingCount}/{target} {label} · {remaining} remaining</span>
               <span>💰 £{promo.bonus_amount}{promo.bonus_percentage ? ` + ${promo.bonus_percentage}%` : ""}</span>
             </div>
             <Progress value={progressPct} className="h-2 bg-white/20" />
@@ -236,8 +236,8 @@ function PromoBannerCard({
 
         <div className="flex gap-2 sm:gap-3 flex-shrink-0">
           {[
-            { val: days, label: "Zile" },
-            { val: hours, label: "Ore" },
+            { val: days, label: "Days" },
+            { val: hours, label: "Hrs" },
             { val: mins, label: "Min" },
             { val: secs, label: "Sec" },
           ].map(({ val, label }) => (
