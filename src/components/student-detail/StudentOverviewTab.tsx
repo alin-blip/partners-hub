@@ -183,7 +183,7 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
             </div>
             <div className="space-y-2"><Label>Email</Label><Input type="email" value={editData.email} onChange={(e) => setEditData({ ...editData, email: e.target.value })} /></div>
             <div className="space-y-2"><Label>Phone</Label><Input value={editData.phone} onChange={(e) => setEditData({ ...editData, phone: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Date of Birth</Label><Input type="date" value={editData.date_of_birth} onChange={(e) => setEditData({ ...editData, date_of_birth: e.target.value })} /></div>
+            <div className="space-y-2"><Label>Date of Birth {role === "agent" && <span className="text-xs text-muted-foreground">(locked)</span>}</Label><Input type="date" value={editData.date_of_birth} onChange={(e) => setEditData({ ...editData, date_of_birth: e.target.value })} disabled={role === "agent"} /></div>
             <div className="space-y-2 sm:col-span-2"><Label>Full UK Address</Label><Textarea value={editData.full_address} onChange={(e) => setEditData({ ...editData, full_address: e.target.value })} /></div>
             <div className="space-y-2"><Label>UK Entry Date</Label><Input type="date" value={editData.uk_entry_date} onChange={(e) => setEditData({ ...editData, uk_entry_date: e.target.value })} /></div>
             <div className="space-y-2">
