@@ -10,10 +10,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
 const categories = [
-  { value: "suggestion", label: "Sugestie" },
-  { value: "bug", label: "Bug / Problemă" },
-  { value: "simplify", label: "Simplificare" },
-  { value: "feature", label: "Funcție nouă" },
+  { value: "suggestion", label: "Suggestion" },
+  { value: "bug", label: "Bug / Issue" },
+  { value: "simplify", label: "Simplification" },
+  { value: "feature", label: "New Feature" },
 ];
 
 export function FeedbackDialog({ children }: { children?: React.ReactNode }) {
