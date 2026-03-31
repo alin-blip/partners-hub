@@ -16,6 +16,30 @@ type Msg = { role: "user" | "assistant"; content: string };
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 const TTS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`;
 
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/#{1,6}\s+/g, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/_([^_]+)_/g, "$1")
+    .replace(/~~([^~]+)~~/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/^\s*[-*+]\s+/gm, "")
+    .replace(/^\s*\d+\.\s+/gm, "")
+    .replace(/^\s*>\s+/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+let audioCtx: AudioContext | null = null;
+function unlockAudio() {
+  if (!audioCtx) audioCtx = new AudioContext();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+}
+
 async function streamChat({
   messages,
   conversationId,
@@ -86,6 +110,9 @@ async function streamChat({
 
 async function playTTS(text: string): Promise<HTMLAudioElement | null> {
   try {
+    const cleanText = stripMarkdown(text);
+    if (!cleanText) return null;
+
     const { data: sessionData } = await supabase.auth.getSession();
     const accessToken = sessionData?.session?.access_token;
 
@@ -95,11 +122,12 @@ async function playTTS(text: string): Promise<HTMLAudioElement | null> {
         "Content-Type": "application/json",
         Authorization: `Bearer ${accessToken || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
       },
-      body: JSON.stringify({ text: text.slice(0, 3000) }),
+      body: JSON.stringify({ text: cleanText.slice(0, 3000) }),
     });
 
     if (!response.ok) {
       console.error("TTS failed:", response.status);
+      toast.error("Vocea nu este disponibilă momentan.");
       return null;
     }
 
@@ -110,6 +138,7 @@ async function playTTS(text: string): Promise<HTMLAudioElement | null> {
     return audio;
   } catch (err) {
     console.error("TTS playback error:", err);
+    toast.error("Eroare la redarea vocii.");
     return null;
   }
 }
@@ -250,6 +279,8 @@ export function AIChatPanel() {
   const send = async () => {
     const text = input.trim();
     if (!text || loading) return;
+
+    unlockAudio();
 
     const userMsg: Msg = { role: "user", content: text };
     const newMessages = [...messages, userMsg];
