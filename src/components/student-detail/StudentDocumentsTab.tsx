@@ -73,7 +73,7 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
   const { data: documents = [], refetch: refetchDocs } = useQuery({
     queryKey: ["student-documents", student.id],
     queryFn: async () => {
-      const { data } = await supabase.from("student_documents").select("*").eq("student_id", student.id).is("cancelled_at" as any, null).order("created_at", { ascending: false });
+      const { data } = await supabase.from("student_documents").select("*").eq("student_id", student.id).eq("is_current", true).is("cancelled_at" as any, null).order("created_at", { ascending: false });
       return data || [];
     },
   });
