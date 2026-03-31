@@ -93,7 +93,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
     setStep(1);
     setUniversityId(""); setCampusId(""); setCourseId(""); setIntakeId(""); setStudyPattern([]);
     setTitle(""); setFirstName(""); setLastName(""); setNationality(""); setGender("");
-    setDob(""); setEmail(""); setPhone(""); setFullAddress("");
+    setDob(""); setEmail(""); setPhone(""); setFullAddress(""); setPostcode("");
     setUkEntryDate(""); setImmigrationStatus(""); setShareCode(""); setNiNumber("");
     setPreviousFundingYears(""); setCrn(""); setQualifications(""); setNotes("");
     setNokName(""); setNokPhone(""); setNokRelationship("");
