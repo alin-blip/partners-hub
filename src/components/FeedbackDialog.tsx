@@ -55,8 +55,8 @@ export function FeedbackDialog({ children }: { children?: React.ReactNode }) {
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Ajută-ne să îmbunătățim platforma</DialogTitle>
-          <DialogDescription>Spune-ne ce putem îmbunătăți, simplifica sau adăuga.</DialogDescription>
+          <DialogTitle>Help us improve the platform</DialogTitle>
+          <DialogDescription>Tell us what we can improve, simplify or add.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
