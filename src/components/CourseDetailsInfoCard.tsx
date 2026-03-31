@@ -19,7 +19,33 @@ const SECTIONS = [
   { key: "additional_info", label: "Additional Info", icon: Info, color: "text-cyan-400 border-cyan-400/30 bg-cyan-400/10" },
 ] as const;
 
+function renderBulletList(items: string[], size: "xs" | "sm"): ReactNode {
+  const filtered = items.map(i => i.trim()).filter(Boolean);
+  if (filtered.length === 0) return null;
+  return (
+    <ul className={`list-disc list-inside space-y-1.5 text-${size} text-slate-300`}>
+      {filtered.map((item, i) => (
+        <li key={i}>{boldBeforeColon(item)}</li>
+      ))}
+    </ul>
+  );
+}
+
+function boldBeforeColon(line: string): ReactNode {
+  const colonIdx = line.indexOf(":");
+  if (colonIdx > 0 && colonIdx < 60) {
+    return (
+      <>
+        <span className="font-semibold text-slate-200">{line.slice(0, colonIdx + 1)}</span>
+        {line.slice(colonIdx + 1)}
+      </>
+    );
+  }
+  return line;
+}
+
 function formatDetailText(text: string, size: "xs" | "sm" = "xs"): ReactNode {
+  // Step 1: split by newlines first
   const lines = text.split(/\n/).map((l) => l.trim()).filter(Boolean);
   const elements: ReactNode[] = [];
   let currentList: ReactNode[] = [];
@@ -27,25 +53,12 @@ function formatDetailText(text: string, size: "xs" | "sm" = "xs"): ReactNode {
   const flushList = () => {
     if (currentList.length > 0) {
       elements.push(
-        <ul key={`ul-${elements.length}`} className={`list-disc list-inside space-y-1 text-${size} text-slate-300`}>
+        <ul key={`ul-${elements.length}`} className={`list-disc list-inside space-y-1.5 text-${size} text-slate-300`}>
           {currentList}
         </ul>
       );
       currentList = [];
     }
-  };
-
-  const boldBeforeColon = (line: string): ReactNode => {
-    const colonIdx = line.indexOf(":");
-    if (colonIdx > 0 && colonIdx < 60) {
-      return (
-        <>
-          <span className="font-semibold text-slate-200">{line.slice(0, colonIdx + 1)}</span>
-          {line.slice(colonIdx + 1)}
-        </>
-      );
-    }
-    return line;
   };
 
   for (const line of lines) {
@@ -58,19 +71,51 @@ function formatDetailText(text: string, size: "xs" | "sm" = "xs"): ReactNode {
     } else if (numberedMatch) {
       currentList.push(<li key={`li-${elements.length}-${currentList.length}`}>{boldBeforeColon(numberedMatch[2])}</li>);
     } else {
-      // Check if line looks like a comma-separated list (3+ items, no long sentences)
+      // Priority: semicolons → commas → sentence splitting → paragraph
+      const semiItems = line.split(/;\s*/);
       const commaItems = line.split(/,\s*/);
-      if (commaItems.length >= 3 && commaItems.every((i) => i.length < 80)) {
+
+      if (semiItems.length >= 2 && semiItems.every(i => i.length > 0)) {
+        // Semicolon-separated list
         flushList();
         elements.push(
-          <ul key={`ul-${elements.length}`} className={`list-disc list-inside space-y-1 text-${size} text-slate-300`}>
+          <ul key={`ul-${elements.length}`} className={`list-disc list-inside space-y-1.5 text-${size} text-slate-300`}>
+            {semiItems.filter(Boolean).map((item, i) => (
+              <li key={i}>{boldBeforeColon(item.trim())}</li>
+            ))}
+          </ul>
+        );
+      } else if (commaItems.length >= 3 && commaItems.every((i) => i.length < 80)) {
+        // Comma-separated list
+        flushList();
+        elements.push(
+          <ul key={`ul-${elements.length}`} className={`list-disc list-inside space-y-1.5 text-${size} text-slate-300`}>
             {commaItems.map((item, i) => (
               <li key={i}>{boldBeforeColon(item.trim())}</li>
             ))}
           </ul>
         );
+      } else if (line.length > 150) {
+        // Long text — try sentence splitting
+        flushList();
+        const sentences = line.split(/\.\s+(?=[A-Z])/).map(s => s.trim()).filter(Boolean);
+        if (sentences.length >= 2) {
+          elements.push(
+            <ul key={`ul-${elements.length}`} className={`list-disc list-inside space-y-1.5 text-${size} text-slate-300`}>
+              {sentences.map((s, i) => (
+                <li key={i}>{boldBeforeColon(s.endsWith('.') ? s : s + '.')}</li>
+              ))}
+            </ul>
+          );
+        } else {
+          elements.push(
+            <p key={`p-${elements.length}`} className={`text-${size} text-slate-300 leading-relaxed`}>
+              {boldBeforeColon(line)}
+            </p>
+          );
+        }
       } else {
-        // It's a heading/paragraph line
+        // Short line — heading or paragraph
         flushList();
         const endsWithColon = line.endsWith(":");
         elements.push(
