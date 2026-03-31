@@ -75,19 +75,22 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
     enabled: !!student.agent_id,
   });
 
-  // Fetch enrollments for consent PDF context
+  // Fetch enrollments for consent PDF context and Regent check
   const { data: enrollments = [] } = useQuery({
     queryKey: ["student-enrollments-for-consent", student.id],
     queryFn: async () => {
       const { data } = await supabase
         .from("enrollments")
-        .select("*, universities(name), courses(name)")
+        .select("*, universities(id, name), courses(name)")
         .eq("student_id", student.id)
-        .order("created_at", { ascending: false })
-        .limit(1);
+        .order("created_at", { ascending: false });
       return data || [];
     },
   });
+
+  const REGENT_UNIVERSITY_ID = "46b1ee8a-1371-42f1-854a-f2ff7f84c8af";
+  const REGENT_APPLICATION_FORM_URL = "https://forms.office.com/Pages/ResponsePage.aspx?id=v1F5UO4QvUicmtQlwrB3iVBDDnirEVBFnLkgzZ2NVK1UOUcxQURDQjg4QVBYV1FORTZKU0kyUERJNi4u";
+  const isRegentStudent = enrollments.some((e: any) => e.universities?.id === REGENT_UNIVERSITY_ID || e.university_id === REGENT_UNIVERSITY_ID);
 
   const getConsentPdfBody = async () => {
     const enrollment = enrollments[0] as any;
