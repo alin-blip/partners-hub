@@ -1,33 +1,32 @@
 
 
-## Plan: Add Voice Conversation to AI Assistant Panel
+## Plan: Export Knowledge Base Documents for ElevenLabs Agent
 
-### Overview
+I will generate formatted text documents from all your platform's knowledge base data, course details, and admission requirements — ready to upload directly to the ElevenLabs agent's Knowledge Base section.
 
-Add a voice button to the EduForYou AI Assistant chat panel that enables real-time voice conversation using ElevenLabs Conversational AI, the same technology already used on the public agent card pages.
+### Documents to Generate
 
-### Approach
+| # | Document | Content |
+|---|----------|---------|
+| 1 | `01_Platform_Guide.txt` | How agents use the platform: enrollment wizard, statuses, navigation, features |
+| 2 | `02_GBS_Courses_Admissions.txt` | All GBS courses, fees, timetables, campus addresses, admission process (OPT, interviews) |
+| 3 | `03_GBS_Documents_Required.txt` | Standard and non-standard route document requirements for GBS |
+| 4 | `04_CECOS_Courses_Requirements.txt` | CECOS courses, entry requirements, tests, personal statements, interview info |
+| 5 | `05_Regent_Courses_Requirements.txt` | All Regent university partner courses with detailed entry/test/PS requirements |
+| 6 | `06_LSC_MLA_Courses_Requirements.txt` | LSC and MLA College course details |
+| 7 | `07_UWTSD_QA_Courses_Requirements.txt` | UWTSD and QA partner courses and admission details |
+| 8 | `08_Campuses_All_Universities.txt` | All campus locations per university |
+| 9 | `09_Commission_Structure.txt` | How commissions work, tiers, university-specific rates |
+| 10 | `10_Enrollment_Statuses_Funding.txt` | All enrollment and funding statuses explained |
 
-Use the `@elevenlabs/react` SDK with the `useConversation` hook for a native, integrated voice experience inside the chat panel. This connects to the same ElevenLabs agent (`agent_4501kmytq1bnekgs59jh6rzjwxw4`) already configured for the platform — no additional API keys needed since it's a public agent.
+### How It Works
 
-### How It Will Work
+1. I'll extract all data from your database (already queried above)
+2. Format each document as clean, structured text optimized for AI knowledge retrieval
+3. Save all files to `/mnt/documents/` for download
+4. You upload them to ElevenLabs agent → Knowledge Base section
 
-1. A **microphone button** appears next to the text input in the AI Assistant panel
-2. Tapping it starts a live voice session — the user speaks and the AI responds with voice
-3. A visual indicator shows when the AI is speaking vs listening
-4. The user can end the voice session and return to text chat at any time
+### After Upload
 
-### Technical Changes
-
-| Step | File | Change |
-|------|------|--------|
-| 1 | `package.json` | Install `@elevenlabs/react` |
-| 2 | `src/components/AIChatPanel.tsx` | Add `useConversation` hook with the existing agent ID. Add a mic toggle button next to the Send button. Show voice status (connected/speaking/listening) in the chat area when active. |
-
-### Key Details
-
-- **No API key needed** — the ElevenLabs agent is public (same as on `/card/:slug` pages)
-- **Connection type**: WebRTC (lower latency)
-- **User must grant microphone permission** — handled with a friendly toast if denied
-- The text chat remains fully functional alongside voice
+Once you've created the agent and uploaded these documents, give me the new Agent ID and I'll integrate it into the platform's AI Assistant (separate from the public card agent).
 
