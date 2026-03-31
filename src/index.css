@@ -95,3 +95,67 @@
     @apply bg-background text-foreground font-sans antialiased;
   }
 }
+
+/* Anti-copy protection */
+.protected-content {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.protected-content input,
+.protected-content textarea,
+.protected-content [contenteditable="true"],
+.protected-content select {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+.protected-content img {
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
+/* Print blocker */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  body::after {
+    content: "Printing is not allowed on this platform.";
+    visibility: visible !important;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 24px;
+    font-weight: 600;
+    color: hsl(var(--foreground));
+  }
+}
+
+/* Watermark */
+.watermark-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+.watermark-overlay span {
+  position: absolute;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 500;
+  color: hsl(var(--foreground) / 0.04);
+  transform: rotate(-30deg);
+  user-select: none;
+}

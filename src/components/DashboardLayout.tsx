@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useMemo } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -14,6 +14,55 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children, allowedRoles }: DashboardLayoutProps) {
   const { user, role, profile, loading } = useAuth();
+
+  // Anti-copy keyboard shortcut blocker
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().includes("MAC");
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      // Block Ctrl/Cmd + P (print), U (view source), S (save)
+      if (mod && ["p", "u", "s"].includes(e.key.toLowerCase())) {
+        e.preventDefault();
+      }
+      // Block Ctrl/Cmd + A (select all) and C (copy) outside inputs
+      if (mod && ["a", "c"].includes(e.key.toLowerCase())) {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (!["INPUT", "TEXTAREA", "SELECT"].includes(tag)) {
+          e.preventDefault();
+        }
+      }
+      // Block F12
+      if (e.key === "F12") e.preventDefault();
+    };
+
+    const ctxHandler = (e: MouseEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (!["INPUT", "TEXTAREA", "SELECT"].includes(tag)) {
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener("keydown", handler);
+    document.addEventListener("contextmenu", ctxHandler);
+    return () => {
+      document.removeEventListener("keydown", handler);
+      document.removeEventListener("contextmenu", ctxHandler);
+    };
+  }, []);
+
+  // Watermark grid positions
+  const watermarkItems = useMemo(() => {
+    const email = profile?.email || user?.email || "";
+    if (!email) return null;
+    const items: { top: number; left: number; key: number }[] = [];
+    let k = 0;
+    for (let row = -5; row < 110; row += 18) {
+      for (let col = -10; col < 110; col += 28) {
+        items.push({ top: row, left: col + ((row / 18) % 2 === 0 ? 0 : 14), key: k++ });
+      }
+    }
+    return { email, items };
+  }, [profile?.email, user?.email]);
 
   if (loading) {
     return (
@@ -35,7 +84,7 @@ export function DashboardLayout({ children, allowedRoles }: DashboardLayoutProps
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full protected-content">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 flex items-center justify-between border-b bg-card px-4 shrink-0">
@@ -55,6 +104,18 @@ export function DashboardLayout({ children, allowedRoles }: DashboardLayoutProps
           </main>
         </div>
         <AIChatPanel />
+        {watermarkItems && (
+          <div className="watermark-overlay" aria-hidden="true">
+            {watermarkItems.items.map((item) => (
+              <span
+                key={item.key}
+                style={{ top: `${item.top}%`, left: `${item.left}%` }}
+              >
+                {watermarkItems.email}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </SidebarProvider>
   );
