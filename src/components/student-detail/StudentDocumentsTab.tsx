@@ -175,9 +175,32 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
       const storagePath = `${student.id}/${selectedDocType}_${Date.now()}.${ext}`;
       const { error: uploadError } = await supabase.storage.from("student-documents").upload(storagePath, file);
       if (uploadError) throw uploadError;
+
+      // Mark previous versions of same doc type as not current
+      const { data: existingDocs } = await supabase
+        .from("student_documents")
+        .select("id, version")
+        .eq("student_id", student.id)
+        .eq("doc_type", selectedDocType)
+        .eq("is_current", true);
+      
+      const nextVersion = existingDocs && existingDocs.length > 0
+        ? Math.max(...existingDocs.map((d: any) => d.version)) + 1
+        : 1;
+
+      if (existingDocs && existingDocs.length > 0) {
+        await supabase
+          .from("student_documents")
+          .update({ is_current: false } as any)
+          .eq("student_id", student.id)
+          .eq("doc_type", selectedDocType)
+          .eq("is_current", true);
+      }
+
       const { error: dbError } = await supabase.from("student_documents").insert({
         student_id: student.id, agent_id: student.agent_id, doc_type: selectedDocType,
         file_name: file.name, file_path: storagePath, file_size: file.size, uploaded_by: user.id,
+        version: nextVersion, is_current: true,
       });
       if (dbError) throw dbError;
       toast({ title: "Document uploaded" });
