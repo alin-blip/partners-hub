@@ -57,6 +57,15 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
   const [emailingLink, setEmailingLink] = useState(false);
   const [emailingRegent, setEmailingRegent] = useState(false);
 
+  // Delete confirmation state
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteCodeDialogOpen, setDeleteCodeDialogOpen] = useState(false);
+  const [deleteCode, setDeleteCode] = useState("");
+  const [requestingCode, setRequestingCode] = useState(false);
+  const [verifyingCode, setVerifyingCode] = useState(false);
+  const [codeRequested, setCodeRequested] = useState(false);
+
   const nonMarketingClauses = CONSENT_CLAUSES.filter((c) => !c.isMarketing);
   const allConsentsChecked = nonMarketingClauses.every((c) => consentChecks[c.id]);
   const canSubmitConsent = allConsentsChecked && consentSignature.trim().length > 0 && !!signatureDataUrl;
