@@ -32,6 +32,22 @@ export default function StudentDetailPage() {
     enabled: !!id,
   });
 
+  // Check if any enrollment is in a locked status (for agents)
+  const LOCKED_STATUSES = ["enrolled", "active", "rejected", "withdrawn"];
+  const { data: hasLockedEnrollment } = useQuery({
+    queryKey: ["student-locked-enrollment", id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("enrollments")
+        .select("id, status")
+        .eq("student_id", id!)
+        .in("status", LOCKED_STATUSES)
+        .limit(1);
+      return (data && data.length > 0) || false;
+    },
+    enabled: !!id,
+  });
+
   const { data: agentProfile } = useQuery({
     queryKey: ["agent-profile", student?.agent_id],
     queryFn: async () => {
