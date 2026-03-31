@@ -6,7 +6,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, User, FileText, GraduationCap, DollarSign, MessageSquare, Sparkles, ShieldCheck, ShieldAlert } from "lucide-react";
+import { ArrowLeft, User, FileText, GraduationCap, DollarSign, MessageSquare, Sparkles, ShieldCheck, ShieldAlert, Lock } from "lucide-react";
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbSeparator, BreadcrumbPage } from "@/components/ui/breadcrumb";
 import { Link } from "react-router-dom";
 import { StudentOverviewTab } from "@/components/student-detail/StudentOverviewTab";
@@ -28,6 +28,22 @@ export default function StudentDetailPage() {
       const { data, error } = await supabase.from("students").select("*").eq("id", id!).single();
       if (error) throw error;
       return data;
+    },
+    enabled: !!id,
+  });
+
+  // Check if any enrollment is in a locked status (for agents)
+  const LOCKED_STATUSES = ["enrolled", "active", "rejected", "withdrawn"];
+  const { data: hasLockedEnrollment } = useQuery({
+    queryKey: ["student-locked-enrollment", id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("enrollments")
+        .select("id, status")
+        .eq("student_id", id!)
+        .in("status", LOCKED_STATUSES)
+        .limit(1);
+      return (data && data.length > 0) || false;
     },
     enabled: !!id,
   });
@@ -62,7 +78,8 @@ export default function StudentDetailPage() {
     return <DashboardLayout><div className="flex items-center justify-center py-20 text-muted-foreground">Student not found</div></DashboardLayout>;
   }
 
-  const canEdit = role === "owner" || role === "admin" || (role === "agent" && student.agent_id === user?.id);
+  const isAgentLocked = role === "agent" && hasLockedEnrollment === true;
+  const canEdit = !isAgentLocked && (role === "owner" || role === "admin" || (role === "agent" && student.agent_id === user?.id));
   const canChangeStatus = role === "owner" || role === "admin";
 
   return (
@@ -99,6 +116,13 @@ export default function StudentDetailPage() {
             </Badge>
           ) : null}
         </div>
+
+        {isAgentLocked && (
+          <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            <Lock className="w-4 h-4 shrink-0" />
+            <span>This student's record is locked because an enrollment has reached a final status. Contact admin to make changes.</span>
+          </div>
+        )}
 
         <Tabs defaultValue="overview" className="w-full">
           <TabsList className="grid w-full grid-cols-6">
