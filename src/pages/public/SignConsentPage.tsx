@@ -33,22 +33,19 @@ export default function SignConsentPage() {
   useEffect(() => {
     if (!token) { setStatus("error"); return; }
 
-    // Fetch token info via anon access
-    supabase
-      .from("consent_signing_tokens")
-      .select("status, expires_at, students(first_name, last_name, title)")
-      .eq("token", token)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (error || !data) { setStatus("error"); return; }
-        if (data.status === "signed") { setStatus("signed"); return; }
-        if (data.status === "expired" || new Date(data.expires_at) < new Date()) {
-          setStatus("expired"); return;
-        }
-        const s = data.students as any;
-        setStudentName(`${s.title ? s.title + " " : ""}${s.first_name} ${s.last_name}`);
+    supabase.functions.invoke("validate-consent-token", {
+      body: { token },
+    }).then(({ data, error }) => {
+      if (error || !data) { setStatus("error"); return; }
+      if (data.status === "signed") { setStatus("signed"); return; }
+      if (data.status === "expired") { setStatus("expired"); return; }
+      if (data.status === "valid") {
+        setStudentName(data.studentName || "Student");
         setStatus("valid");
-      });
+        return;
+      }
+      setStatus("error");
+    });
   }, [token]);
 
   const handleSubmit = async () => {
