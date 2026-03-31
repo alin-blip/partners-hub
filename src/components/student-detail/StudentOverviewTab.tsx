@@ -279,7 +279,32 @@ export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
               {(student as any).crn && <div><p className="text-muted-foreground text-xs mb-0.5">CRN</p><p className="font-medium">{(student as any).crn}</p></div>}
               {student.study_pattern && <div><p className="text-muted-foreground text-xs mb-0.5">Study Pattern</p><p className="font-medium">{student.study_pattern}</p></div>}
               <div><p className="text-muted-foreground text-xs mb-0.5">Qualifications</p><p className="font-medium">{student.qualifications || "—"}</p></div>
-              <div><p className="text-muted-foreground text-xs mb-0.5">Agent</p><p className="font-medium">{agentName || "—"}</p></div>
+              <div>
+                <p className="text-muted-foreground text-xs mb-0.5">Agent</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium">{agentName || "—"}</p>
+                  {role === "owner" && !reassigning && (
+                    <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={() => setReassigning(true)}>
+                      <UserCog className="w-3 h-3" /> Reassign
+                    </Button>
+                  )}
+                </div>
+                {reassigning && role === "owner" && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <Select onValueChange={(v) => reassignStudent.mutate(v)}>
+                      <SelectTrigger className="h-8 text-xs w-[200px]"><SelectValue placeholder="Select agent…" /></SelectTrigger>
+                      <SelectContent>
+                        {allAgents.filter((a: any) => a.id !== student.agent_id).map((a: any) => (
+                          <SelectItem key={a.id} value={a.id}>{a.full_name} ({a.email})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button variant="ghost" size="sm" className="h-8" onClick={() => setReassigning(false)}>
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                )}
+              </div>
               <div><p className="text-muted-foreground text-xs mb-0.5">Created</p><p className="font-medium">{format(new Date(student.created_at), "dd MMM yyyy")}</p></div>
               {student.notes && <div className="col-span-full"><p className="text-muted-foreground text-xs mb-0.5">Notes</p><p className="font-medium whitespace-pre-wrap">{student.notes}</p></div>}
             </div>
