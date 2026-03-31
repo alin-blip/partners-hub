@@ -335,8 +335,26 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
             )}
           </div>
         </CardHeader>
-        <CardContent>
-          {documents.length === 0 ? (
+        <CardContent className="space-y-3">
+          {isRegentStudent && (
+            <a
+              href={REGENT_APPLICATION_FORM_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between p-3 rounded-lg border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <FileText className="w-4 h-4 text-primary" />
+                <div>
+                  <p className="text-sm font-medium">Regent Application Form</p>
+                  <p className="text-xs text-muted-foreground">Complete the online application form for Regent University</p>
+                </div>
+              </div>
+              <ExternalLink className="w-4 h-4 text-primary shrink-0" />
+            </a>
+          )}
+
+          {documents.length === 0 && !isRegentStudent ? (
             <p className="text-sm text-muted-foreground text-center py-6">No documents uploaded</p>
           ) : (
             <div className="space-y-2">
