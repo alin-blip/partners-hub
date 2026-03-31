@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Download, Trash2, FileText, RefreshCw, ShieldCheck, Eye, Archive } from "lucide-react";
+import { Upload, Download, Trash2, FileText, RefreshCw, ShieldCheck, Eye, Archive, Send, Copy, Check, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { SignatureCanvas } from "@/components/SignatureCanvas";
 import { syncToDrive } from "@/lib/drive-sync";
@@ -48,6 +48,11 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
   // Preview state
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
+
+  // Consent link state
+  const [sendingLink, setSendingLink] = useState(false);
+  const [consentLink, setConsentLink] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const nonMarketingClauses = CONSENT_CLAUSES.filter((c) => !c.isMarketing);
   const allConsentsChecked = nonMarketingClauses.every((c) => consentChecks[c.id]);
@@ -269,12 +274,38 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
     }
   };
 
+  const handleSendConsentLink = async () => {
+    setSendingLink(true);
+    setConsentLink(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-consent-token", {
+        body: { student_id: student.id },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setConsentLink(data.signing_url);
+      toast({ title: "Consent link created", description: "Copy the link and send it to the student." });
+    } catch (err: any) {
+      toast({ title: "Failed to create link", description: err.message, variant: "destructive" });
+    } finally {
+      setSendingLink(false);
+    }
+  };
+
+  const handleCopyLink = () => {
+    if (!consentLink) return;
+    navigator.clipboard.writeText(consentLink);
+    setLinkCopied(true);
+    toast({ title: "Link copied to clipboard" });
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
+
   return (
     <>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-3">
           <CardTitle className="text-base">Documents</CardTitle>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {documents.length > 0 && (
               <Button size="sm" variant="outline" onClick={handleDownloadAll} disabled={downloadingAll}>
                 <Archive className="w-3 h-3 mr-1" /> {downloadingAll ? "Zipping…" : "Download All"}
@@ -282,6 +313,10 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
             )}
             {canEdit && (
               <>
+                <Button size="sm" variant="outline" onClick={handleSendConsentLink} disabled={sendingLink}>
+                  {sendingLink ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
+                  Send Consent Link
+                </Button>
                 <Button size="sm" variant="outline" onClick={() => setConsentDialogOpen(true)}>
                   <RefreshCw className="w-3 h-3 mr-1" /> Re-generate Consent
                 </Button>
@@ -326,6 +361,23 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
           )}
         </CardContent>
       </Card>
+
+      {consentLink && (
+        <Card className="border-accent/50">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium mb-1">Consent Signing Link</p>
+                <p className="text-xs text-muted-foreground truncate">{consentLink}</p>
+              </div>
+              <Button size="sm" variant="outline" onClick={handleCopyLink}>
+                {linkCopied ? <Check className="w-3 h-3 mr-1" /> : <Copy className="w-3 h-3 mr-1" />}
+                {linkCopied ? "Copied" : "Copy"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Re-generate Consent Form Dialog */}
       <Dialog open={consentDialogOpen} onOpenChange={(o) => { if (!o) { setPreviewUrl(null); } setConsentDialogOpen(o); }}>
