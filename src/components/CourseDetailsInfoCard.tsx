@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { FileText, ClipboardCheck, Users, BookOpen, FolderOpen, Info } from "lucide-react";
+import { ReactNode } from "react";
 
 interface Props {
   courseId: string;
@@ -17,6 +18,76 @@ const SECTIONS = [
   { key: "personal_statement_guidelines", label: "Personal Statement", icon: BookOpen, color: "text-rose-400 border-rose-400/30 bg-rose-400/10" },
   { key: "additional_info", label: "Additional Info", icon: Info, color: "text-cyan-400 border-cyan-400/30 bg-cyan-400/10" },
 ] as const;
+
+function formatDetailText(text: string, size: "xs" | "sm" = "xs"): ReactNode {
+  const lines = text.split(/\n/).map((l) => l.trim()).filter(Boolean);
+  const elements: ReactNode[] = [];
+  let currentList: ReactNode[] = [];
+
+  const flushList = () => {
+    if (currentList.length > 0) {
+      elements.push(
+        <ul key={`ul-${elements.length}`} className={`list-disc list-inside space-y-1 text-${size} text-slate-300`}>
+          {currentList}
+        </ul>
+      );
+      currentList = [];
+    }
+  };
+
+  const boldBeforeColon = (line: string): ReactNode => {
+    const colonIdx = line.indexOf(":");
+    if (colonIdx > 0 && colonIdx < 60) {
+      return (
+        <>
+          <span className="font-semibold text-slate-200">{line.slice(0, colonIdx + 1)}</span>
+          {line.slice(colonIdx + 1)}
+        </>
+      );
+    }
+    return line;
+  };
+
+  for (const line of lines) {
+    // Detect bullet/dash/numbered lines
+    const bulletMatch = line.match(/^[-•●]\s*(.*)/);
+    const numberedMatch = line.match(/^(\d+)[.)]\s*(.*)/);
+
+    if (bulletMatch) {
+      currentList.push(<li key={`li-${elements.length}-${currentList.length}`}>{boldBeforeColon(bulletMatch[1])}</li>);
+    } else if (numberedMatch) {
+      currentList.push(<li key={`li-${elements.length}-${currentList.length}`}>{boldBeforeColon(numberedMatch[2])}</li>);
+    } else {
+      // Check if line looks like a comma-separated list (3+ items, no long sentences)
+      const commaItems = line.split(/,\s*/);
+      if (commaItems.length >= 3 && commaItems.every((i) => i.length < 80)) {
+        flushList();
+        elements.push(
+          <ul key={`ul-${elements.length}`} className={`list-disc list-inside space-y-1 text-${size} text-slate-300`}>
+            {commaItems.map((item, i) => (
+              <li key={i}>{boldBeforeColon(item.trim())}</li>
+            ))}
+          </ul>
+        );
+      } else {
+        // It's a heading/paragraph line
+        flushList();
+        const endsWithColon = line.endsWith(":");
+        elements.push(
+          <p
+            key={`p-${elements.length}`}
+            className={`text-${size} ${endsWithColon ? "font-semibold text-slate-200 mt-2" : "text-slate-300"} leading-relaxed`}
+          >
+            {boldBeforeColon(line)}
+          </p>
+        );
+      }
+    }
+  }
+  flushList();
+
+  return <div className="space-y-2">{elements}</div>;
+}
 
 export function CourseDetailsInfoCard({ courseId, compact = false }: Props) {
   const { data: details } = useQuery({
@@ -53,9 +124,7 @@ export function CourseDetailsInfoCard({ courseId, compact = false }: Props) {
               </AccordionTrigger>
               <AccordionContent className="pb-3 pt-0">
                 <div className={`pl-4 border-l-2 ${color.split(" ")[1]} ml-1.5`}>
-                  <p className="text-xs text-slate-300 whitespace-pre-line leading-relaxed">
-                    {(details as any)[key]}
-                  </p>
+                  {formatDetailText((details as any)[key], "xs")}
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -79,7 +148,7 @@ export function CourseDetailsInfoCard({ courseId, compact = false }: Props) {
                 <Icon className="w-4 h-4 mt-0.5 text-accent shrink-0" />
                 <div>
                   <p className="font-medium text-sm">{label}</p>
-                  <p className="text-muted-foreground whitespace-pre-line text-sm">{value}</p>
+                  {formatDetailText(value, "sm")}
                 </div>
               </div>
             );
