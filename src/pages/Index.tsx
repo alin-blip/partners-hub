@@ -399,7 +399,7 @@ const Index = () => {
               </div>
               <div className="pt-4">
                 <Link to="/login">
-                  <Button variant="outline" size="lg" className="border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10">
+                  <Button variant="outline" size="lg" className="text-primary-foreground border-primary bg-accent">
                     Already have an account? Log In
                   </Button>
                 </Link>
