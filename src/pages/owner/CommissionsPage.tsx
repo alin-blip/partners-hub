@@ -22,7 +22,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   PoundSterling, Users, TrendingUp, ChevronDown, ChevronRight,
-  CreditCard, Clock, CheckCircle2, AlertCircle,
+  CreditCard, Clock, CheckCircle2, AlertCircle, ArrowUpCircle, X,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -200,10 +200,89 @@ export default function CommissionsPage() {
     });
   };
 
+  // Fetch tier upgrade requests
+  const { data: upgradeRequests = [] } = useQuery({
+    queryKey: ["tier-upgrade-requests"],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("tier_upgrade_requests")
+        .select("*")
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+      return (data || []) as any[];
+    },
+  });
+
+  const approveUpgrade = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any)
+        .from("tier_upgrade_requests")
+        .update({ status: "approved", reviewed_at: new Date().toISOString(), reviewed_by: user?.id })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tier-upgrade-requests"] });
+      toast({ title: "Tier upgrade approved" });
+    },
+  });
+
+  const rejectUpgrade = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any)
+        .from("tier_upgrade_requests")
+        .update({ status: "rejected", reviewed_at: new Date().toISOString(), reviewed_by: user?.id })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tier-upgrade-requests"] });
+      toast({ title: "Tier upgrade rejected" });
+    },
+  });
+
   return (
     <DashboardLayout allowedRoles={["owner"]}>
       <div className="space-y-6">
         <h1 className="text-2xl font-bold tracking-tight">Commission Ledger</h1>
+
+        {/* Pending Tier Upgrades */}
+        {upgradeRequests.length > 0 && (
+          <Card className="border-amber-300 bg-amber-50/50 dark:bg-amber-950/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ArrowUpCircle className="w-4 h-4 text-amber-600" />
+                Pending Tier Upgrades ({upgradeRequests.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {upgradeRequests.map((req: any) => {
+                const profile = profileMap.get(req.user_id);
+                return (
+                  <div key={req.id} className="flex items-center justify-between rounded-lg border bg-background p-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">
+                        {profile?.full_name || "Unknown"} <Badge variant="outline" className="text-xs ml-1">{req.user_role}</Badge>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {req.current_tier_name} (£{Number(req.current_rate)}) → {req.new_tier_name} (£{Number(req.new_rate)}) · {req.student_count} students
+                      </p>
+                      <p className="text-[10px] text-muted-foreground/60">{format(new Date(req.created_at), "dd MMM yyyy HH:mm")}</p>
+                    </div>
+                    <div className="flex gap-2 ml-3">
+                      <Button size="sm" variant="default" className="h-7 text-xs" onClick={() => approveUpgrade.mutate(req.id)}>
+                        <CheckCircle2 className="w-3 h-3 mr-1" /> Approve
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => rejectUpgrade.mutate(req.id)}>
+                        <X className="w-3 h-3 mr-1" /> Reject
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard title="Total Owed" value={`£${totalOwed.toLocaleString()}`} icon={PoundSterling} />

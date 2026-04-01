@@ -135,6 +135,36 @@ export function NotificationBell() {
         });
       }
 
+      // 4. Pending tier upgrade requests (owner only)
+      if (role === "owner") {
+        const { data: upgrades } = await (supabase as any)
+          .from("tier_upgrade_requests")
+          .select("id, user_id, user_role, current_tier_name, new_tier_name, current_rate, new_rate, student_count, created_at")
+          .eq("status", "pending")
+          .order("created_at", { ascending: false })
+          .limit(5);
+
+        if (upgrades) {
+          const upgradeUserIds = [...new Set(upgrades.map((u: any) => u.user_id))] as string[];
+          const { data: upgradeProfiles } = await supabase
+            .from("profiles")
+            .select("id, full_name")
+            .in("id", upgradeUserIds);
+          const upgradeNameMap = Object.fromEntries((upgradeProfiles || []).map((p: any) => [p.id, p.full_name]));
+
+          upgrades.forEach((u: any) => {
+            items.push({
+              id: `upgrade-${u.id}`,
+              type: "enrollment",
+              title: `Tier upgrade: ${upgradeNameMap[u.user_id] || "Unknown"}`,
+              description: `${u.current_tier_name} → ${u.new_tier_name} (£${u.current_rate} → £${u.new_rate})`,
+              time: u.created_at,
+              link: `${prefix}/commissions`,
+            });
+          });
+        }
+      }
+
       items.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
       return items.slice(0, 15);
     },

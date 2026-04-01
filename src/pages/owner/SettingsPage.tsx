@@ -448,112 +448,175 @@ function CommissionTiersSection({ deleteItem, universities }: { deleteItem: any;
 }
 
 /* ──────────────────────────────────────────────────────── */
-/*  Admin Commission Settings                              */
+/*  Admin Commission Tiers                                 */
 /* ──────────────────────────────────────────────────────── */
 
-function AdminCommissionSettingsSection() {
+function AdminCommissionTiersSection() {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingTier, setEditingTier] = useState<any>(null);
+  const [bulkTiers, setBulkTiers] = useState<{ tier_name: string; min_students: string; max_students: string; rate_per_student: string }[]>([
+    { tier_name: "", min_students: "0", max_students: "", rate_per_student: "100" },
+  ]);
 
-  const { data: admins = [] } = useQuery({
-    queryKey: ["admin-profiles-for-settings"],
+  const { data: tiers = [] } = useQuery({
+    queryKey: ["admin-commission-tiers"],
     queryFn: async () => {
-      const { data: roles } = await supabase.from("user_roles").select("user_id").eq("role", "admin");
-      if (!roles?.length) return [];
-      const ids = roles.map((r: any) => r.user_id);
-      const { data } = await supabase.from("profiles").select("id, full_name, email").in("id", ids);
-      return data || [];
-    },
-  });
-
-  const { data: settings = [] } = useQuery({
-    queryKey: ["admin-commission-settings-all"],
-    queryFn: async () => {
-      const { data } = await supabase.from("admin_commission_settings").select("*");
+      const { data } = await supabase
+        .from("admin_commission_tiers" as any)
+        .select("*")
+        .order("min_students");
       return (data || []) as any[];
     },
   });
 
-  const settingsMap = new Map(settings.map((s: any) => [s.admin_id, s]));
-
-  const upsertRate = useMutation({
-    mutationFn: async ({ adminId, rate }: { adminId: string; rate: number }) => {
-      const existing = settingsMap.get(adminId);
-      if (existing) {
-        const { error } = await supabase.from("admin_commission_settings").update({ rate_per_student: rate }).eq("id", existing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("admin_commission_settings").insert({ admin_id: adminId, rate_per_student: rate });
-        if (error) throw error;
-      }
+  const addTiersBulk = useMutation({
+    mutationFn: async (rows: any[]) => {
+      const { error } = await (supabase as any).from("admin_commission_tiers").insert(rows);
+      if (error) throw error;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["admin-commission-settings-all"] });
-      toast({ title: "Admin rate saved" });
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-commission-tiers"] }); toast({ title: "Admin tiers added" }); },
   });
+
+  const updateTier = useMutation({
+    mutationFn: async (d: any) => {
+      const { error } = await (supabase as any).from("admin_commission_tiers").update({
+        tier_name: d.tier_name,
+        min_students: Number(d.min_students),
+        max_students: d.max_students ? Number(d.max_students) : null,
+        rate_per_student: Number(d.rate_per_student),
+      }).eq("id", d.id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-commission-tiers"] }); toast({ title: "Admin tier updated" }); },
+  });
+
+  const deleteTier = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any).from("admin_commission_tiers").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-commission-tiers"] }); toast({ title: "Admin tier deleted" }); },
+  });
+
+  const globalTiers = tiers.filter((t: any) => !t.admin_id);
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Admin Commission Rates</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between pb-3">
+        <CardTitle className="text-base">Admin Commission Tiers</CardTitle>
+        <Dialog open={addOpen} onOpenChange={(o) => { setAddOpen(o); if (!o) setBulkTiers([{ tier_name: "", min_students: "0", max_students: "", rate_per_student: "100" }]); }}>
+          <DialogTrigger asChild>
+            <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90">
+              <Plus className="w-3 h-3 mr-1" /> Add
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader><DialogTitle>Add Admin Commission Tiers</DialogTitle></DialogHeader>
+            <form className="space-y-4 pt-2" onSubmit={(e) => {
+              e.preventDefault();
+              const rows = bulkTiers
+                .filter(t => t.tier_name.trim())
+                .map(t => ({
+                  tier_name: t.tier_name,
+                  min_students: Number(t.min_students),
+                  max_students: t.max_students ? Number(t.max_students) : null,
+                  rate_per_student: Number(t.rate_per_student),
+                  admin_id: null,
+                }));
+              if (rows.length === 0) return;
+              addTiersBulk.mutate(rows);
+              setAddOpen(false);
+            }}>
+              <div className="space-y-3">
+                <div className="grid grid-cols-[1fr_80px_80px_100px_36px] gap-2 text-xs font-medium text-muted-foreground px-1">
+                  <span>Tier Name</span><span>Min</span><span>Max</span><span>£/Student</span><span></span>
+                </div>
+                {bulkTiers.map((tier, idx) => (
+                  <div key={idx} className="grid grid-cols-[1fr_80px_80px_100px_36px] gap-2 items-center">
+                    <Input placeholder="e.g. Starter" value={tier.tier_name} onChange={(e) => { const next = [...bulkTiers]; next[idx] = { ...next[idx], tier_name: e.target.value }; setBulkTiers(next); }} required />
+                    <Input type="number" min={0} value={tier.min_students} onChange={(e) => { const next = [...bulkTiers]; next[idx] = { ...next[idx], min_students: e.target.value }; setBulkTiers(next); }} required />
+                    <Input type="number" placeholder="∞" value={tier.max_students} onChange={(e) => { const next = [...bulkTiers]; next[idx] = { ...next[idx], max_students: e.target.value }; setBulkTiers(next); }} />
+                    <Input type="number" min={0} step="0.01" value={tier.rate_per_student} onChange={(e) => { const next = [...bulkTiers]; next[idx] = { ...next[idx], rate_per_student: e.target.value }; setBulkTiers(next); }} required />
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" disabled={bulkTiers.length === 1} onClick={() => setBulkTiers(bulkTiers.filter((_, i) => i !== idx))}>
+                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+                <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => setBulkTiers([...bulkTiers, { tier_name: "", min_students: "0", max_students: "", rate_per_student: "100" }])}>
+                  <Plus className="w-3 h-3 mr-1" /> Add Another Tier
+                </Button>
+              </div>
+              <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
+                Save {bulkTiers.length > 1 ? `${bulkTiers.length} Tiers` : "Tier"}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Admin</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead className="text-right">Rate (£/student)</TableHead>
-              <TableHead></TableHead>
+              <TableHead>Tier</TableHead>
+              <TableHead>Min Students</TableHead>
+              <TableHead>Max Students</TableHead>
+              <TableHead>£ per Student</TableHead>
+              <TableHead className="w-24" />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {admins.map((admin: any) => {
-              const current = settingsMap.get(admin.id);
-              return (
-                <AdminRateRow
-                  key={admin.id}
-                  admin={admin}
-                  currentRate={current?.rate_per_student ?? 100}
-                  onSave={(rate) => upsertRate.mutate({ adminId: admin.id, rate })}
-                />
-              );
-            })}
-            {admins.length === 0 && (
+            {globalTiers.map((t: any) => (
+              <TableRow key={t.id}>
+                <TableCell className="font-medium">{t.tier_name}</TableCell>
+                <TableCell>{t.min_students}</TableCell>
+                <TableCell>{t.max_students ?? "∞"}</TableCell>
+                <TableCell>£{t.rate_per_student}</TableCell>
+                <TableCell>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => { setEditingTier(t); setEditOpen(true); }}>
+                      <Pencil className="w-4 h-4 text-muted-foreground" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => deleteTier.mutate(t.id)}>
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+            {globalTiers.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground py-6">No admins found</TableCell>
+                <TableCell colSpan={5} className="text-center text-muted-foreground py-4">No admin tiers configured</TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </CardContent>
-    </Card>
-  );
-}
 
-function AdminRateRow({ admin, currentRate, onSave }: { admin: any; currentRate: number; onSave: (rate: number) => void }) {
-  const [rate, setRate] = useState(String(currentRate));
-  const changed = Number(rate) !== currentRate;
-  return (
-    <TableRow>
-      <TableCell className="font-medium">{admin.full_name}</TableCell>
-      <TableCell className="text-muted-foreground">{admin.email}</TableCell>
-      <TableCell className="text-right">
-        <Input
-          type="number"
-          className="w-24 ml-auto text-right"
-          value={rate}
-          onChange={(e) => setRate(e.target.value)}
-        />
-      </TableCell>
-      <TableCell>
-        {changed && (
-          <Button size="sm" onClick={() => onSave(Number(rate))}>Save</Button>
-        )}
-      </TableCell>
-    </TableRow>
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Admin Tier</DialogTitle></DialogHeader>
+          {editingTier && (
+            <form className="space-y-4 pt-2" onSubmit={(e) => {
+              e.preventDefault();
+              const fd = Object.fromEntries(new FormData(e.currentTarget));
+              updateTier.mutate({ id: editingTier.id, ...fd });
+              setEditOpen(false);
+            }}>
+              <div className="space-y-2"><Label>Tier Name</Label><Input name="tier_name" required defaultValue={editingTier.tier_name} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2"><Label>Min Students</Label><Input name="min_students" type="number" required min={0} defaultValue={editingTier.min_students} /></div>
+                <div className="space-y-2"><Label>Max Students</Label><Input name="max_students" type="number" placeholder="∞" defaultValue={editingTier.max_students ?? ""} /></div>
+              </div>
+              <div className="space-y-2"><Label>Rate per Student (£)</Label><Input name="rate_per_student" type="number" required min={0} step="0.01" defaultValue={editingTier.rate_per_student} /></div>
+              <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">Save Changes</Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 }
 
@@ -2158,7 +2221,7 @@ export default function SettingsPage() {
           <TabsContent value="commissions" className="mt-4 space-y-6">
             <CommissionTiersSection deleteItem={deleteItem} universities={universities} />
             <UniversityCommissionsSection universities={universities} />
-            <AdminCommissionSettingsSection />
+            <AdminCommissionTiersSection />
           </TabsContent>
 
           <TabsContent value="promotions" className="mt-4">
