@@ -158,7 +158,7 @@ const Index = () => {
                   Start Free — No Card Required <ChevronRight className="w-5 h-5 ml-1" />
                 </Button>
                 <Link to="/login">
-                  <Button variant="outline" size="lg" className="border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10 text-base px-8 h-13 w-full sm:w-auto">
+                  <Button variant="outline" size="lg" className="border-primary-foreground/20 text-primary-foreground text-base px-8 h-13 w-full sm:w-auto bg-accent">
                     Log In to Dashboard
                   </Button>
                 </Link>
