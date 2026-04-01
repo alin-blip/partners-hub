@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Users, UserCheck, ClipboardList, PoundSterling } from "lucide-react";
+import { Users, UserCheck, ClipboardList, PoundSterling, TrendingUp, Target } from "lucide-react";
 import { calcCommission } from "@/lib/commissions";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
