@@ -45,13 +45,13 @@ export default function CommissionsPage() {
   const [payPeriod, setPayPeriod] = useState("");
   const [payNotes, setPayNotes] = useState("");
 
-  // Fetch snapshots
+  // Fetch snapshots with intake info
   const { data: snapshots = [] } = useQuery({
     queryKey: ["commission-snapshots"],
     queryFn: async () => {
       const { data } = await supabase
         .from("commission_snapshots")
-        .select("*, enrollments(status, funding_status, students(first_name, last_name, agent_id), universities(name), courses(name))")
+        .select("*, enrollments(status, funding_status, intake_id, students(first_name, last_name, agent_id), universities(name), courses(name), intakes(label))")
         .order("created_at", { ascending: false });
       return (data || []) as any[];
     },
@@ -146,7 +146,21 @@ export default function CommissionsPage() {
     paymentsBySnapshot.set(p.snapshot_id, list);
   }
 
-  // Calculate agent summaries
+  // Helper: group snapshots by intake
+  function groupByIntake(snaps: any[]) {
+    const intakeMap = new Map<string, { intakeLabel: string; snapshots: any[] }>();
+    for (const snap of snaps) {
+      const intakeId = snap.enrollments?.intake_id || "no-intake";
+      const intakeLabel = snap.enrollments?.intakes?.label || "No Intake";
+      if (!intakeMap.has(intakeId)) {
+        intakeMap.set(intakeId, { intakeLabel, snapshots: [] });
+      }
+      intakeMap.get(intakeId)!.snapshots.push(snap);
+    }
+    return intakeMap;
+  }
+
+  // Calculate agent summaries with per-intake breakdown
   const agentSummaries = Array.from(agentSnapshots.entries()).map(([agentId, snaps]) => {
     const profile = profileMap.get(agentId);
     const adminProfile = profile?.admin_id ? profileMap.get(profile.admin_id) : null;
@@ -162,19 +176,30 @@ export default function CommissionsPage() {
     const totalAgentPaid = agentPayments.reduce((s: number, p: any) => s + Number(p.amount), 0);
     const totalAdminPaid = adminPayments.reduce((s: number, p: any) => s + Number(p.amount), 0);
 
+    // Per-intake eligibility
+    const intakeGroups = groupByIntake(snaps);
+    const intakeBreakdown = Array.from(intakeGroups.entries()).map(([intakeId, group]) => {
+      const count = group.snapshots.length;
+      const qualifies = count >= 5;
+      const total25 = group.snapshots.reduce((s: number, snap: any) => s + Math.round(Number(snap.agent_rate) * 0.25 * 100) / 100, 0);
+      const total75 = group.snapshots.reduce((s: number, snap: any) => {
+        if (snap.snapshot_status === "ready_full" || snap.snapshot_status === "paid") {
+          return s + Math.round(Number(snap.agent_rate) * 0.75 * 100) / 100;
+        }
+        return s;
+      }, 0);
+      const readyForFull = group.snapshots.filter((s: any) => s.snapshot_status === "ready_full").length;
+      return { intakeId, intakeLabel: group.intakeLabel, count, qualifies, total25, total75, readyForFull, snapshots: group.snapshots };
+    });
+
     const eligibleCount = snaps.length;
-    const qualifiesFor25 = eligibleCount >= 5;
     const readyForFull = snaps.filter((s: any) => s.snapshot_status === "ready_full").length;
 
-    // 25% / 75% automatic breakdown per snapshot
-    const agent25Total = snaps.reduce((s: number, snap: any) => s + Math.round(Number(snap.agent_rate) * 0.25 * 100) / 100, 0);
-    const agent75Total = snaps.reduce((s: number, snap: any) => {
-      if (snap.snapshot_status === "ready_full" || snap.snapshot_status === "paid") {
-        return s + Math.round(Number(snap.agent_rate) * 0.75 * 100) / 100;
-      }
-      return s;
-    }, 0);
+    // Totals across all intakes (only eligible intakes count for 25%)
+    const agent25Total = intakeBreakdown.reduce((s, ib) => s + (ib.qualifies ? ib.total25 : 0), 0);
+    const agent75Total = intakeBreakdown.reduce((s, ib) => s + ib.total75, 0);
     const agent25Remaining = Math.max(0, Math.round((agent25Total - totalAgentPaid) * 100) / 100);
+    const qualifiesFor25 = intakeBreakdown.some(ib => ib.qualifies);
 
     return {
       agentId,
@@ -183,6 +208,7 @@ export default function CommissionsPage() {
       adminName: adminProfile?.full_name || "—",
       adminId: profile?.admin_id,
       snapshots: snaps,
+      intakeBreakdown,
       eligibleCount,
       qualifiesFor25,
       readyForFull,
@@ -531,125 +557,138 @@ function AgentRow({
                 </Card>
               )}
 
-              {/* Per-enrollment snapshots */}
-              <div className="rounded-md border bg-background">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs">Student</TableHead>
-                      <TableHead className="text-xs">University</TableHead>
-                      <TableHead className="text-xs text-right">Rate</TableHead>
-                      <TableHead className="text-xs text-right">25%</TableHead>
-                      <TableHead className="text-xs text-right">75%</TableHead>
-                      <TableHead className="text-xs">Status</TableHead>
-                      <TableHead className="text-xs text-right">Paid</TableHead>
-                      <TableHead className="text-xs text-right">Remaining</TableHead>
-                      <TableHead className="text-xs">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {agent.snapshots.map((snap: any) => {
-                      const snapshotPayments = paymentsBySnapshot.get(snap.id) || [];
-                      const agentPaid = snapshotPayments
-                        .filter((p: any) => p.recipient_role === "agent")
-                        .reduce((s: number, p: any) => s + Number(p.amount), 0);
-                      const rate = Number(snap.agent_rate);
-                      const amount25 = Math.round(rate * 0.25 * 100) / 100;
-                      const amount75 = Math.round(rate * 0.75 * 100) / 100;
-                      const remaining = rate - agentPaid;
-                      const isReadyFull = snap.snapshot_status === "ready_full" || snap.snapshot_status === "paid";
-                      const statusInfo = SNAPSHOT_STATUS_LABELS[snap.snapshot_status] || { label: snap.snapshot_status, color: "" };
-
-                      return (
-                        <TableRow key={snap.id}>
-                          <TableCell className="text-sm">
-                            {snap.enrollments?.students?.first_name} {snap.enrollments?.students?.last_name}
-                          </TableCell>
-                          <TableCell className="text-sm">{snap.enrollments?.universities?.name || "—"}</TableCell>
-                          <TableCell className="text-sm text-right tabular-nums font-medium">£{rate.toLocaleString()}</TableCell>
-                          <TableCell className="text-sm text-right tabular-nums">
-                            <span className={agent.qualifiesFor25 ? "text-green-700 dark:text-green-400 font-medium" : "text-muted-foreground"}>
-                              £{amount25.toLocaleString()}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-sm text-right tabular-nums">
-                            {isReadyFull ? (
-                              <span className="text-blue-700 dark:text-blue-400 font-medium">£{amount75.toLocaleString()}</span>
-                            ) : (
-                              <span className="text-muted-foreground">£{amount75.toLocaleString()}</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className={`text-xs ${statusInfo.color}`}>
-                              {statusInfo.label}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-sm text-right tabular-nums">
-                            £{agentPaid.toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-sm text-right tabular-nums font-semibold">
-                            {remaining > 0 ? `£${remaining.toLocaleString()}` : <span className="text-green-600">✓ Paid</span>}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-1">
-                              {remaining > 0 && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 text-xs"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onRecordPayment(snap.id, agent.agentId, "agent", remaining);
-                                  }}
-                                >
-                                  <CreditCard className="w-3 h-3 mr-1" />
-                                  Pay
-                                </Button>
-                              )}
-                              {snap.admin_id && Number(snap.admin_rate) > 0 && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 text-xs"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const adminPaid = snapshotPayments
-                                      .filter((p: any) => p.recipient_role === "admin")
-                                      .reduce((s: number, p: any) => s + Number(p.amount), 0);
-                                    onRecordPayment(snap.id, snap.admin_id, "admin", Number(snap.admin_rate) - adminPaid);
-                                  }}
-                                >
-                                  Pay Admin
-                                </Button>
-                              )}
-                              {snap.snapshot_status === "paying_25" && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 text-xs"
-                                  onClick={(e) => { e.stopPropagation(); onUpdateStatus(snap.id, "paid"); }}
-                                >
-                                  Mark Paid
-                                </Button>
-                              )}
-                              {snap.snapshot_status === "pending_25" && agent.qualifiesFor25 && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 text-xs"
-                                  onClick={(e) => { e.stopPropagation(); onUpdateStatus(snap.id, "paying_25"); }}
-                                >
-                                  Start 25%
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
+              {/* Per-intake grouped snapshots */}
+              {agent.intakeBreakdown.map((ib: any) => (
+                <div key={ib.intakeId} className="space-y-1">
+                  <div className="flex items-center gap-2 px-2 pt-2">
+                    <Badge variant="outline" className="text-xs font-semibold">{ib.intakeLabel}</Badge>
+                    <span className="text-xs text-muted-foreground">{ib.count} student(s)</span>
+                    {ib.qualifies ? (
+                      <Badge className="bg-green-500/10 text-green-700 border-green-200 text-[10px]" variant="outline">25% eligible</Badge>
+                    ) : (
+                      <Badge className="bg-amber-500/10 text-amber-700 border-amber-200 text-[10px]" variant="outline">{ib.count}/5 needed</Badge>
+                    )}
+                  </div>
+                  <div className="rounded-md border bg-background">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs">Student</TableHead>
+                          <TableHead className="text-xs">University</TableHead>
+                          <TableHead className="text-xs text-right">Rate</TableHead>
+                          <TableHead className="text-xs text-right">25%</TableHead>
+                          <TableHead className="text-xs text-right">75%</TableHead>
+                          <TableHead className="text-xs">Status</TableHead>
+                          <TableHead className="text-xs text-right">Paid</TableHead>
+                          <TableHead className="text-xs text-right">Remaining</TableHead>
+                          <TableHead className="text-xs">Actions</TableHead>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
+                      </TableHeader>
+                      <TableBody>
+                        {ib.snapshots.map((snap: any) => {
+                          const snapshotPayments = paymentsBySnapshot.get(snap.id) || [];
+                          const agentPaid = snapshotPayments
+                            .filter((p: any) => p.recipient_role === "agent")
+                            .reduce((s: number, p: any) => s + Number(p.amount), 0);
+                          const rate = Number(snap.agent_rate);
+                          const amount25 = Math.round(rate * 0.25 * 100) / 100;
+                          const amount75 = Math.round(rate * 0.75 * 100) / 100;
+                          const remaining = rate - agentPaid;
+                          const isReadyFull = snap.snapshot_status === "ready_full" || snap.snapshot_status === "paid";
+                          const statusInfo = SNAPSHOT_STATUS_LABELS[snap.snapshot_status] || { label: snap.snapshot_status, color: "" };
+
+                          return (
+                            <TableRow key={snap.id}>
+                              <TableCell className="text-sm">
+                                {snap.enrollments?.students?.first_name} {snap.enrollments?.students?.last_name}
+                              </TableCell>
+                              <TableCell className="text-sm">{snap.enrollments?.universities?.name || "—"}</TableCell>
+                              <TableCell className="text-sm text-right tabular-nums font-medium">£{rate.toLocaleString()}</TableCell>
+                              <TableCell className="text-sm text-right tabular-nums">
+                                <span className={ib.qualifies ? "text-green-700 dark:text-green-400 font-medium" : "text-muted-foreground"}>
+                                  £{amount25.toLocaleString()}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-sm text-right tabular-nums">
+                                {isReadyFull ? (
+                                  <span className="text-blue-700 dark:text-blue-400 font-medium">£{amount75.toLocaleString()}</span>
+                                ) : (
+                                  <span className="text-muted-foreground">£{amount75.toLocaleString()}</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className={`text-xs ${statusInfo.color}`}>
+                                  {statusInfo.label}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-sm text-right tabular-nums">
+                                £{agentPaid.toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-sm text-right tabular-nums font-semibold">
+                                {remaining > 0 ? `£${remaining.toLocaleString()}` : <span className="text-green-600">✓ Paid</span>}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex gap-1">
+                                  {remaining > 0 && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-xs"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onRecordPayment(snap.id, agent.agentId, "agent", remaining);
+                                      }}
+                                    >
+                                      <CreditCard className="w-3 h-3 mr-1" />
+                                      Pay
+                                    </Button>
+                                  )}
+                                  {snap.admin_id && Number(snap.admin_rate) > 0 && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 text-xs"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const adminPaid = snapshotPayments
+                                          .filter((p: any) => p.recipient_role === "admin")
+                                          .reduce((s: number, p: any) => s + Number(p.amount), 0);
+                                        onRecordPayment(snap.id, snap.admin_id, "admin", Number(snap.admin_rate) - adminPaid);
+                                      }}
+                                    >
+                                      Pay Admin
+                                    </Button>
+                                  )}
+                                  {snap.snapshot_status === "paying_25" && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 text-xs"
+                                      onClick={(e) => { e.stopPropagation(); onUpdateStatus(snap.id, "paid"); }}
+                                    >
+                                      Mark Paid
+                                    </Button>
+                                  )}
+                                  {snap.snapshot_status === "pending_25" && ib.qualifies && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 text-xs"
+                                      onClick={(e) => { e.stopPropagation(); onUpdateStatus(snap.id, "paying_25"); }}
+                                    >
+                                      Start 25%
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              ))}
             </div>
           </TableCell>
         </TableRow>

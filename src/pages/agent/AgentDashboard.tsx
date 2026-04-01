@@ -58,13 +58,13 @@ export default function AgentDashboard() {
     },
   });
 
-  // Fetch commission snapshots for this agent
+  // Fetch commission snapshots for this agent (with intake info)
   const { data: snapshots = [] } = useQuery({
     queryKey: ["agent-snapshots", user?.id],
     queryFn: async () => {
       const { data } = await supabase
         .from("commission_snapshots")
-        .select("id, agent_rate, snapshot_status, eligible_at, enrollments(universities(name), students(first_name, last_name))")
+        .select("id, agent_rate, snapshot_status, eligible_at, enrollments(intake_id, universities(name), students(first_name, last_name), intakes(label))")
         .eq("agent_id", user!.id);
       return (data || []) as any[];
     },
@@ -88,8 +88,18 @@ export default function AgentDashboard() {
   const totalCommission = snapshots.reduce((s: number, snap: any) => s + Number(snap.agent_rate), 0);
   const totalPaid = myPayments.reduce((s: number, p: any) => s + Number(p.amount), 0);
   const totalRemaining = totalCommission - totalPaid;
-  const qualifiesFor25 = snapshots.length >= 5;
   const readyForFull = snapshots.filter((s: any) => s.snapshot_status === "ready_full").length;
+
+  // Per-intake eligibility
+  const intakeGroups = new Map<string, { label: string; count: number }>();
+  for (const snap of snapshots) {
+    const intakeId = snap.enrollments?.intake_id || "no-intake";
+    const intakeLabel = snap.enrollments?.intakes?.label || "No Intake";
+    if (!intakeGroups.has(intakeId)) intakeGroups.set(intakeId, { label: intakeLabel, count: 0 });
+    intakeGroups.get(intakeId)!.count++;
+  }
+  const qualifiesFor25 = Array.from(intakeGroups.values()).some(g => g.count >= 5);
+  const bestIntake = Array.from(intakeGroups.values()).sort((a, b) => b.count - a.count)[0];
 
   const monthlyTarget = 10;
   const thisMonthStudents = students.filter((s: any) => {
@@ -154,11 +164,11 @@ export default function AgentDashboard() {
                 </Badge>
               ) : (
                 <Badge className="bg-amber-500/10 text-amber-700 border-amber-200" variant="outline">
-                  {snapshots.length}/5 students
+                  {bestIntake ? `${bestIntake.count}/5 (${bestIntake.label})` : `${snapshots.length}/5`} students
                 </Badge>
               )}
             </div>
-            <Progress value={Math.min((snapshots.length / 5) * 100, 100)} className="h-2" />
+            <Progress value={Math.min(((bestIntake?.count || 0) / 5) * 100, 100)} className="h-2" />
             {readyForFull > 0 && (
               <p className="text-xs text-green-700">
                 {readyForFull} enrollment(s) ready for full commission payment
