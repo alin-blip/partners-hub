@@ -1,88 +1,52 @@
 
 
-# Agent Tier Auto-Progression + Admin Tiers
+# Fix: Missing Commission Triggers + paid_by_university Status
 
-## What's Missing Today
+## Root Cause
 
-1. **Agent tier progression** works at snapshot-creation time (the trigger picks the right tier based on student count), but there's **no approval workflow** — the owner never gets a notification or approval prompt when an agent moves up a tier.
+The database function `create_commission_snapshot()` exists, but the **trigger `trg_commission_snapshot` was never created** on the `enrollments` table. The migration likely partially failed — tables and function were created, but the `CREATE TRIGGER` statements at the end did not execute. This means:
 
-2. **Admin commission** is a **flat rate** per admin (`admin_commission_settings.rate_per_student`). There are no tiers for admins at all.
+1. Changing `funding_status` to `approved` does **not** create a commission snapshot
+2. Changing `status` to `paid_by_university` does **not** update snapshot status
+3. No audit triggers exist on `commission_snapshots` or `commission_payments`
+4. Consequently, nothing shows on the Commissions page, Agent dashboard, or Admin dashboard
 
----
+## Fix Plan
 
-## What We'll Build
+### Step 1: New Migration — Recreate Missing Triggers
 
-### 1. Admin Commission Tiers Table
+Create a migration that:
+- Creates `trg_commission_snapshot` on `enrollments` (with `IF NOT EXISTS` pattern using `DROP TRIGGER IF EXISTS` first)
+- Creates `audit_commission_snapshots` on `commission_snapshots`
+- Creates `audit_commission_payments` on `commission_payments`
 
-Replace the single flat-rate `admin_commission_settings` with a tiered system, similar to agent `commission_tiers`:
+```sql
+DROP TRIGGER IF EXISTS trg_commission_snapshot ON public.enrollments;
+CREATE TRIGGER trg_commission_snapshot 
+  AFTER UPDATE ON public.enrollments
+  FOR EACH ROW EXECUTE FUNCTION public.create_commission_snapshot();
 
-New table: `admin_commission_tiers`
+DROP TRIGGER IF EXISTS audit_commission_snapshots ON public.commission_snapshots;
+CREATE TRIGGER audit_commission_snapshots 
+  AFTER INSERT OR UPDATE OR DELETE ON public.commission_snapshots
+  FOR EACH ROW EXECUTE FUNCTION public.audit_trigger_func();
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK |
-| admin_id | uuid | Nullable — NULL = global admin tiers |
-| tier_name | text | e.g. "Starter", "Silver", "Gold" |
-| min_students | integer | e.g. 0, 30, 50 |
-| max_students | integer | Nullable |
-| rate_per_student | numeric | e.g. 100, 150, 200 |
+DROP TRIGGER IF EXISTS audit_commission_payments ON public.commission_payments;
+CREATE TRIGGER audit_commission_payments 
+  AFTER INSERT OR UPDATE OR DELETE ON public.commission_payments
+  FOR EACH ROW EXECUTE FUNCTION public.audit_trigger_func();
+```
 
-Keep `admin_commission_settings` for any admin-specific overrides, but add tiers as the primary mechanism.
+### Step 2: Verify After Migration
 
-### 2. Tier Upgrade Approval Workflow
+Query the database to confirm all 3 triggers are active on the correct tables.
 
-New table: `tier_upgrade_requests`
+### Step 3: Test the Flow
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK |
-| user_id | uuid | Agent or Admin requesting upgrade |
-| user_role | text | 'agent' / 'admin' |
-| current_tier_name | text | e.g. "Silver" |
-| new_tier_name | text | e.g. "Gold" |
-| current_rate | numeric | |
-| new_rate | numeric | |
-| student_count | integer | Count that triggered upgrade |
-| status | text | 'pending' → 'approved' / 'rejected' |
-| created_at | timestamptz | |
-| reviewed_at | timestamptz | |
-| reviewed_by | uuid | Owner who approved |
+After the triggers are in place, the user can:
+1. Set an enrollment's `funding_status` → `approved` → snapshot auto-created
+2. Set enrollment `status` → `paid_by_university` → snapshot updated to `ready_full`
+3. Data appears in Commissions page, Agent and Admin dashboards
 
-**How it works:**
-- The snapshot trigger detects when an agent/admin qualifies for a higher tier
-- Instead of auto-applying, it creates a `tier_upgrade_request` with status `pending`
-- The snapshot still uses the **current (lower) tier rate** until approved
-- Owner sees pending requests on the Commissions page with "Approve / Reject" buttons
-- On approval: future snapshots use the new tier rate; optionally backfill existing pending snapshots
-
-### 3. Database Trigger Update
-
-Modify `create_commission_snapshot()` to:
-- After resolving the agent rate, check if it's higher than the agent's last snapshot rate
-- If higher → insert a row into `tier_upgrade_requests` and use the **previous rate** for the snapshot
-- Same logic for admin rate using the new `admin_commission_tiers`
-
-### 4. UI Changes
-
-**Owner Commissions Page** — new section at top:
-- "Pending Tier Upgrades" alert/card with approve/reject buttons
-- Shows: agent/admin name, current tier → new tier, student count, rate change
-
-**Settings Page**:
-- Replace flat admin rate input with a tiers table (same CRUD as agent commission tiers)
-- Add/edit/delete admin tiers with min/max students and rate
-
-**Notifications**:
-- Owner gets an in-app notification when a tier upgrade is pending
-
----
-
-## Implementation Steps
-
-1. **Migration**: Create `admin_commission_tiers` table with RLS + seed default tiers (0-29: £100, 30-49: £150, 50+: £200)
-2. **Migration**: Create `tier_upgrade_requests` table with RLS (Owner ALL, Agent/Admin SELECT own)
-3. **Migration**: Update `create_commission_snapshot()` trigger to check for tier jumps and create upgrade requests instead of auto-applying
-4. **Update `SettingsPage.tsx`**: Replace `AdminCommissionSettingsSection` with tiered CRUD (like agent tiers)
-5. **Update `CommissionsPage.tsx`**: Add "Pending Upgrades" section with approve/reject
-6. **Update `NotificationBell.tsx`**: Include pending upgrade requests in notifications query
+No UI code changes needed — the `paid_by_university` status is already in all STATUSES arrays and StatusBadge config.
 
