@@ -490,15 +490,18 @@ function AgentRow({
         </TableCell>
         <TableCell className="text-muted-foreground">{agent.adminName}</TableCell>
         <TableCell className="text-right tabular-nums">{agent.eligibleCount}</TableCell>
-        <TableCell className="text-right">
+        <TableCell className="text-right tabular-nums">
           {agent.qualifiesFor25 ? (
-            <Badge className="bg-green-500/10 text-green-700 border-green-200" variant="outline">
-              Eligible (£{agent.monthly25Amount})
-            </Badge>
+            <span className="font-medium text-green-700 dark:text-green-400">£{agent.agent25Total.toLocaleString()}</span>
           ) : (
-            <Badge className="bg-amber-500/10 text-amber-700 border-amber-200" variant="outline">
-              {agent.eligibleCount}/5 students
-            </Badge>
+            <span className="text-muted-foreground text-xs">{agent.eligibleCount}/5 needed</span>
+          )}
+        </TableCell>
+        <TableCell className="text-right tabular-nums">
+          {agent.readyForFull > 0 ? (
+            <span className="font-medium text-blue-700 dark:text-blue-400">£{agent.agent75Total.toLocaleString()}</span>
+          ) : (
+            <span className="text-muted-foreground text-xs">—</span>
           )}
         </TableCell>
         <TableCell className="text-right font-medium tabular-nums">£{agent.totalAgentOwed.toLocaleString()}</TableCell>
