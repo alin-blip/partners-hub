@@ -11,6 +11,8 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   funding: { label: "Funding", className: "bg-purple-500/10 text-purple-700 border-purple-200" },
   enrolled: { label: "Enrolled", className: "bg-green-500/10 text-green-700 border-green-200" },
   active: { label: "Active", className: "bg-emerald-600/10 text-emerald-800 border-emerald-300" },
+  paid_by_university: { label: "Paid by University", className: "bg-teal-500/10 text-teal-700 border-teal-200" },
+  commission_ready: { label: "Commission Ready", className: "bg-teal-600/10 text-teal-800 border-teal-300" },
   rejected: { label: "Rejected", className: "bg-red-500/10 text-red-700 border-red-200" },
   withdrawn: { label: "Withdrawn", className: "bg-gray-500/10 text-gray-700 border-gray-200" },
   // Funding statuses
