@@ -4,8 +4,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Users, UserCheck, ClipboardList } from "lucide-react";
+import { Users, UserCheck, ClipboardList, PoundSterling, Clock } from "lucide-react";
 import { PromoBanner } from "@/components/PromoBanner";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
