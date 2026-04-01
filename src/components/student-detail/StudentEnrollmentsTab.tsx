@@ -154,6 +154,8 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
 
       toast({ title: "Student transferred", description: "Enrollment updated to the new university/course." });
       qc.invalidateQueries({ queryKey: ["student-enrollments", studentId] });
+      qc.invalidateQueries({ queryKey: ["student-documents", studentId] });
+      qc.invalidateQueries({ queryKey: ["student-documents-cancelled", studentId] });
       setTransferEnrollment(null);
     } catch (err: any) {
       toast({ title: "Transfer failed", description: err.message, variant: "destructive" });

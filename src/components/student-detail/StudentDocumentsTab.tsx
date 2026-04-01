@@ -225,16 +225,8 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
   };
 
   const handleDeleteDoc = async (doc: any) => {
-    if (role === "agent") {
-      // Agent can only cancel (soft-delete)
-      const { error } = await supabase.from("student_documents").update({
-        cancelled_at: new Date().toISOString(),
-        cancelled_by: user?.id,
-      } as any).eq("id", doc.id);
-      if (error) toast({ title: "Cancel failed", description: error.message, variant: "destructive" });
-      else { toast({ title: "Document cancelled" }); refetchDocs(); }
-      return;
-    }
+    // Agents cannot cancel or delete documents
+    if (role === "agent") return;
 
     if (role === "admin") {
       // Admin needs code from owner
@@ -586,11 +578,6 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
                   </div>
                   <div className="flex gap-1 items-center">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownload(doc)}><Download className="w-3.5 h-3.5" /></Button>
-                    {canEdit && role === "agent" && (
-                      <Button variant="ghost" size="sm" className="h-8 text-orange-600 hover:text-orange-700 text-xs gap-1" onClick={() => handleDeleteDoc(doc)}>
-                        <Archive className="w-3.5 h-3.5" /> Cancel
-                      </Button>
-                    )}
                     {canEdit && (role === "owner" || role === "admin") && (
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteDoc(doc)}>
                         <Trash2 className="w-3.5 h-3.5 text-destructive" />
