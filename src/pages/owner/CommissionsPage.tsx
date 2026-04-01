@@ -513,8 +513,7 @@ function AgentRow({
 
       {isExpanded && (
         <TableRow className="bg-muted/20 hover:bg-muted/30">
-          <TableCell></TableCell>
-          <TableCell colSpan={7} className="py-3">
+          <TableCell colSpan={9} className="py-3">
             <div className="space-y-3">
               {/* Admin commission summary */}
               {agent.adminId && (
