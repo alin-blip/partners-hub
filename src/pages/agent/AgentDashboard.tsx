@@ -5,11 +5,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Users, ClipboardList, Trophy, PoundSterling, HelpCircle } from "lucide-react";
+import { Users, ClipboardList, Trophy, PoundSterling, HelpCircle, CheckCircle2, Clock } from "lucide-react";
 import { PromoBanner } from "@/components/PromoBanner";
-import { calcCommission } from "@/lib/commissions";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
