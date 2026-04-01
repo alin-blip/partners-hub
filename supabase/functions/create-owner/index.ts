@@ -134,6 +134,33 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Send welcome email for new agents
+  if (role === "agent") {
+    // Fetch caller's name for the email
+    const { data: callerProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("full_name")
+      .eq("id", callerId)
+      .single();
+
+    try {
+      await supabaseAdmin.functions.invoke("send-transactional-email", {
+        body: {
+          templateName: "welcome-agent",
+          recipientEmail: email,
+          idempotencyKey: `welcome-agent-${authData.user.id}`,
+          templateData: {
+            agentName: full_name,
+            adminName: callerProfile?.full_name || undefined,
+          },
+        },
+      });
+    } catch (e) {
+      // Non-blocking — log but don't fail account creation
+      console.error("Failed to send welcome email:", e);
+    }
+  }
+
   return new Response(JSON.stringify({ success: true, user_id: authData.user.id }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
