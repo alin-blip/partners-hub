@@ -138,7 +138,13 @@ export default function CommissionsPage() {
     agentSnapshots.set(s.agent_id, list);
   }
 
-  // (paymentsBySnapshot moved above into agentSummaries section)
+  // Payments per snapshot
+  const paymentsBySnapshot = new Map<string, any[]>();
+  for (const p of payments) {
+    const list = paymentsBySnapshot.get(p.snapshot_id) || [];
+    list.push(p);
+    paymentsBySnapshot.set(p.snapshot_id, list);
+  }
 
   // Helper: group snapshots by intake
   function groupByIntake(snaps: any[]) {
