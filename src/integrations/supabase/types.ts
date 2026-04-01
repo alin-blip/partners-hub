@@ -238,6 +238,13 @@ export type Database = {
             foreignKeyName: "ai_knowledge_base_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "conversation_partner_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_knowledge_base_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -618,6 +625,13 @@ export type Database = {
             foreignKeyName: "direct_conversations_participant_1_fkey"
             columns: ["participant_1"]
             isOneToOne: false
+            referencedRelation: "conversation_partner_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "direct_conversations_participant_1_fkey"
+            columns: ["participant_1"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -626,6 +640,13 @@ export type Database = {
             columns: ["participant_1"]
             isOneToOne: false
             referencedRelation: "public_agent_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "direct_conversations_participant_2_fkey"
+            columns: ["participant_2"]
+            isOneToOne: false
+            referencedRelation: "conversation_partner_view"
             referencedColumns: ["id"]
           },
           {
@@ -675,6 +696,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "direct_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "direct_messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_partner_view"
             referencedColumns: ["id"]
           },
           {
@@ -1091,6 +1119,13 @@ export type Database = {
             foreignKeyName: "profiles_admin_id_fkey"
             columns: ["admin_id"]
             isOneToOne: false
+            referencedRelation: "conversation_partner_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -1183,6 +1218,13 @@ export type Database = {
           uploaded_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "resources_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "conversation_partner_view"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "resources_uploaded_by_fkey"
             columns: ["uploaded_by"]
@@ -1644,6 +1686,13 @@ export type Database = {
             foreignKeyName: "students_agent_id_fkey"
             columns: ["agent_id"]
             isOneToOne: false
+            referencedRelation: "conversation_partner_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "students_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -1728,6 +1777,13 @@ export type Database = {
             foreignKeyName: "tasks_assigned_to_fkey"
             columns: ["assigned_to"]
             isOneToOne: false
+            referencedRelation: "conversation_partner_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -1736,6 +1792,13 @@ export type Database = {
             columns: ["assigned_to"]
             isOneToOne: false
             referencedRelation: "public_agent_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "conversation_partner_view"
             referencedColumns: ["id"]
           },
           {
@@ -1888,6 +1951,27 @@ export type Database = {
       }
     }
     Views: {
+      conversation_partner_view: {
+        Row: {
+          avatar_url: string | null
+          full_name: string | null
+          id: string | null
+          slug: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          full_name?: string | null
+          id?: string | null
+          slug?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          full_name?: string | null
+          id?: string | null
+          slug?: string | null
+        }
+        Relationships: []
+      }
       public_agent_profiles: {
         Row: {
           avatar_url: string | null
