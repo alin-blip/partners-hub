@@ -1,142 +1,196 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { MetricCard } from "@/components/MetricCard";
-import { calcCommissionByEnrollments, buildUniversityBreakdown, EnrollmentBreakdownItem } from "@/lib/commissions";
-import { PoundSterling, Users, TrendingUp, ChevronDown, ChevronRight, CircleDollarSign } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  PoundSterling, Users, TrendingUp, ChevronDown, ChevronRight,
+  CreditCard, Clock, CheckCircle2, AlertCircle,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
-const months = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
+const SNAPSHOT_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  pending_25: { label: "Pending 25%", color: "bg-amber-500/10 text-amber-700 border-amber-200" },
+  paying_25: { label: "Paying 25%", color: "bg-blue-500/10 text-blue-700 border-blue-200" },
+  ready_full: { label: "Ready Full Payment", color: "bg-green-500/10 text-green-700 border-green-200" },
+  paid: { label: "Fully Paid", color: "bg-emerald-600/10 text-emerald-800 border-emerald-300" },
+};
 
 export default function CommissionsPage() {
-  const now = new Date();
-  const [month, setMonth] = useState(now.getMonth());
-  const [year, setYear] = useState(now.getFullYear());
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const qc = useQueryClient();
   const [expandedAgents, setExpandedAgents] = useState<Set<string>>(new Set());
+  const [paymentDialog, setPaymentDialog] = useState<{ snapshotId: string; recipientId: string; recipientRole: string; maxAmount: number } | null>(null);
+  const [payAmount, setPayAmount] = useState("");
+  const [payType, setPayType] = useState("25_percent_monthly");
+  const [payPeriod, setPayPeriod] = useState("");
+  const [payNotes, setPayNotes] = useState("");
 
-  const { data: tiers = [] } = useQuery({
-    queryKey: ["commission-tiers"],
+  // Fetch snapshots
+  const { data: snapshots = [] } = useQuery({
+    queryKey: ["commission-snapshots"],
     queryFn: async () => {
-      const { data } = await supabase.from("commission_tiers").select("*").order("min_students");
-      return data || [];
+      const { data } = await supabase
+        .from("commission_snapshots")
+        .select("*, enrollments(status, funding_status, students(first_name, last_name, agent_id), universities(name), courses(name))")
+        .order("created_at", { ascending: false });
+      return (data || []) as any[];
     },
   });
 
-  const { data: uniCommissions = [] } = useQuery({
-    queryKey: ["university-commissions"],
+  // Fetch payments
+  const { data: payments = [] } = useQuery({
+    queryKey: ["commission-payments"],
     queryFn: async () => {
-      const { data } = await (supabase as any)
-        .from("university_commissions")
-        .select("university_id, commission_per_student, tier_id, universities(name)");
-      return data || [];
+      const { data } = await supabase
+        .from("commission_payments")
+        .select("*")
+        .order("paid_at", { ascending: false });
+      return (data || []) as any[];
     },
   });
 
-  const { data: universities = [] } = useQuery({
-    queryKey: ["all-universities-names"],
+  // Fetch agents/admins
+  const { data: profiles = [] } = useQuery({
+    queryKey: ["all-profiles-commission"],
     queryFn: async () => {
-      const { data } = await supabase.from("universities").select("id, name");
-      return data || [];
-    },
-  });
-
-  const { data: agents = [] } = useQuery({
-    queryKey: ["all-agents-profiles"],
-    queryFn: async () => {
-      const { data } = await supabase.from("profiles").select("id, full_name, email, is_active, admin_id");
-      return data || [];
+      const { data } = await supabase.from("profiles").select("id, full_name, email, admin_id");
+      return (data || []) as any[];
     },
   });
 
   const { data: roles = [] } = useQuery({
-    queryKey: ["all-roles"],
+    queryKey: ["all-roles-commission"],
     queryFn: async () => {
       const { data } = await supabase.from("user_roles").select("user_id, role");
-      return data || [];
-    },
-  });
-
-  // Fetch enrollments for both stages
-  const { data: enrollments = [] } = useQuery({
-    queryKey: ["all-enrollments-commission", month, year],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("enrollments")
-        .select("id, status, student_id, created_at, university_id, students!inner(agent_id)")
-        .in("status", ["active", "offer_received", "accepted"]);
-      return data || [];
-    },
-  });
-
-  const { data: adminProfiles = [] } = useQuery({
-    queryKey: ["admin-profiles-map"],
-    queryFn: async () => {
-      const { data } = await supabase.from("profiles").select("id, full_name");
-      return data || [];
+      return (data || []) as any[];
     },
   });
 
   const roleMap = new Map(roles.map((r: any) => [r.user_id, r.role]));
-  const adminMap = new Map(adminProfiles.map((p: any) => [p.id, p.full_name]));
-  const uniNameMap = new Map(universities.map((u: any) => [u.id, u.name]));
-  const agentList = agents.filter((a: any) => roleMap.get(a.id) === "agent");
-  const tierMap = new Map(tiers.map((t: any) => [t.id, t]));
+  const profileMap = new Map(profiles.map((p: any) => [p.id, p]));
 
-  // Split enrollments by stage
-  const generatedEnrollments = enrollments.filter((e: any) => e.status === "active");
-  const possibleEnrollments = enrollments.filter((e: any) => e.status === "offer_received" || e.status === "accepted");
-
-  // Group enrollments per agent
-  function groupByAgent(enrs: any[]) {
-    const map = new Map<string, { university_id: string }[]>();
-    for (const e of enrs) {
-      const agentId = (e as any).students?.agent_id;
-      if (agentId) {
-        if (!map.has(agentId)) map.set(agentId, []);
-        map.get(agentId)!.push({ university_id: e.university_id });
-      }
-    }
-    return map;
-  }
-
-  const generatedByAgent = groupByAgent(generatedEnrollments);
-  const possibleByAgent = groupByAgent(possibleEnrollments);
-
-  const agentCommissions = agentList.map((agent: any) => {
-    const genEnrs = generatedByAgent.get(agent.id) || [];
-    const posEnrs = possibleByAgent.get(agent.id) || [];
-    const generated = calcCommissionByEnrollments(genEnrs, uniCommissions, tiers);
-    const possible = calcCommissionByEnrollments(posEnrs, uniCommissions, tiers);
-    const genBreakdown = buildUniversityBreakdown(genEnrs, uniCommissions, tiers, uniNameMap, tierMap);
-    const posBreakdown = buildUniversityBreakdown(posEnrs, uniCommissions, tiers, uniNameMap, tierMap);
-    return {
-      ...agent,
-      generatedStudents: genEnrs.length,
-      possibleStudents: posEnrs.length,
-      generated,
-      possible,
-      genBreakdown,
-      posBreakdown,
-      adminName: agent.admin_id ? adminMap.get(agent.admin_id) || "—" : "—",
-    };
+  // Payment mutation
+  const recordPayment = useMutation({
+    mutationFn: async (data: { snapshot_id: string; recipient_id: string; recipient_role: string; amount: number; payment_type: string; period_label: string; notes: string }) => {
+      const { error } = await supabase.from("commission_payments").insert({
+        snapshot_id: data.snapshot_id,
+        recipient_id: data.recipient_id,
+        recipient_role: data.recipient_role,
+        amount: data.amount,
+        payment_type: data.payment_type,
+        period_label: data.period_label || null,
+        notes: data.notes || null,
+        paid_by: user?.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["commission-payments"] });
+      qc.invalidateQueries({ queryKey: ["commission-snapshots"] });
+      toast({ title: "Payment recorded successfully" });
+      setPaymentDialog(null);
+      resetPaymentForm();
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  const totalGenerated = agentCommissions.reduce((s, a) => s + a.generated, 0);
-  const totalPossible = agentCommissions.reduce((s, a) => s + a.possible, 0);
-  const totalActiveStudents = agentCommissions.reduce((s, a) => s + a.generatedStudents, 0);
-  const totalPossibleStudents = agentCommissions.reduce((s, a) => s + a.possibleStudents, 0);
+  // Update snapshot status
+  const updateSnapshotStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { error } = await supabase.from("commission_snapshots").update({ snapshot_status: status }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["commission-snapshots"] });
+      toast({ title: "Status updated" });
+    },
+  });
 
-  const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i);
+  function resetPaymentForm() {
+    setPayAmount(""); setPayType("25_percent_monthly"); setPayPeriod(""); setPayNotes("");
+  }
+
+  // Group snapshots by agent
+  const agentSnapshots = new Map<string, any[]>();
+  for (const s of snapshots) {
+    const list = agentSnapshots.get(s.agent_id) || [];
+    list.push(s);
+    agentSnapshots.set(s.agent_id, list);
+  }
+
+  // Payments per snapshot
+  const paymentsBySnapshot = new Map<string, any[]>();
+  for (const p of payments) {
+    const list = paymentsBySnapshot.get(p.snapshot_id) || [];
+    list.push(p);
+    paymentsBySnapshot.set(p.snapshot_id, list);
+  }
+
+  // Calculate agent summaries
+  const agentSummaries = Array.from(agentSnapshots.entries()).map(([agentId, snaps]) => {
+    const profile = profileMap.get(agentId);
+    const adminProfile = profile?.admin_id ? profileMap.get(profile.admin_id) : null;
+
+    const totalAgentOwed = snaps.reduce((s, snap) => s + Number(snap.agent_rate), 0);
+    const totalAdminOwed = snaps.reduce((s, snap) => s + Number(snap.admin_rate), 0);
+
+    const agentPayments = payments.filter((p: any) => p.recipient_id === agentId && p.recipient_role === "agent");
+    const adminPayments = profile?.admin_id
+      ? payments.filter((p: any) => p.recipient_id === profile.admin_id && snaps.some((snap: any) => snap.id === p.snapshot_id))
+      : [];
+
+    const totalAgentPaid = agentPayments.reduce((s: number, p: any) => s + Number(p.amount), 0);
+    const totalAdminPaid = adminPayments.reduce((s: number, p: any) => s + Number(p.amount), 0);
+
+    const eligibleCount = snaps.length;
+    const qualifiesFor25 = eligibleCount >= 5;
+    const readyForFull = snaps.filter((s: any) => s.snapshot_status === "ready_full").length;
+
+    return {
+      agentId,
+      agentName: profile?.full_name || "Unknown",
+      agentEmail: profile?.email || "",
+      adminName: adminProfile?.full_name || "—",
+      adminId: profile?.admin_id,
+      snapshots: snaps,
+      eligibleCount,
+      qualifiesFor25,
+      readyForFull,
+      totalAgentOwed,
+      totalAgentPaid,
+      agentRemaining: totalAgentOwed - totalAgentPaid,
+      totalAdminOwed,
+      totalAdminPaid,
+      adminRemaining: totalAdminOwed - totalAdminPaid,
+      monthly25Amount: qualifiesFor25 ? Math.round((totalAgentOwed - totalAgentPaid) * 0.25 * 100) / 100 : 0,
+    };
+  }).sort((a, b) => b.agentRemaining - a.agentRemaining);
+
+  // Totals
+  const totalOwed = agentSummaries.reduce((s, a) => s + a.totalAgentOwed + a.totalAdminOwed, 0);
+  const totalPaid = agentSummaries.reduce((s, a) => s + a.totalAgentPaid + a.totalAdminPaid, 0);
+  const totalRemaining = totalOwed - totalPaid;
+  const eligibleAgents = agentSummaries.filter(a => a.qualifiesFor25).length;
 
   const toggleExpand = (id: string) => {
     setExpandedAgents(prev => {
@@ -149,166 +203,347 @@ export default function CommissionsPage() {
   return (
     <DashboardLayout allowedRoles={["owner"]}>
       <div className="space-y-6">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <h1 className="text-2xl font-bold tracking-tight">Commissions</h1>
-          <div className="flex gap-2">
-            <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {months.map((m, i) => (
-                  <SelectItem key={i} value={String(i)}>{m}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
-              <SelectTrigger className="w-[100px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {years.map((y) => (
-                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        <h1 className="text-2xl font-bold tracking-tight">Commission Ledger</h1>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard title="Generated Commission" value={`£${totalGenerated.toLocaleString()}`} icon={PoundSterling} />
-          <MetricCard title="Possible Commission" value={`£${totalPossible.toLocaleString()}`} icon={CircleDollarSign} />
-          <MetricCard title="Active Students" value={totalActiveStudents} icon={Users} />
-          <MetricCard title="Offer Stage Students" value={totalPossibleStudents} icon={TrendingUp} />
+          <MetricCard title="Total Owed" value={`£${totalOwed.toLocaleString()}`} icon={PoundSterling} />
+          <MetricCard title="Total Paid" value={`£${totalPaid.toLocaleString()}`} icon={CheckCircle2} />
+          <MetricCard title="Remaining" value={`£${totalRemaining.toLocaleString()}`} icon={Clock} />
+          <MetricCard title="Eligible Agents (5+)" value={eligibleAgents} icon={Users} />
         </div>
 
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold">Agent Breakdown</h2>
-          <div className="rounded-lg border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-8"></TableHead>
-                  <TableHead>Agent</TableHead>
-                  <TableHead>Admin</TableHead>
-                  <TableHead className="text-right">Active</TableHead>
-                  <TableHead className="text-right">Offer</TableHead>
-                  <TableHead className="text-right">Generated</TableHead>
-                  <TableHead className="text-right">Possible</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {agentCommissions.map((a) => {
-                  const isExpanded = expandedAgents.has(a.id);
-                  const hasData = a.generatedStudents > 0 || a.possibleStudents > 0;
-                  return (
-                    <>
-                      <TableRow
-                        key={a.id}
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => hasData && toggleExpand(a.id)}
-                      >
-                        <TableCell className="w-8 px-2">
-                          {hasData && (
-                            isExpanded
-                              ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                              : <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{a.full_name}</p>
-                            <p className="text-xs text-muted-foreground">{a.email}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{a.adminName}</TableCell>
-                        <TableCell className="text-right tabular-nums">{a.generatedStudents}</TableCell>
-                        <TableCell className="text-right tabular-nums">{a.possibleStudents}</TableCell>
-                        <TableCell className="text-right font-medium tabular-nums">
-                          £{a.generated.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground">
-                          £{a.possible.toLocaleString()}
-                        </TableCell>
-                      </TableRow>
-                      {isExpanded && (
-                        <TableRow key={`${a.id}-breakdown`} className="bg-muted/20 hover:bg-muted/30">
-                          <TableCell></TableCell>
-                          <TableCell colSpan={6} className="py-2">
-                            <BreakdownTables genBreakdown={a.genBreakdown} posBreakdown={a.posBreakdown} />
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </>
-                  );
-                })}
-                {agentCommissions.length === 0 && (
+        <Tabs defaultValue="agents">
+          <TabsList>
+            <TabsTrigger value="agents">Agent Breakdown</TabsTrigger>
+            <TabsTrigger value="payments">Payment History</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="agents" className="space-y-4 mt-4">
+            <div className="rounded-lg border bg-card">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                      No agents found
-                    </TableCell>
+                    <TableHead className="w-8"></TableHead>
+                    <TableHead>Agent</TableHead>
+                    <TableHead>Admin</TableHead>
+                    <TableHead className="text-right">Eligible</TableHead>
+                    <TableHead className="text-right">25% Status</TableHead>
+                    <TableHead className="text-right">Owed</TableHead>
+                    <TableHead className="text-right">Paid</TableHead>
+                    <TableHead className="text-right">Remaining</TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
+                </TableHeader>
+                <TableBody>
+                  {agentSummaries.map((a) => {
+                    const isExpanded = expandedAgents.has(a.agentId);
+                    return (
+                      <AgentRow
+                        key={a.agentId}
+                        agent={a}
+                        isExpanded={isExpanded}
+                        onToggle={() => toggleExpand(a.agentId)}
+                        paymentsBySnapshot={paymentsBySnapshot}
+                        onRecordPayment={(snapshotId, recipientId, recipientRole, maxAmount) =>
+                          setPaymentDialog({ snapshotId, recipientId, recipientRole, maxAmount })
+                        }
+                        onUpdateStatus={(id, status) => updateSnapshotStatus.mutate({ id, status })}
+                        profileMap={profileMap}
+                      />
+                    );
+                  })}
+                  {agentSummaries.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                        No commission snapshots yet. Snapshots are created when funding status is approved.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="payments" className="mt-4">
+            <div className="rounded-lg border bg-card">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Recipient</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Period</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead>Notes</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {payments.map((p: any) => (
+                    <TableRow key={p.id}>
+                      <TableCell className="text-sm">{format(new Date(p.paid_at), "dd MMM yyyy")}</TableCell>
+                      <TableCell className="font-medium">{profileMap.get(p.recipient_id)?.full_name || "Unknown"}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">{p.recipient_role}</Badge>
+                      </TableCell>
+                      <TableCell className="text-sm">{p.payment_type.replace(/_/g, " ")}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{p.period_label || "—"}</TableCell>
+                      <TableCell className="text-right font-medium tabular-nums">£{Number(p.amount).toLocaleString()}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{p.notes || "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                  {payments.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                        No payments recorded yet
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
+
+      {/* Record Payment Dialog */}
+      <Dialog open={!!paymentDialog} onOpenChange={(open) => { if (!open) { setPaymentDialog(null); resetPaymentForm(); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Record Payment</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Amount (£)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={payAmount}
+                onChange={(e) => setPayAmount(e.target.value)}
+                placeholder={paymentDialog ? `Max: £${paymentDialog.maxAmount}` : ""}
+              />
+            </div>
+            <div>
+              <Label>Payment Type</Label>
+              <Select value={payType} onValueChange={setPayType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="25_percent_monthly">25% Monthly</SelectItem>
+                  <SelectItem value="remaining_75">Remaining 75%</SelectItem>
+                  <SelectItem value="manual">Manual</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Period (e.g. April 2026)</Label>
+              <Input value={payPeriod} onChange={(e) => setPayPeriod(e.target.value)} />
+            </div>
+            <div>
+              <Label>Notes</Label>
+              <Textarea value={payNotes} onChange={(e) => setPayNotes(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setPaymentDialog(null); resetPaymentForm(); }}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (!paymentDialog || !payAmount) return;
+                recordPayment.mutate({
+                  snapshot_id: paymentDialog.snapshotId,
+                  recipient_id: paymentDialog.recipientId,
+                  recipient_role: paymentDialog.recipientRole,
+                  amount: Number(payAmount),
+                  payment_type: payType,
+                  period_label: payPeriod,
+                  notes: payNotes,
+                });
+              }}
+              disabled={!payAmount || Number(payAmount) <= 0}
+            >
+              Record Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
 
-function BreakdownTables({ genBreakdown, posBreakdown }: { genBreakdown: EnrollmentBreakdownItem[]; posBreakdown: EnrollmentBreakdownItem[] }) {
-  return (
-    <div className="space-y-3">
-      {genBreakdown.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold text-foreground mb-1">Generated (Active)</p>
-          <BreakdownTable items={genBreakdown} />
-        </div>
-      )}
-      {posBreakdown.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold text-muted-foreground mb-1">Possible (Offer Stage)</p>
-          <BreakdownTable items={posBreakdown} />
-        </div>
-      )}
-      {genBreakdown.length === 0 && posBreakdown.length === 0 && (
-        <p className="text-xs text-muted-foreground">No enrollments</p>
-      )}
-    </div>
-  );
-}
+/* ──── Agent Row with expand ──── */
 
-function BreakdownTable({ items }: { items: EnrollmentBreakdownItem[] }) {
+function AgentRow({
+  agent, isExpanded, onToggle, paymentsBySnapshot, onRecordPayment, onUpdateStatus, profileMap,
+}: {
+  agent: any;
+  isExpanded: boolean;
+  onToggle: () => void;
+  paymentsBySnapshot: Map<string, any[]>;
+  onRecordPayment: (snapshotId: string, recipientId: string, recipientRole: string, maxAmount: number) => void;
+  onUpdateStatus: (id: string, status: string) => void;
+  profileMap: Map<string, any>;
+}) {
   return (
-    <div className="rounded-md border bg-background">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="text-xs">University</TableHead>
-            <TableHead className="text-xs text-right">Students</TableHead>
-            <TableHead className="text-xs text-right">Rate</TableHead>
-            <TableHead className="text-xs">Source</TableHead>
-            <TableHead className="text-xs text-right">Subtotal</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {items.map((b) => (
-            <TableRow key={b.universityId}>
-              <TableCell className="text-sm">{b.universityName}</TableCell>
-              <TableCell className="text-sm text-right tabular-nums">{b.count}</TableCell>
-              <TableCell className="text-sm text-right tabular-nums">£{b.ratePerStudent.toLocaleString()}</TableCell>
-              <TableCell>
-                <Badge variant="secondary" className="text-xs font-normal">
-                  {b.rateSource}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-sm text-right font-medium tabular-nums">£{b.subtotal.toLocaleString()}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+    <>
+      <TableRow className="cursor-pointer hover:bg-muted/50" onClick={onToggle}>
+        <TableCell className="w-8 px-2">
+          {isExpanded
+            ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+        </TableCell>
+        <TableCell>
+          <div>
+            <p className="font-medium">{agent.agentName}</p>
+            <p className="text-xs text-muted-foreground">{agent.agentEmail}</p>
+          </div>
+        </TableCell>
+        <TableCell className="text-muted-foreground">{agent.adminName}</TableCell>
+        <TableCell className="text-right tabular-nums">{agent.eligibleCount}</TableCell>
+        <TableCell className="text-right">
+          {agent.qualifiesFor25 ? (
+            <Badge className="bg-green-500/10 text-green-700 border-green-200" variant="outline">
+              Eligible (£{agent.monthly25Amount})
+            </Badge>
+          ) : (
+            <Badge className="bg-amber-500/10 text-amber-700 border-amber-200" variant="outline">
+              {agent.eligibleCount}/5 students
+            </Badge>
+          )}
+        </TableCell>
+        <TableCell className="text-right font-medium tabular-nums">£{agent.totalAgentOwed.toLocaleString()}</TableCell>
+        <TableCell className="text-right tabular-nums text-muted-foreground">£{agent.totalAgentPaid.toLocaleString()}</TableCell>
+        <TableCell className="text-right font-semibold tabular-nums">
+          £{agent.agentRemaining.toLocaleString()}
+        </TableCell>
+      </TableRow>
+
+      {isExpanded && (
+        <TableRow className="bg-muted/20 hover:bg-muted/30">
+          <TableCell></TableCell>
+          <TableCell colSpan={7} className="py-3">
+            <div className="space-y-3">
+              {/* Admin commission summary */}
+              {agent.adminId && (
+                <Card className="border-dashed">
+                  <CardContent className="py-3 px-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">Admin Commission: {agent.adminName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Owed: £{agent.totalAdminOwed.toLocaleString()} | Paid: £{agent.totalAdminPaid.toLocaleString()} | Remaining: £{agent.adminRemaining.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Per-enrollment snapshots */}
+              <div className="rounded-md border bg-background">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs">Student</TableHead>
+                      <TableHead className="text-xs">University</TableHead>
+                      <TableHead className="text-xs">Rate</TableHead>
+                      <TableHead className="text-xs">Source</TableHead>
+                      <TableHead className="text-xs">Status</TableHead>
+                      <TableHead className="text-xs text-right">Paid</TableHead>
+                      <TableHead className="text-xs">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {agent.snapshots.map((snap: any) => {
+                      const snapshotPayments = paymentsBySnapshot.get(snap.id) || [];
+                      const agentPaid = snapshotPayments
+                        .filter((p: any) => p.recipient_role === "agent")
+                        .reduce((s: number, p: any) => s + Number(p.amount), 0);
+                      const remaining = Number(snap.agent_rate) - agentPaid;
+                      const statusInfo = SNAPSHOT_STATUS_LABELS[snap.snapshot_status] || { label: snap.snapshot_status, color: "" };
+
+                      return (
+                        <TableRow key={snap.id}>
+                          <TableCell className="text-sm">
+                            {snap.enrollments?.students?.first_name} {snap.enrollments?.students?.last_name}
+                          </TableCell>
+                          <TableCell className="text-sm">{snap.enrollments?.universities?.name || "—"}</TableCell>
+                          <TableCell className="text-sm tabular-nums">£{Number(snap.agent_rate).toLocaleString()}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="text-xs font-normal">{snap.rate_source}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={`text-xs ${statusInfo.color}`}>
+                              {statusInfo.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-right tabular-nums">
+                            £{agentPaid.toLocaleString()}
+                            {remaining > 0 && (
+                              <span className="text-muted-foreground"> / £{Number(snap.agent_rate).toLocaleString()}</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              {remaining > 0 && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onRecordPayment(snap.id, agent.agentId, "agent", remaining);
+                                  }}
+                                >
+                                  <CreditCard className="w-3 h-3 mr-1" />
+                                  Pay Agent
+                                </Button>
+                              )}
+                              {snap.admin_id && Number(snap.admin_rate) > 0 && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 text-xs"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const adminPaid = snapshotPayments
+                                      .filter((p: any) => p.recipient_role === "admin")
+                                      .reduce((s: number, p: any) => s + Number(p.amount), 0);
+                                    onRecordPayment(snap.id, snap.admin_id, "admin", Number(snap.admin_rate) - adminPaid);
+                                  }}
+                                >
+                                  Pay Admin
+                                </Button>
+                              )}
+                              {snap.snapshot_status === "paying_25" && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 text-xs"
+                                  onClick={(e) => { e.stopPropagation(); onUpdateStatus(snap.id, "paid"); }}
+                                >
+                                  Mark Paid
+                                </Button>
+                              )}
+                              {snap.snapshot_status === "pending_25" && agent.qualifiesFor25 && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 text-xs"
+                                  onClick={(e) => { e.stopPropagation(); onUpdateStatus(snap.id, "paying_25"); }}
+                                >
+                                  Start 25%
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </TableCell>
+        </TableRow>
+      )}
+    </>
   );
 }
