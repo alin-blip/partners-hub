@@ -137,6 +137,21 @@ export default function OwnerDashboard() {
   // Pipeline
   const pipelineCount = allEnrollments.filter((e: any) => !["active", "rejected"].includes(e.status)).length;
 
+  // Lead-to-enrollment conversion
+  const totalLeads = leads.length;
+  const convertedLeads = leads.filter((l: any) => l.status === "converted").length;
+  const conversionRate = totalLeads > 0 ? Math.round((convertedLeads / totalLeads) * 100) : 0;
+
+  // Leads per agent
+  const agentLeadCounts = new Map<string, number>();
+  for (const l of leads) {
+    agentLeadCounts.set((l as any).agent_id, (agentLeadCounts.get((l as any).agent_id) || 0) + 1);
+  }
+  const agentConvertedLeads = new Map<string, number>();
+  for (const l of leads.filter((l: any) => l.status === "converted")) {
+    agentConvertedLeads.set((l as any).agent_id, (agentConvertedLeads.get((l as any).agent_id) || 0) + 1);
+  }
+
   // Total revenue
   const totalRevenue = activeAgents.reduce((sum: number, agent: any) => {
     const count = agentActiveEnrollments.get(agent.id) || 0;
