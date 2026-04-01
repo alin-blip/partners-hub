@@ -146,7 +146,21 @@ export default function CommissionsPage() {
     paymentsBySnapshot.set(p.snapshot_id, list);
   }
 
-  // Calculate agent summaries
+  // Helper: group snapshots by intake
+  function groupByIntake(snaps: any[]) {
+    const intakeMap = new Map<string, { intakeLabel: string; snapshots: any[] }>();
+    for (const snap of snaps) {
+      const intakeId = snap.enrollments?.intake_id || "no-intake";
+      const intakeLabel = snap.enrollments?.intakes?.label || "No Intake";
+      if (!intakeMap.has(intakeId)) {
+        intakeMap.set(intakeId, { intakeLabel, snapshots: [] });
+      }
+      intakeMap.get(intakeId)!.snapshots.push(snap);
+    }
+    return intakeMap;
+  }
+
+  // Calculate agent summaries with per-intake breakdown
   const agentSummaries = Array.from(agentSnapshots.entries()).map(([agentId, snaps]) => {
     const profile = profileMap.get(agentId);
     const adminProfile = profile?.admin_id ? profileMap.get(profile.admin_id) : null;
@@ -162,19 +176,30 @@ export default function CommissionsPage() {
     const totalAgentPaid = agentPayments.reduce((s: number, p: any) => s + Number(p.amount), 0);
     const totalAdminPaid = adminPayments.reduce((s: number, p: any) => s + Number(p.amount), 0);
 
+    // Per-intake eligibility
+    const intakeGroups = groupByIntake(snaps);
+    const intakeBreakdown = Array.from(intakeGroups.entries()).map(([intakeId, group]) => {
+      const count = group.snapshots.length;
+      const qualifies = count >= 5;
+      const total25 = group.snapshots.reduce((s: number, snap: any) => s + Math.round(Number(snap.agent_rate) * 0.25 * 100) / 100, 0);
+      const total75 = group.snapshots.reduce((s: number, snap: any) => {
+        if (snap.snapshot_status === "ready_full" || snap.snapshot_status === "paid") {
+          return s + Math.round(Number(snap.agent_rate) * 0.75 * 100) / 100;
+        }
+        return s;
+      }, 0);
+      const readyForFull = group.snapshots.filter((s: any) => s.snapshot_status === "ready_full").length;
+      return { intakeId, intakeLabel: group.intakeLabel, count, qualifies, total25, total75, readyForFull, snapshots: group.snapshots };
+    });
+
     const eligibleCount = snaps.length;
-    const qualifiesFor25 = eligibleCount >= 5;
     const readyForFull = snaps.filter((s: any) => s.snapshot_status === "ready_full").length;
 
-    // 25% / 75% automatic breakdown per snapshot
-    const agent25Total = snaps.reduce((s: number, snap: any) => s + Math.round(Number(snap.agent_rate) * 0.25 * 100) / 100, 0);
-    const agent75Total = snaps.reduce((s: number, snap: any) => {
-      if (snap.snapshot_status === "ready_full" || snap.snapshot_status === "paid") {
-        return s + Math.round(Number(snap.agent_rate) * 0.75 * 100) / 100;
-      }
-      return s;
-    }, 0);
+    // Totals across all intakes (only eligible intakes count for 25%)
+    const agent25Total = intakeBreakdown.reduce((s, ib) => s + (ib.qualifies ? ib.total25 : 0), 0);
+    const agent75Total = intakeBreakdown.reduce((s, ib) => s + ib.total75, 0);
     const agent25Remaining = Math.max(0, Math.round((agent25Total - totalAgentPaid) * 100) / 100);
+    const qualifiesFor25 = intakeBreakdown.some(ib => ib.qualifies);
 
     return {
       agentId,
@@ -183,6 +208,7 @@ export default function CommissionsPage() {
       adminName: adminProfile?.full_name || "—",
       adminId: profile?.admin_id,
       snapshots: snaps,
+      intakeBreakdown,
       eligibleCount,
       qualifiesFor25,
       readyForFull,
