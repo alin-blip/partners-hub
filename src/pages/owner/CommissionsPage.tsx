@@ -346,8 +346,8 @@ export default function CommissionsPage() {
                   })}
                   {agentSummaries.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                        No commission snapshots yet. Snapshots are created when funding status is approved.
+                      <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                        No commission snapshots yet. Snapshots are created when enrollment status reaches funding.
                       </TableCell>
                     </TableRow>
                   )}
