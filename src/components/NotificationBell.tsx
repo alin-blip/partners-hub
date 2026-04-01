@@ -145,7 +145,7 @@ export function NotificationBell() {
           .limit(5);
 
         if (upgrades) {
-          const upgradeUserIds = [...new Set(upgrades.map((u: any) => u.user_id))];
+          const upgradeUserIds = [...new Set(upgrades.map((u: any) => u.user_id))] as string[];
           const { data: upgradeProfiles } = await supabase
             .from("profiles")
             .select("id, full_name")
