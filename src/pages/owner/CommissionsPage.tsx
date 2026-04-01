@@ -166,6 +166,16 @@ export default function CommissionsPage() {
     const qualifiesFor25 = eligibleCount >= 5;
     const readyForFull = snaps.filter((s: any) => s.snapshot_status === "ready_full").length;
 
+    // 25% / 75% automatic breakdown per snapshot
+    const agent25Total = snaps.reduce((s: number, snap: any) => s + Math.round(Number(snap.agent_rate) * 0.25 * 100) / 100, 0);
+    const agent75Total = snaps.reduce((s: number, snap: any) => {
+      if (snap.snapshot_status === "ready_full" || snap.snapshot_status === "paid") {
+        return s + Math.round(Number(snap.agent_rate) * 0.75 * 100) / 100;
+      }
+      return s;
+    }, 0);
+    const agent25Remaining = Math.max(0, Math.round((agent25Total - totalAgentPaid) * 100) / 100);
+
     return {
       agentId,
       agentName: profile?.full_name || "Unknown",
@@ -182,7 +192,10 @@ export default function CommissionsPage() {
       totalAdminOwed,
       totalAdminPaid,
       adminRemaining: totalAdminOwed - totalAdminPaid,
-      monthly25Amount: qualifiesFor25 ? Math.round((totalAgentOwed - totalAgentPaid) * 0.25 * 100) / 100 : 0,
+      agent25Total,
+      agent75Total,
+      agent25Remaining,
+      monthly25Amount: qualifiesFor25 ? agent25Remaining : 0,
     };
   }).sort((a, b) => b.agentRemaining - a.agentRemaining);
 
