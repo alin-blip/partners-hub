@@ -58,13 +58,13 @@ export default function AgentDashboard() {
     },
   });
 
-  // Fetch commission snapshots for this agent
+  // Fetch commission snapshots for this agent (with intake info)
   const { data: snapshots = [] } = useQuery({
     queryKey: ["agent-snapshots", user?.id],
     queryFn: async () => {
       const { data } = await supabase
         .from("commission_snapshots")
-        .select("id, agent_rate, snapshot_status, eligible_at, enrollments(universities(name), students(first_name, last_name))")
+        .select("id, agent_rate, snapshot_status, eligible_at, enrollments(intake_id, universities(name), students(first_name, last_name), intakes(label))")
         .eq("agent_id", user!.id);
       return (data || []) as any[];
     },
