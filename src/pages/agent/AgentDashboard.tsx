@@ -58,8 +58,39 @@ export default function AgentDashboard() {
     },
   });
 
+  // Fetch commission snapshots for this agent
+  const { data: snapshots = [] } = useQuery({
+    queryKey: ["agent-snapshots", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("commission_snapshots")
+        .select("id, agent_rate, snapshot_status, eligible_at, enrollments(universities(name), students(first_name, last_name))")
+        .eq("agent_id", user!.id);
+      return (data || []) as any[];
+    },
+    enabled: !!user,
+  });
+
+  const { data: myPayments = [] } = useQuery({
+    queryKey: ["agent-payments", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("commission_payments")
+        .select("amount")
+        .eq("recipient_id", user!.id)
+        .eq("recipient_role", "agent");
+      return (data || []) as any[];
+    },
+    enabled: !!user,
+  });
+
   const activeEnrollments = enrollments.filter((e: any) => e.status === "active").length;
-  const { tier: currentTier, amount: commissionAmount } = calcCommission(activeEnrollments, tiers);
+  const totalCommission = snapshots.reduce((s: number, snap: any) => s + Number(snap.agent_rate), 0);
+  const totalPaid = myPayments.reduce((s: number, p: any) => s + Number(p.amount), 0);
+  const totalRemaining = totalCommission - totalPaid;
+  const qualifiesFor25 = snapshots.length >= 5;
+  const readyForFull = snapshots.filter((s: any) => s.snapshot_status === "ready_full").length;
+
   const monthlyTarget = 10;
   const thisMonthStudents = students.filter((s: any) => {
     const d = new Date(s.created_at);
