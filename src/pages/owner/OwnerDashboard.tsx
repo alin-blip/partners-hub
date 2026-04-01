@@ -231,10 +231,17 @@ export default function OwnerDashboard() {
         <DashboardSearchCard />
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <MetricCard title="Total Students" value={students.length} icon={Users} />
           <MetricCard title="Active Agents" value={activeAgents.length} icon={UserCheck} />
           <MetricCard title="In Pipeline" value={pipelineCount} icon={ClipboardList} />
+          <MetricCard title="Total Leads" value={totalLeads} icon={Target} />
+          <MetricCard
+            title="Conversion Rate"
+            value={`${conversionRate}%`}
+            icon={TrendingUp}
+            description={`${convertedLeads} of ${totalLeads} leads converted`}
+          />
           <MetricCard
             title="Est. Revenue"
             value={`£${totalRevenue.toLocaleString()}`}
