@@ -1,150 +1,80 @@
 
-## Ce se întâmplă acum
 
-Sunt 2 probleme reale, separate:
+# Comisioane calculate pe Intake (nu global pe agent)
 
-1. `paid_by_university` există în UI, dar nu este permis în baza de date.
-   - Am verificat migrarea `supabase/migrations/20260331094522_a0a8f3bc-1de2-4fce-be6e-7158a4e205a0.sql`
-   - Constraint-ul `enrollments_status_check` permite doar:
-     `applied, documents_pending, documents_submitted, processing, offer_received, accepted, funding, enrolled, active, rejected, withdrawn`
-   - `paid_by_university` lipsește, de aceea apare eroarea:
-     `violates check constraint enrollments_status_check`
+## Ce se schimbă
 
-2. Comisioanele nu apar “de la funding în jos” pentru că logica actuală le creează doar când `funding_status = approved`.
-   - Funcția `create_commission_snapshot()` creează snapshot doar la:
-     `IF NEW.funding_status = 'approved' ...`
-   - Asta înseamnă că un enrollment aflat doar în status `funding` nu intră încă în `commission_snapshots`
-   - Deci nu apare în `Commissions`, nici la agent, nici la admin
+Acum tier-ul se aplică pe numărul total de studenți ai agentului. Cerința: tier-ul și comisionul se calculează **per intake** — un agent cu 3 studenți pe Intake A și 4 pe Intake B nu are 7 studenți pentru tier, ci 3 și 4 separat.
 
-Mai este și un risc suplimentar:
-- contextul backend spune că în prezent nu există trigger-uri active în DB, chiar dacă există migrare SQL pentru ele
-- deci trebuie refăcute explicit în migrare
+## Modificări necesare
 
-## Ce trebuie schimbat
+### 1. Migrare DB — Rescriere `create_commission_snapshot()`
 
-### 1. Reparăm statusul `paid_by_university`
-Voi face o migrare nouă care:
-- șterge constraint-ul vechi `enrollments_status_check`
-- îl recreează incluzând și `paid_by_university`
+Funcția trigger trebuie modificată astfel:
+- Când numără studenții pentru tier matching, filtrează și pe `intake_id` (din enrollment-ul curent)
+- Contorizarea: `WHERE s.agent_id = _agent_id AND e.intake_id = NEW.intake_id AND e.university_id = _uni_id AND e.status IN (...)`
+- Tier upgrade detection: compară per intake, nu global
+- Admin rate counting: tot per intake
 
-Asta rezolvă imediat eroarea când schimbi statusul din UI.
+Același principiu pentru toate cele 3 priorități (uni tiers, uni commission, global tiers).
 
-### 2. Clarificăm regula pentru apariția comisioanelor
-Din mesajul tău, regula dorită este:
-- comisioanele să apară din stadiul `funding` încolo, nu doar după `funding_status = approved`
+### 2. Frontend — CommissionsPage.tsx
 
-Asta înseamnă că trebuie să schimbăm logica de snapshot astfel:
+- Grupare snapshots per agent + per intake (nu doar per agent)
+- Afișare breakdown pe intake în tabelul expandat
+- Eligibilitatea 25% (5+ studenți) se calculează per intake
+- Fetch intake info din enrollments join (adăugăm `intakes(label)` la query-ul de snapshots)
 
-```text
-Enrollment status:
-funding / enrolled / active / paid_by_university
-    -> apare în commissions
+### 3. Frontend — AgentDashboard.tsx
 
-Funding status:
-approved
-    -> marchează eligibilitatea pentru payout 25%
+- `qualifiesFor25` trebuie calculat per intake, nu pe total snapshots
+- Groupare snapshots pe intake_id, verificare 5+ per fiecare
+
+### 4. Frontend — AdminDashboard.tsx
+
+- Similar: commission summary per intake
+
+### 5. Lib — commissions.ts
+
+- `calcCommission` și `calcCommissionByEnrollments` primesc intake_id ca parametru de grupare
+- `buildUniversityBreakdown` devine `buildIntakeBreakdown` sau adaugă intake dimension
+
+## Detalii tehnice
+
+### DB function changes (pseudo-SQL)
+```sql
+-- Instead of counting all agent enrollments:
+SELECT count(*) INTO _count 
+FROM enrollments e JOIN students s ON e.student_id = s.id
+WHERE s.agent_id = _agent_id 
+  AND e.university_id = _uni_id
+  AND e.intake_id = NEW.intake_id  -- NEW: filter by intake
+  AND e.status IN ('funding','enrolled','active','paid_by_university');
 ```
 
-Adică:
-- snapshot-ul se creează mai devreme, când enrollment-ul intră în `funding` sau mai sus
-- payout logic rămâne separată:
-  - 25% când `funding_status = approved`
-  - 75% când `status = paid_by_university`
+### Commission snapshot table
+- Nu necesită coloane noi — deja are `enrollment_id` care linkuieste la `enrollments.intake_id`
+- Query-urile frontend pot join-ui `enrollments.intake_id → intakes.label`
 
-### 3. Refacem trigger-ele lipsă
-Voi include în aceeași reparație:
-- `trg_commission_snapshot` pe `enrollments`
-- `audit_commission_snapshots`
-- `audit_commission_payments`
+### UI changes
+- CommissionsPage: snapshots grouped by `agent → intake`, eligibility shown per intake
+- Expanded row shows intake label alongside university
+- "5+ needed" badge shown per intake group
 
-Ca să fim siguri că automatizarea chiar rulează.
+## Pași de implementare
 
-## Implementare propusă
+1. **Migrare SQL**: Rescriere `create_commission_snapshot()` cu logică per-intake
+2. **CommissionsPage.tsx**: Query include `intakes(label)`, groupare per intake, UI breakdown
+3. **AgentDashboard.tsx**: Eligibilitate per intake
+4. **AdminDashboard.tsx**: Commission totals per intake
+5. **commissions.ts**: Update utility functions pentru intake grouping
 
-### Migrare nouă
-Voi adăuga o migrare care face 3 lucruri:
-
-1. Update la `enrollments_status_check`
-2. Înlocuiește `create_commission_snapshot()` cu o versiune care:
-   - creează snapshot când statusul intră în `funding`, `enrolled`, `active` sau `paid_by_university`
-   - nu dublează snapshot-urile pentru același enrollment
-   - setează:
-     - `snapshot_status = pending_25` inițial
-     - `snapshot_status = ready_full` dacă enrollment-ul ajunge la `paid_by_university`
-3. Reface trigger-ele lipsă
-
-### Ajustare logică snapshot
-Voi muta regula de creare din:
-- `funding_status = approved`
-
-în:
-- `status IN ('funding', 'enrolled', 'active', 'paid_by_university')`
-
-și voi păstra separat:
-- dacă `funding_status` devine `approved`, snapshot-ul rămâne eligibil pentru 25%
-- dacă `status` devine `paid_by_university`, snapshot-ul trece la `ready_full`
-
-### UI
-Nu e nevoie de schimbări majore în UI pentru eroarea asta, pentru că:
-- `paid_by_university` este deja prezent în:
-  - `StudentEnrollmentsTab`
-  - `EnrollmentsPage`
-  - `StatusBadge`
-
-Dar după repararea backend-ului, datele vor începe să apară corect și în:
-- `CommissionsPage`
-- `AgentDashboard`
-- `AdminDashboard`
-
-## Rezultat după implementare
-
-După fix:
-
-1. vei putea seta fără eroare:
-   - `paid_by_university`
-
-2. enrollment-urile vor apărea în Commissions din momentul în care ajung în:
-   - `funding`
-   - `enrolled`
-   - `active`
-   - `paid_by_university`
-
-3. payout flow rămâne:
-   - 25% la `funding_status = approved`
-   - restul la `paid_by_university`
-
-## Detaliu tehnic important
-
-Acum există o nealiniere între:
-- UI statuses
-- DB check constraint
-- trigger logic
-
-Fixul corect trebuie să le alinieze pe toate 3 într-o singură iterație, altfel:
-- ori UI permite un status pe care DB îl respinge
-- ori DB îl acceptă dar comisioanele tot nu apar
-- ori triggerul nu rulează deloc
-
-## Ce voi implementa exact
-
-1. Migrare pentru `enrollments_status_check` cu `paid_by_university`
-2. Rescriere `create_commission_snapshot()` pentru apariție din `funding` în sus
-3. Re-creare trigger `trg_commission_snapshot`
-4. Re-creare triggere audit
-5. Păstrarea logicii de tier approval existente
-
-## Ce să verifici după implementare
+## Verificare
 
 ```text
-Test 1:
-funding -> apare în Commissions
-
-Test 2:
-funding_status = approved -> snapshot rămâne eligibil pentru 25%
-
-Test 3:
-status = paid_by_university -> fără eroare + snapshot devine ready_full
-
-Test 4:
-agent și admin văd valorile în dashboardurile lor
+Test 1: Agent cu 3 studenți pe Intake A, 4 pe Intake B → tier Starter (nu Silver)
+Test 2: Agent cu 5+ studenți pe un singur intake → qualifies for 25% pe acel intake
+Test 3: CommissionsPage afișează breakdown pe intake
+Test 4: Snapshot-urile noi folosesc rate calculat per intake
 ```
+
