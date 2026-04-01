@@ -2221,7 +2221,7 @@ export default function SettingsPage() {
           <TabsContent value="commissions" className="mt-4 space-y-6">
             <CommissionTiersSection deleteItem={deleteItem} universities={universities} />
             <UniversityCommissionsSection universities={universities} />
-            <AdminCommissionSettingsSection />
+            <AdminCommissionTiersSection />
           </TabsContent>
 
           <TabsContent value="promotions" className="mt-4">
