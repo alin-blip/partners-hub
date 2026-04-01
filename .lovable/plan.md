@@ -1,117 +1,116 @@
 
 
-## Security Audit: What Exists vs What's Missing
+# Audit Complet Pre-Lansare — EduForYou UK Agent Platform
 
-### Current Security Posture (What We Have)
+---
 
-| Area | Status | Details |
-|------|--------|---------|
-| Role-based access (RBAC) | ✅ Done | Owner/Admin/Agent roles via `user_roles` table + `has_role()` security definer |
-| RLS on all tables | ✅ Done | Every table has role-appropriate policies |
-| No public signup | ✅ Done | Accounts created only via `create-owner` edge function |
-| Agent sees own data only | ✅ Done | RLS restricts agents to own students/enrollments |
-| Admin sees team data | ✅ Done | Admin can see agents under their `admin_id` |
-| Document delete protection | ✅ Done | Agent can only "cancel" (soft-delete); admin needs owner code to hard-delete |
-| Student reassignment (owner only) | ✅ Done | Only owner can reassign students between agents |
-| Export CSV restricted | ✅ Done | Only owner/admin see Export CSV button |
-| Anti-copy (watermark, shortcuts) | ✅ Done | Email watermark, blocked Ctrl+P/C/U/S, disabled right-click |
-| Status changes restricted | ✅ Done | Only owner/admin can change enrollment status (UI-level) |
-| Commission visibility | ✅ Partial | Agents see their own commission card, not tier structure |
-| Login tracking (XP) | ✅ Done | Daily login events recorded in `agent_xp_events` |
+## Rezumat Executiv
 
-### Critical Gaps (What's Missing)
+Scanarea de securitate a identificat **4 probleme critice (error)** si **7 avertizmente (warn)**. De asemenea, exista o eroare React in consola (ref pe Badge). Mai jos, fiecare problema este clasificata cu prioritate si solutie propusa.
 
-**Priority 1 — Data Integrity (Points 1, 2)**
+---
 
-Currently agents can edit ALL student fields (name, DOB, immigration status) after submission. No fields are locked. No RLS prevents agents from updating sensitive columns.
+## A. Probleme Critice (ERROR) — Necesita rezolvare inainte de lansare
 
-- **Need**: Lock sensitive fields (first_name, last_name, date_of_birth, immigration_status) for agents after student creation
-- **Need**: Enrollment status workflow locks — agents can't move status backwards; certain statuses lock the enrollment entirely
-- **Need**: Server-side enforcement via RLS UPDATE policies with column checks or a validation trigger
+### 1. Security Definer View (`public_agent_profiles`)
+- **Problema**: View-ul ruleaza cu permisiunile creatorului, nu ale utilizatorului.
+- **Fix**: Recrearea view-ului fara `SECURITY DEFINER`, sau cu `SECURITY INVOKER`.
 
-**Priority 2 — Audit Trail (Point 10)**
+### 2. Student Finance Forms — Agent ALL policy prea permisiva
+- **Problema**: Politica `ALL` permite agentilor sa si stearga formularele financiare. Datele contin NI numbers, parole, share codes — date extrem de sensibile.
+- **Fix**: Inlocuirea politicii `ALL` cu politici granulare (`SELECT`, `INSERT`, `UPDATE`). Eliminarea `DELETE` pentru agenti. Verificarea ca parolele nu sunt stocate in clar.
 
-No `audit_log` table exists. Changes to students, enrollments, and documents are not tracked. If fraud occurs, there's no way to trace who did what.
+### 3. Profile expuse partenerilor de conversatie
+- **Problema**: Oricine e intr-o conversatie poate citi telefonul, adresa si postcode-ul celuilalt.
+- **Fix**: Crearea unui view `conversation_partner_view` cu doar `id`, `full_name`, `avatar_url`, `slug`. Inlocuirea politicii RLS cu acces la view in loc de tabela `profiles`.
 
-- **Need**: `audit_log` table with: `user_id`, `action`, `table_name`, `record_id`, `old_values`, `new_values`, `created_at`
-- **Need**: Database triggers on `students`, `enrollments`, `student_documents` that auto-log changes
+### 4. Politici INSERT pe `students` aplicate rolului `{public}`
+- **Problema**: Politicile INSERT/UPDATE pentru agenti si admini pe tabela `students` sunt pe rolul `public` in loc de `authenticated`, ceea ce teoretic permite acces fara autentificare.
+- **Fix**: Modificarea tuturor politicilor relevante de pe `{public}` la `{authenticated}`.
 
-**Priority 3 — Session Timeout (Point 12)**
+---
 
-No auto-logout on inactivity. An agent could walk away and someone else could access the system.
+## B. Avertizmente (WARN) — Recomandate pentru lansare
 
-- **Need**: Client-side idle timer (e.g. 30 min inactivity → auto sign-out)
-- **Need**: Warning dialog at 25 min before logout
+### 5. Leaked Password Protection dezactivata
+- **Fix**: Activarea HIBP check din Cloud → Users → Auth Settings → Email → Password HIBP Check.
 
-**Priority 4 — Document Version History (Point 4)**
+### 6. Generated-images bucket — upload fara verificare de ownership
+- **Problema**: Orice utilizator autentificat poate uploada in folderul altui utilizator.
+- **Fix**: Adaugarea conditiei `(storage.foldername(name))[1] = auth.uid()::text` in politica INSERT.
 
-When a document is re-uploaded, the old version is overwritten with no history.
+### 7. Realtime direct_messages — fara restrictie pe canal
+- **Problema**: Orice utilizator autentificat poate asculta orice canal Realtime.
+- **Impact**: Moderat — datele sunt filtrate de RLS la nivel Postgres, dar metadata canalului e vizibila.
+- **Fix**: Adaugarea de politici RLS pe `realtime.messages` (necesita configurare avansata, poate fi amanata post-lansare).
 
-- **Need**: `version` column on `student_documents` + keep old versions with `is_current` flag
-- **Need**: Upload log showing who uploaded what and when (partially covered by `created_at` + `uploaded_by`)
+### 8. Agent streaks vizibile pentru toti
+- **Impact**: Scazut — intentionat pentru leaderboard. Acceptabil.
 
-**Priority 5 — Agent Restrictions on Edit After Status (Point 2)**
+### 9. Consent tokens in clar
+- **Impact**: Moderat — tokenurile sunt read-only de agentul creator. Riscul e limitat.
+- **Fix post-lansare**: Hash-uirea tokenurilor stocate.
 
-No workflow control exists. An agent can currently edit a student even after "enrolled" status.
+### 10. Email send log fara retentie
+- **Impact**: Scazut — doar owner si service_role au acces.
+- **Fix post-lansare**: Politica de retentie automata (DELETE dupa 90 zile).
 
-- **Need**: Check enrollment status before allowing student edits
-- **Need**: Block student overview edits if any enrollment is in `enrolled`, `active` status (for agents)
+### 11. Suppressed emails fara DELETE policy
+- **Impact**: Scazut.
+- **Fix post-lansare**: Adaugarea politicii DELETE pentru owner.
 
-### Implementation Plan
+---
 
-**Phase 1: Immediate Security (this session)**
+## C. Eroare React in Consola
 
-1. **Create `audit_log` table** + database triggers on `students`, `enrollments`, `student_documents` to auto-record all INSERT/UPDATE/DELETE with old/new values and user ID
+- **Problema**: `UniversitiesCoursesPage` paseaza un `ref` catre `Badge` si `CourseDetailsInfoCard` care nu folosesc `forwardRef`.
+- **Fix**: Adaugarea `React.forwardRef` pe componenta `CourseDetailsInfoCard`, sau eliminarea ref-ului.
 
-2. **Add idle timeout** to `AuthContext.tsx` — 30-minute inactivity timer with a 5-minute warning dialog, then auto sign-out
+---
 
-3. **Lock agent edits on sensitive fields** — In `StudentOverviewTab.tsx`, when role is `agent`, make `first_name`, `last_name`, `date_of_birth`, `immigration_status` read-only (non-editable). Only admin/owner can change these.
+## D. Verificari Suplimentare Confirmate OK
 
-4. **Enrollment workflow locks** — In `StudentEnrollmentsTab.tsx` and the RLS/UI, prevent agents from changing status. Add UI locks: if enrollment status is `enrolled` or `active`, disable the edit button on student overview for agents.
+| Zona | Status |
+|------|--------|
+| RBAC (Owner/Admin/Agent) | OK — `user_roles` + `has_role()` security definer |
+| Signup public blocat | OK — doar `create-owner` edge function |
+| Idle timeout 30 min | OK — cu warning la 25 min |
+| Rate limiting login | OK — 5 incercari/min, lockout 60s |
+| Audit log + triggers | OK — INSERT/UPDATE/DELETE pe students, enrollments, documents, notes |
+| Audit log protejat | OK — INSERT doar `service_role` |
+| Agent field locks | OK — first_name, last_name, DOB, immigration_status blocate server-side (trigger) + UI |
+| Enrollment workflow locks | OK — agentii nu pot edita daca enrollment e in status final |
+| Anti-copy (watermark, shortcuts) | OK |
+| Document versioning | OK — `version` + `is_current` pe `student_documents` |
+| Consent extern functional | OK — `/sign-consent/:token` via Edge Functions |
+| Domain live | OK — `agents-eduforyou.co.uk` |
+| Export CSV restrictionat | OK — doar owner/admin |
 
-5. **Remove agent access to Export CSV** — Already done (only owner/admin see it). Verify no other export paths exist.
+---
 
-**Phase 2: Enhanced (next session)**
+## E. Plan de Implementare
 
-6. Document version history table
-7. 2FA setup via backend auth settings
-8. Rate limiting on login attempts
+### Inainte de lansare (Prioritate 1-4)
 
-### Technical Details
+1. **Migratia SQL**: Modificarea politicilor RLS pe `students` de la `{public}` la `{authenticated}`
+2. **Migratia SQL**: Splitarea politicii `ALL` pe `student_finance_forms` in SELECT + INSERT + UPDATE (fara DELETE pentru agenti)
+3. **Migratia SQL**: Crearea view-ului `conversation_partner_view` si ajustarea politicii de profil
+4. **Migratia SQL**: Recrearea view-ului `public_agent_profiles` ca `SECURITY INVOKER`
+5. **Migratia SQL**: Adaugarea conditiei de ownership pe bucket-ul `generated-images`
+6. **Activare HIBP**: Din interfata Cloud → Auth Settings
+7. **Fix React warning**: `CourseDetailsInfoCard` forwardRef
 
-**Audit log trigger (SQL)**:
-```text
-audit_log table:
-  id, user_id, action (INSERT/UPDATE/DELETE),
-  table_name, record_id, old_values (jsonb),
-  new_values (jsonb), ip_address, created_at
+### Post-lansare (Prioritate 5+)
 
-Triggers on: students, enrollments, student_documents, student_notes
-Uses current_setting('request.jwt.claims') to extract user_id
-```
+8. Realtime channel restrictions
+9. Token hashing pe consent_signing_tokens
+10. Email log retention policy
 
-**Idle timeout (AuthContext)**:
-```text
-- Track mouse/keyboard/touch events
-- Reset 30-min timer on activity
-- Show warning dialog at 25 min
-- Call signOut() at 30 min
-- Clean up event listeners on unmount
-```
+---
 
-**Agent field locks (StudentOverviewTab)**:
-```text
-- When role === "agent" and editing:
-  - first_name, last_name → disabled inputs
-  - date_of_birth → disabled
-  - immigration_status → disabled select
-  - Show "(locked)" label next to disabled fields
-```
+## Estimare
 
-**Enrollment workflow control**:
-```text
-- Agent cannot edit student if any enrollment status in
-  [enrolled, active, rejected, withdrawn]
-- Show "Student is locked" message instead of Edit button
-```
+- Fixuri pre-lansare: **5-6 migratii SQL + 1 fix React minor**
+- Timp estimat: **~1 sesiune de implementare**
+- Risc daca nu se rezolva: **Ridicat** pentru punctele 2-4 (date PII expuse/modificabile)
 
