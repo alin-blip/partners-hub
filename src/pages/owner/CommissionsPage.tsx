@@ -313,14 +313,15 @@ export default function CommissionsPage() {
           <TabsContent value="agents" className="space-y-4 mt-4">
             <div className="rounded-lg border bg-card">
               <Table>
-                <TableHeader>
+                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-8"></TableHead>
                     <TableHead>Agent</TableHead>
                     <TableHead>Admin</TableHead>
-                    <TableHead className="text-right">Eligible</TableHead>
-                    <TableHead className="text-right">25% Status</TableHead>
-                    <TableHead className="text-right">Owed</TableHead>
+                    <TableHead className="text-right">Students</TableHead>
+                    <TableHead className="text-right">25% Due</TableHead>
+                    <TableHead className="text-right">75% Due</TableHead>
+                    <TableHead className="text-right">Total Owed</TableHead>
                     <TableHead className="text-right">Paid</TableHead>
                     <TableHead className="text-right">Remaining</TableHead>
                   </TableRow>
