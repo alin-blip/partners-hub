@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Download, Loader2, ScrollText } from "lucide-react";
+import { FileText, Download, Loader2, ScrollText, ShieldCheck, ShieldAlert, ShieldX } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 interface Props {
@@ -18,6 +19,7 @@ export function StudentAIDocumentsTab({ studentId, studentName }: Props) {
   const [generating, setGenerating] = useState<"cv" | "personal_statement" | null>(null);
   const [cvContent, setCvContent] = useState<string | null>(null);
   const [psContent, setPsContent] = useState<string | null>(null);
+  const [psAiScore, setPsAiScore] = useState<number | null>(null);
   const [useGuidelines, setUseGuidelines] = useState(true);
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -30,8 +32,12 @@ export function StudentAIDocumentsTab({ studentId, studentName }: Props) {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      if (type === "cv") setCvContent(data.content);
-      else setPsContent(data.content);
+      if (type === "cv") {
+        setCvContent(data.content);
+      } else {
+        setPsContent(data.content);
+        setPsAiScore(data.ai_score ?? null);
+      }
 
       toast({ title: `${type === "cv" ? "CV" : "Personal Statement"} generated successfully` });
     } catch (e: any) {
@@ -55,7 +61,6 @@ export function StudentAIDocumentsTab({ studentId, studentName }: Props) {
         @media print { body { margin: 0; } }
       </style></head><body>`);
 
-    // Simple markdown-to-HTML conversion for print
     const html = content
       .replace(/^### (.*$)/gm, "<h3>$1</h3>")
       .replace(/^## (.*$)/gm, "<h2>$1</h2>")
@@ -66,7 +71,6 @@ export function StudentAIDocumentsTab({ studentId, studentName }: Props) {
       .replace(/\n\n/g, "</p><p>")
       .replace(/<\/li>\n<li>/g, "</li><li>");
 
-    // Wrap consecutive <li> in <ul>
     const withUl = html.replace(/(<li>.*?<\/li>)+/gs, (match) => `<ul>${match}</ul>`);
 
     win.document.write(`<p>${withUl}</p></body></html>`);
@@ -74,21 +78,49 @@ export function StudentAIDocumentsTab({ studentId, studentName }: Props) {
     setTimeout(() => win.print(), 300);
   };
 
+  const AiScoreBadge = ({ score }: { score: number }) => {
+    if (score < 15) {
+      return (
+        <Badge className="bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700 gap-1">
+          <ShieldCheck className="w-3.5 h-3.5" />
+          AI Score: {score}% ✓
+        </Badge>
+      );
+    }
+    if (score <= 25) {
+      return (
+        <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-700 gap-1">
+          <ShieldAlert className="w-3.5 h-3.5" />
+          AI Score: {score}% ⚠
+        </Badge>
+      );
+    }
+    return (
+      <Badge className="bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700 gap-1">
+        <ShieldX className="w-3.5 h-3.5" />
+        AI Score: {score}% ✗
+      </Badge>
+    );
+  };
+
   const DocumentCard = ({
     title,
     icon: Icon,
     type,
     content,
+    aiScore,
   }: {
     title: string;
     icon: any;
     type: "cv" | "personal_statement";
     content: string | null;
+    aiScore?: number | null;
   }) => (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <Icon className="w-4 h-4" /> {title}
+          {aiScore !== null && aiScore !== undefined && <AiScoreBadge score={aiScore} />}
         </CardTitle>
         <div className="flex gap-2">
           <Button
@@ -136,7 +168,7 @@ export function StudentAIDocumentsTab({ studentId, studentName }: Props) {
           <Switch id="use-guidelines" checked={useGuidelines} onCheckedChange={setUseGuidelines} />
           <Label htmlFor="use-guidelines" className="text-sm cursor-pointer">Use course-specific guidelines</Label>
         </div>
-        <DocumentCard title="Personal Statement" icon={ScrollText} type="personal_statement" content={psContent} />
+        <DocumentCard title="Personal Statement" icon={ScrollText} type="personal_statement" content={psContent} aiScore={psAiScore} />
       </div>
     </div>
   );
