@@ -57,71 +57,14 @@ export function useAgentXP() {
     enabled: !!user,
   });
 
-  // Record daily login
+  // Record daily login via edge function
   const loginMutation = useMutation({
     mutationFn: async () => {
       if (!user) return;
-      const today = new Date().toISOString().split("T")[0];
-
-      // Check if already logged today
-      const { data: existing } = await supabase
-        .from("agent_xp_events")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("event_type", "daily_login")
-        .gte("created_at", `${today}T00:00:00`)
-        .lte("created_at", `${today}T23:59:59`)
-        .maybeSingle();
-
-      if (existing) return; // Already logged today
-
-      // Get current streak
-      const { data: currentStreak } = await supabase
-        .from("agent_streaks")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split("T")[0];
-
-      let newStreak = 1;
-      let longestStreak = 1;
-
-      if (currentStreak) {
-        if (currentStreak.last_active_date === yesterdayStr) {
-          newStreak = currentStreak.current_streak + 1;
-        } else if (currentStreak.last_active_date === today) {
-          return; // Already processed
-        }
-        longestStreak = Math.max(newStreak, currentStreak.longest_streak);
-      }
-
-      // Calculate XP: base login + streak bonus
-      const streakBonus = Math.max(0, (newStreak - 1) * XP_VALUES.streak_bonus);
-      const totalXpEarned = XP_VALUES.daily_login + streakBonus;
-      const newTotalXp = (currentStreak?.total_xp || 0) + totalXpEarned;
-      const newLevel = getLevelInfo(newTotalXp).current.level;
-
-      // Insert XP event
-      await supabase.from("agent_xp_events").insert({
-        user_id: user.id,
-        event_type: "daily_login",
-        xp_amount: totalXpEarned,
-        metadata: { streak: newStreak, bonus: streakBonus },
+      const { error } = await supabase.functions.invoke("record-xp", {
+        body: { event_type: "daily_login" },
       });
-
-      // Upsert streak
-      await supabase.from("agent_streaks").upsert({
-        user_id: user.id,
-        current_streak: newStreak,
-        longest_streak: longestStreak,
-        last_active_date: today,
-        total_xp: newTotalXp,
-        level: newLevel,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: "user_id" });
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["agent-streak"] });
@@ -143,7 +86,7 @@ export function useAgentXP() {
   };
 }
 
-// Hook to add XP for specific actions
+// Hook to add XP for specific actions via edge function
 export function useAddXP() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -151,34 +94,10 @@ export function useAddXP() {
   return useMutation({
     mutationFn: async ({ eventType, metadata }: { eventType: string; metadata?: any }) => {
       if (!user) return;
-      const xpAmount = XP_VALUES[eventType] || 10;
-
-      await supabase.from("agent_xp_events").insert({
-        user_id: user.id,
-        event_type: eventType,
-        xp_amount: xpAmount,
-        metadata,
+      const { error } = await supabase.functions.invoke("record-xp", {
+        body: { event_type: eventType, metadata },
       });
-
-      // Update total XP
-      const { data: streak } = await supabase
-        .from("agent_streaks")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      const newTotalXp = (streak?.total_xp || 0) + xpAmount;
-      const newLevel = getLevelInfo(newTotalXp).current.level;
-
-      await supabase.from("agent_streaks").upsert({
-        user_id: user.id,
-        current_streak: streak?.current_streak || 0,
-        longest_streak: streak?.longest_streak || 0,
-        last_active_date: streak?.last_active_date || new Date().toISOString().split("T")[0],
-        total_xp: newTotalXp,
-        level: newLevel,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: "user_id" });
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["agent-streak"] });
