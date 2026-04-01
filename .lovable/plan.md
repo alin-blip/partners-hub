@@ -1,147 +1,88 @@
 
 
-# Commission System — Updated Plan
+# Agent Tier Auto-Progression + Admin Tiers
 
-## Business Rules (Updated)
+## What's Missing Today
 
-### Commission Eligibility Flow
+1. **Agent tier progression** works at snapshot-creation time (the trigger picks the right tier based on student count), but there's **no approval workflow** — the owner never gets a notification or approval prompt when an agent moves up a tier.
 
-```text
-Enrollment Status Flow:
-applied → ... → enrolled → active → funded → paid_by_university
-                                       │              │
-                              25% monthly payout    Remaining 75%
-                              starts here           released here
-
-Funding Status Flow (on enrollment):
-not_started → application_submitted → approved → disbursed
-                                         │
-                                   "Student Finance Done"
-                                   = triggers snapshot creation
-```
-
-### Key Rules
-
-1. **25% eligibility** triggers when `funding_status = "approved"` (Student Finance Application Done). Agent must have 5+ enrollments at this stage.
-2. **Remaining 75%** released when enrollment status = `"paid_by_university"` (new status). Agent sees **"Commission Ready to be Paid"**.
-3. Rates are **locked at snapshot time** — future tier changes do not affect existing snapshots.
-4. Owner can manually override any snapshot.
-
-### Admin Commission
-- Configurable rate per admin (default £100/student from their agents' enrollments).
-- Same eligibility triggers as agent commission.
+2. **Admin commission** is a **flat rate** per admin (`admin_commission_settings.rate_per_student`). There are no tiers for admins at all.
 
 ---
 
-## Database Changes
+## What We'll Build
 
-### Migration 1: `commission_snapshots` table
+### 1. Admin Commission Tiers Table
+
+Replace the single flat-rate `admin_commission_settings` with a tiered system, similar to agent `commission_tiers`:
+
+New table: `admin_commission_tiers`
 
 | Column | Type | Notes |
 |--------|------|-------|
 | id | uuid | PK |
-| enrollment_id | uuid | FK, unique — one snapshot per enrollment |
-| agent_id | uuid | Agent who owns the student |
-| admin_id | uuid | Nullable — admin of the agent |
-| university_id | uuid | Reference |
-| agent_rate | numeric | Locked £/student for agent |
-| admin_rate | numeric | Locked £/student for admin |
-| rate_source | text | e.g. "Global: Gold", "Custom" |
-| snapshot_status | text | `pending_25` → `paying_25` → `ready_full` → `paid` |
-| eligible_at | timestamptz | When funding_status hit "approved" |
-| full_release_at | timestamptz | When status hit "paid_by_university" |
+| admin_id | uuid | Nullable — NULL = global admin tiers |
+| tier_name | text | e.g. "Starter", "Silver", "Gold" |
+| min_students | integer | e.g. 0, 30, 50 |
+| max_students | integer | Nullable |
+| rate_per_student | numeric | e.g. 100, 150, 200 |
+
+Keep `admin_commission_settings` for any admin-specific overrides, but add tiers as the primary mechanism.
+
+### 2. Tier Upgrade Approval Workflow
+
+New table: `tier_upgrade_requests`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid | PK |
+| user_id | uuid | Agent or Admin requesting upgrade |
+| user_role | text | 'agent' / 'admin' |
+| current_tier_name | text | e.g. "Silver" |
+| new_tier_name | text | e.g. "Gold" |
+| current_rate | numeric | |
+| new_rate | numeric | |
+| student_count | integer | Count that triggered upgrade |
+| status | text | 'pending' → 'approved' / 'rejected' |
 | created_at | timestamptz | |
+| reviewed_at | timestamptz | |
+| reviewed_by | uuid | Owner who approved |
 
-RLS: Owner ALL; Admin SELECT team; Agent SELECT own.
+**How it works:**
+- The snapshot trigger detects when an agent/admin qualifies for a higher tier
+- Instead of auto-applying, it creates a `tier_upgrade_request` with status `pending`
+- The snapshot still uses the **current (lower) tier rate** until approved
+- Owner sees pending requests on the Commissions page with "Approve / Reject" buttons
+- On approval: future snapshots use the new tier rate; optionally backfill existing pending snapshots
 
-### Migration 2: `commission_payments` table
+### 3. Database Trigger Update
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK |
-| snapshot_id | uuid | FK |
-| recipient_id | uuid | Agent or Admin |
-| recipient_role | text | 'agent' / 'admin' |
-| amount | numeric | |
-| payment_type | text | '25_percent_monthly' / 'remaining_75' / 'manual' |
-| period_label | text | e.g. "April 2026" |
-| paid_at | timestamptz | |
-| paid_by | uuid | Owner who recorded |
-| notes | text | |
+Modify `create_commission_snapshot()` to:
+- After resolving the agent rate, check if it's higher than the agent's last snapshot rate
+- If higher → insert a row into `tier_upgrade_requests` and use the **previous rate** for the snapshot
+- Same logic for admin rate using the new `admin_commission_tiers`
 
-RLS: Owner ALL; Admin SELECT team; Agent SELECT own.
+### 4. UI Changes
 
-### Migration 3: `admin_commission_settings` table
+**Owner Commissions Page** — new section at top:
+- "Pending Tier Upgrades" alert/card with approve/reject buttons
+- Shows: agent/admin name, current tier → new tier, student count, rate change
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK |
-| admin_id | uuid | Unique per admin |
-| rate_per_student | numeric | Default 100 |
-| updated_at | timestamptz | |
+**Settings Page**:
+- Replace flat admin rate input with a tiers table (same CRUD as agent commission tiers)
+- Add/edit/delete admin tiers with min/max students and rate
 
-RLS: Owner ALL; Admin SELECT own.
-
-### Migration 4: Add new enrollment status + funding status
-
-- Add `"paid_by_university"` to the STATUSES arrays in UI code (EnrollmentsPage, StudentEnrollmentsTab, StudentNotesTab).
-- Add `"commission_ready"` display label in StatusBadge for agent view.
+**Notifications**:
+- Owner gets an in-app notification when a tier upgrade is pending
 
 ---
 
-## Snapshot Auto-Creation Logic
+## Implementation Steps
 
-A database trigger on `enrollments` UPDATE:
-- When `funding_status` changes to `"approved"` → create a `commission_snapshot` row with:
-  - Current agent rate (resolved from tiers/university_commissions)
-  - Current admin rate (from `admin_commission_settings`)
-  - `snapshot_status = 'pending_25'`
-
-When enrollment `status` changes to `"paid_by_university"`:
-- Update snapshot: `snapshot_status = 'ready_full'`, set `full_release_at = now()`
-
----
-
-## UI Changes
-
-### Owner Commissions Page (redesign)
-- **Summary cards**: Total Owed, Total Paid, Remaining, Eligible Agents
-- **Agent table**: Per-agent with eligible students, total commission, 25% paid, remaining, "Record Payment" button
-- **Expand row**: Per-enrollment breakdown with locked rate, snapshot status, payment history
-- **Admin section**: Admin commission summary aggregated from their team
-- **Payment history tab**: Full ledger of all payments
-
-### Agent Dashboard
-- Commission card: "£X total | £Y paid | £Z remaining"
-- 25% eligibility: "3/5 students — 2 more to qualify" progress indicator
-- Per-enrollment: status badge showing "Funded — 25% eligible" or "Paid by Uni — Ready for full payment"
-
-### Admin Dashboard
-- Team commission overview with per-agent breakdown
-- Admin's own commission (£100 × eligible students from team)
-
-### Settings Page
-- Admin commission rate configuration section (owner only)
-
----
-
-## Code Changes Summary
-
-1. **4 SQL migrations** (3 new tables + trigger for auto-snapshot)
-2. **Update `src/lib/commissions.ts`** — add snapshot-based calculation helpers
-3. **Redesign `CommissionsPage.tsx`** — payment tracking UI with "Record Payment" dialog
-4. **Update `AgentDashboard.tsx`** — commission summary + eligibility progress
-5. **Update `AdminDashboard.tsx`** — team commission view (create if needed)
-6. **Update `SettingsPage.tsx`** — admin commission rate config
-7. **Update status arrays** in EnrollmentsPage, StudentEnrollmentsTab, StudentNotesTab, StatusBadge — add `paid_by_university`
-8. **Update `StudentFundingTab.tsx`** — funding_status options remain as-is (`approved` = "done")
-
----
-
-## Post-Sprint: Invoicing Feature (noted for next sprint)
-
-- Agent/Admin can generate an invoice from within the app for their commission
-- Owner sees invoice with statuses: `submitted` → `received` → `in_review` → `paid`
-- New `commission_invoices` table with PDF generation
-- Will be planned in detail after this commission sprint is complete
+1. **Migration**: Create `admin_commission_tiers` table with RLS + seed default tiers (0-29: £100, 30-49: £150, 50+: £200)
+2. **Migration**: Create `tier_upgrade_requests` table with RLS (Owner ALL, Agent/Admin SELECT own)
+3. **Migration**: Update `create_commission_snapshot()` trigger to check for tier jumps and create upgrade requests instead of auto-applying
+4. **Update `SettingsPage.tsx`**: Replace `AdminCommissionSettingsSection` with tiered CRUD (like agent tiers)
+5. **Update `CommissionsPage.tsx`**: Add "Pending Upgrades" section with approve/reject
+6. **Update `NotificationBell.tsx`**: Include pending upgrade requests in notifications query
 
