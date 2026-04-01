@@ -88,8 +88,18 @@ export default function AgentDashboard() {
   const totalCommission = snapshots.reduce((s: number, snap: any) => s + Number(snap.agent_rate), 0);
   const totalPaid = myPayments.reduce((s: number, p: any) => s + Number(p.amount), 0);
   const totalRemaining = totalCommission - totalPaid;
-  const qualifiesFor25 = snapshots.length >= 5;
   const readyForFull = snapshots.filter((s: any) => s.snapshot_status === "ready_full").length;
+
+  // Per-intake eligibility
+  const intakeGroups = new Map<string, { label: string; count: number }>();
+  for (const snap of snapshots) {
+    const intakeId = snap.enrollments?.intake_id || "no-intake";
+    const intakeLabel = snap.enrollments?.intakes?.label || "No Intake";
+    if (!intakeGroups.has(intakeId)) intakeGroups.set(intakeId, { label: intakeLabel, count: 0 });
+    intakeGroups.get(intakeId)!.count++;
+  }
+  const qualifiesFor25 = Array.from(intakeGroups.values()).some(g => g.count >= 5);
+  const bestIntake = Array.from(intakeGroups.values()).sort((a, b) => b.count - a.count)[0];
 
   const monthlyTarget = 10;
   const thisMonthStudents = students.filter((s: any) => {
