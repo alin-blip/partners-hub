@@ -35,6 +35,36 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_commission_tiers: {
+        Row: {
+          admin_id: string | null
+          created_at: string
+          id: string
+          max_students: number | null
+          min_students: number
+          rate_per_student: number
+          tier_name: string
+        }
+        Insert: {
+          admin_id?: string | null
+          created_at?: string
+          id?: string
+          max_students?: number | null
+          min_students?: number
+          rate_per_student?: number
+          tier_name: string
+        }
+        Update: {
+          admin_id?: string | null
+          created_at?: string
+          id?: string
+          max_students?: number | null
+          min_students?: number
+          rate_per_student?: number
+          tier_name?: string
+        }
+        Relationships: []
+      }
       agent_card_settings: {
         Row: {
           accreditation: string | null
@@ -1947,6 +1977,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      tier_upgrade_requests: {
+        Row: {
+          created_at: string
+          current_rate: number
+          current_tier_name: string
+          id: string
+          new_rate: number
+          new_tier_name: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          student_count: number
+          user_id: string
+          user_role: string
+        }
+        Insert: {
+          created_at?: string
+          current_rate?: number
+          current_tier_name?: string
+          id?: string
+          new_rate?: number
+          new_tier_name?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          student_count?: number
+          user_id: string
+          user_role?: string
+        }
+        Update: {
+          created_at?: string
+          current_rate?: number
+          current_tier_name?: string
+          id?: string
+          new_rate?: number
+          new_tier_name?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          student_count?: number
+          user_id?: string
+          user_role?: string
+        }
+        Relationships: []
       }
       timetable_options: {
         Row: {
