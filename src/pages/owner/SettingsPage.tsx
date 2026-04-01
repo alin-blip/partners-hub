@@ -448,6 +448,116 @@ function CommissionTiersSection({ deleteItem, universities }: { deleteItem: any;
 }
 
 /* ──────────────────────────────────────────────────────── */
+/*  Admin Commission Settings                              */
+/* ──────────────────────────────────────────────────────── */
+
+function AdminCommissionSettingsSection() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  const { data: admins = [] } = useQuery({
+    queryKey: ["admin-profiles-for-settings"],
+    queryFn: async () => {
+      const { data: roles } = await supabase.from("user_roles").select("user_id").eq("role", "admin");
+      if (!roles?.length) return [];
+      const ids = roles.map((r: any) => r.user_id);
+      const { data } = await supabase.from("profiles").select("id, full_name, email").in("id", ids);
+      return data || [];
+    },
+  });
+
+  const { data: settings = [] } = useQuery({
+    queryKey: ["admin-commission-settings-all"],
+    queryFn: async () => {
+      const { data } = await supabase.from("admin_commission_settings").select("*");
+      return (data || []) as any[];
+    },
+  });
+
+  const settingsMap = new Map(settings.map((s: any) => [s.admin_id, s]));
+
+  const upsertRate = useMutation({
+    mutationFn: async ({ adminId, rate }: { adminId: string; rate: number }) => {
+      const existing = settingsMap.get(adminId);
+      if (existing) {
+        const { error } = await supabase.from("admin_commission_settings").update({ rate_per_student: rate }).eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("admin_commission_settings").insert({ admin_id: adminId, rate_per_student: rate });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-commission-settings-all"] });
+      toast({ title: "Admin rate saved" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Admin Commission Rates</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Admin</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead className="text-right">Rate (£/student)</TableHead>
+              <TableHead></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {admins.map((admin: any) => {
+              const current = settingsMap.get(admin.id);
+              return (
+                <AdminRateRow
+                  key={admin.id}
+                  admin={admin}
+                  currentRate={current?.rate_per_student ?? 100}
+                  onSave={(rate) => upsertRate.mutate({ adminId: admin.id, rate })}
+                />
+              );
+            })}
+            {admins.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center text-muted-foreground py-6">No admins found</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AdminRateRow({ admin, currentRate, onSave }: { admin: any; currentRate: number; onSave: (rate: number) => void }) {
+  const [rate, setRate] = useState(String(currentRate));
+  const changed = Number(rate) !== currentRate;
+  return (
+    <TableRow>
+      <TableCell className="font-medium">{admin.full_name}</TableCell>
+      <TableCell className="text-muted-foreground">{admin.email}</TableCell>
+      <TableCell className="text-right">
+        <Input
+          type="number"
+          className="w-24 ml-auto text-right"
+          value={rate}
+          onChange={(e) => setRate(e.target.value)}
+        />
+      </TableCell>
+      <TableCell>
+        {changed && (
+          <Button size="sm" onClick={() => onSave(Number(rate))}>Save</Button>
+        )}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+/* ──────────────────────────────────────────────────────── */
 /*  University Commission Rates                            */
 /* ──────────────────────────────────────────────────────── */
 
@@ -2048,6 +2158,7 @@ export default function SettingsPage() {
           <TabsContent value="commissions" className="mt-4 space-y-6">
             <CommissionTiersSection deleteItem={deleteItem} universities={universities} />
             <UniversityCommissionsSection universities={universities} />
+            <AdminCommissionSettingsSection />
           </TabsContent>
 
           <TabsContent value="promotions" className="mt-4">

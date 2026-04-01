@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_commission_settings: {
+        Row: {
+          admin_id: string
+          id: string
+          rate_per_student: number
+          updated_at: string
+        }
+        Insert: {
+          admin_id: string
+          id?: string
+          rate_per_student?: number
+          updated_at?: string
+        }
+        Update: {
+          admin_id?: string
+          id?: string
+          rate_per_student?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       agent_card_settings: {
         Row: {
           accreditation: string | null
@@ -371,6 +392,109 @@ export type Database = {
             columns: ["university_id"]
             isOneToOne: false
             referencedRelation: "universities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commission_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          notes: string | null
+          paid_at: string
+          paid_by: string | null
+          payment_type: string
+          period_label: string | null
+          recipient_id: string
+          recipient_role: string
+          snapshot_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          paid_at?: string
+          paid_by?: string | null
+          payment_type?: string
+          period_label?: string | null
+          recipient_id: string
+          recipient_role?: string
+          snapshot_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          paid_at?: string
+          paid_by?: string | null
+          payment_type?: string
+          period_label?: string | null
+          recipient_id?: string
+          recipient_role?: string
+          snapshot_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_payments_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "commission_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      commission_snapshots: {
+        Row: {
+          admin_id: string | null
+          admin_rate: number
+          agent_id: string
+          agent_rate: number
+          created_at: string
+          eligible_at: string
+          enrollment_id: string
+          full_release_at: string | null
+          id: string
+          rate_source: string
+          snapshot_status: string
+          university_id: string
+        }
+        Insert: {
+          admin_id?: string | null
+          admin_rate?: number
+          agent_id: string
+          agent_rate?: number
+          created_at?: string
+          eligible_at?: string
+          enrollment_id: string
+          full_release_at?: string | null
+          id?: string
+          rate_source?: string
+          snapshot_status?: string
+          university_id: string
+        }
+        Update: {
+          admin_id?: string | null
+          admin_rate?: number
+          agent_id?: string
+          agent_rate?: number
+          created_at?: string
+          eligible_at?: string
+          enrollment_id?: string
+          full_release_at?: string | null
+          id?: string
+          rate_source?: string
+          snapshot_status?: string
+          university_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commission_snapshots_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: true
+            referencedRelation: "enrollments"
             referencedColumns: ["id"]
           },
         ]

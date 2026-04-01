@@ -5,11 +5,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Users, ClipboardList, Trophy, PoundSterling, HelpCircle } from "lucide-react";
+import { Users, ClipboardList, Trophy, PoundSterling, HelpCircle, CheckCircle2, Clock } from "lucide-react";
 import { PromoBanner } from "@/components/PromoBanner";
-import { calcCommission } from "@/lib/commissions";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -57,8 +58,39 @@ export default function AgentDashboard() {
     },
   });
 
+  // Fetch commission snapshots for this agent
+  const { data: snapshots = [] } = useQuery({
+    queryKey: ["agent-snapshots", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("commission_snapshots")
+        .select("id, agent_rate, snapshot_status, eligible_at, enrollments(universities(name), students(first_name, last_name))")
+        .eq("agent_id", user!.id);
+      return (data || []) as any[];
+    },
+    enabled: !!user,
+  });
+
+  const { data: myPayments = [] } = useQuery({
+    queryKey: ["agent-payments", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("commission_payments")
+        .select("amount")
+        .eq("recipient_id", user!.id)
+        .eq("recipient_role", "agent");
+      return (data || []) as any[];
+    },
+    enabled: !!user,
+  });
+
   const activeEnrollments = enrollments.filter((e: any) => e.status === "active").length;
-  const { tier: currentTier, amount: commissionAmount } = calcCommission(activeEnrollments, tiers);
+  const totalCommission = snapshots.reduce((s: number, snap: any) => s + Number(snap.agent_rate), 0);
+  const totalPaid = myPayments.reduce((s: number, p: any) => s + Number(p.amount), 0);
+  const totalRemaining = totalCommission - totalPaid;
+  const qualifiesFor25 = snapshots.length >= 5;
+  const readyForFull = snapshots.filter((s: any) => s.snapshot_status === "ready_full").length;
+
   const monthlyTarget = 10;
   const thisMonthStudents = students.filter((s: any) => {
     const d = new Date(s.created_at);
@@ -104,11 +136,36 @@ export default function AgentDashboard() {
           </div>
         </div>
 
-        <div data-onboarding="step-stats" className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div data-onboarding="step-stats" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard title="My Students" value={students.length} icon={Users} />
           <MetricCard title="Active Enrollments" value={activeEnrollments} icon={ClipboardList} />
-          <MetricCard title="Commission Tier" value={currentTier?.tier_name || "—"} icon={Trophy} description={`£${commissionAmount.toLocaleString()} earned`} />
+          <MetricCard title="Total Commission" value={`£${totalCommission.toLocaleString()}`} icon={PoundSterling} description={`£${totalPaid.toLocaleString()} paid`} />
+          <MetricCard title="Remaining" value={`£${totalRemaining.toLocaleString()}`} icon={Clock} />
         </div>
+
+        {/* Commission eligibility card */}
+        <Card className="border bg-card">
+          <CardContent className="py-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">25% Monthly Payout Eligibility</span>
+              {qualifiesFor25 ? (
+                <Badge className="bg-green-500/10 text-green-700 border-green-200" variant="outline">
+                  <CheckCircle2 className="w-3 h-3 mr-1" /> Eligible
+                </Badge>
+              ) : (
+                <Badge className="bg-amber-500/10 text-amber-700 border-amber-200" variant="outline">
+                  {snapshots.length}/5 students
+                </Badge>
+              )}
+            </div>
+            <Progress value={Math.min((snapshots.length / 5) * 100, 100)} className="h-2" />
+            {readyForFull > 0 && (
+              <p className="text-xs text-green-700">
+                {readyForFull} enrollment(s) ready for full commission payment
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
         <div data-onboarding="step-target" className="rounded-lg border bg-card p-5">
           <div className="flex items-center justify-between mb-2">

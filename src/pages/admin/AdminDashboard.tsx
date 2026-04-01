@@ -4,8 +4,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Users, UserCheck, ClipboardList } from "lucide-react";
+import { Users, UserCheck, ClipboardList, PoundSterling, Clock } from "lucide-react";
 import { PromoBanner } from "@/components/PromoBanner";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -50,6 +52,51 @@ export default function AdminDashboard() {
     enabled: !!user,
   });
 
+  // Admin commission data
+  const { data: adminSnapshots = [] } = useQuery({
+    queryKey: ["admin-commission-snapshots", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("commission_snapshots")
+        .select("id, admin_rate, agent_rate, snapshot_status, agent_id")
+        .not("admin_id", "is", null);
+      return (data || []) as any[];
+    },
+    enabled: !!user,
+  });
+
+  const { data: adminPayments = [] } = useQuery({
+    queryKey: ["admin-commission-payments", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("commission_payments")
+        .select("amount")
+        .eq("recipient_id", user!.id)
+        .eq("recipient_role", "admin");
+      return (data || []) as any[];
+    },
+    enabled: !!user,
+  });
+
+  const { data: adminSettings } = useQuery({
+    queryKey: ["admin-settings", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("admin_commission_settings")
+        .select("rate_per_student")
+        .eq("admin_id", user!.id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const agentIds = new Set(agents.map((a: any) => a.id));
+  const teamSnapshots = adminSnapshots.filter((s: any) => agentIds.has(s.agent_id));
+  const adminTotalOwed = teamSnapshots.reduce((s: number, snap: any) => s + Number(snap.admin_rate), 0);
+  const adminTotalPaid = adminPayments.reduce((s: number, p: any) => s + Number(p.amount), 0);
+  const adminRemaining = adminTotalOwed - adminTotalPaid;
+
   return (
     <DashboardLayout allowedRoles={["admin"]}>
       <div className="space-y-6">
@@ -58,11 +105,29 @@ export default function AdminDashboard() {
         <DashboardSearchCard />
         <h1 className="text-2xl font-bold tracking-tight">Team Dashboard</h1>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard title="My Agents" value={agents.length} icon={UserCheck} />
           <MetricCard title="Team Students" value={students.length} icon={Users} />
           <MetricCard title="Team Enrollments" value={enrollments.length} icon={ClipboardList} />
+          <MetricCard title="My Commission" value={`£${adminTotalOwed.toLocaleString()}`} icon={PoundSterling} description={`£${adminTotalPaid.toLocaleString()} paid`} />
         </div>
+
+        {/* Admin commission card */}
+        <Card className="border bg-card">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Your Commission Summary</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Rate: £{adminSettings?.rate_per_student ?? 100}/student | Eligible students: {teamSnapshots.length} | Remaining: £{adminRemaining.toLocaleString()}
+                </p>
+              </div>
+              <Badge variant="outline" className="bg-muted">
+                <Clock className="w-3 h-3 mr-1" /> {teamSnapshots.filter((s: any) => s.snapshot_status === "ready_full").length} ready for payment
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="space-y-4">
           <h2 className="text-lg font-semibold">My Agents</h2>

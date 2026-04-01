@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 
 const STATUSES = [
   "applied", "documents_pending", "documents_submitted", "processing",
-  "offer_received", "accepted", "funding", "enrolled", "active", "rejected", "withdrawn",
+  "offer_received", "accepted", "funding", "enrolled", "active", "paid_by_university", "rejected", "withdrawn",
 ];
 
 interface Props {
