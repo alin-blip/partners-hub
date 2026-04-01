@@ -225,16 +225,8 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
   };
 
   const handleDeleteDoc = async (doc: any) => {
-    if (role === "agent") {
-      // Agent can only cancel (soft-delete)
-      const { error } = await supabase.from("student_documents").update({
-        cancelled_at: new Date().toISOString(),
-        cancelled_by: user?.id,
-      } as any).eq("id", doc.id);
-      if (error) toast({ title: "Cancel failed", description: error.message, variant: "destructive" });
-      else { toast({ title: "Document cancelled" }); refetchDocs(); }
-      return;
-    }
+    // Agents cannot cancel or delete documents
+    if (role === "agent") return;
 
     if (role === "admin") {
       // Admin needs code from owner
