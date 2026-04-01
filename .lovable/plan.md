@@ -1,116 +1,147 @@
 
 
-# Audit Complet Pre-Lansare — EduForYou UK Agent Platform
+# Commission System — Updated Plan
+
+## Business Rules (Updated)
+
+### Commission Eligibility Flow
+
+```text
+Enrollment Status Flow:
+applied → ... → enrolled → active → funded → paid_by_university
+                                       │              │
+                              25% monthly payout    Remaining 75%
+                              starts here           released here
+
+Funding Status Flow (on enrollment):
+not_started → application_submitted → approved → disbursed
+                                         │
+                                   "Student Finance Done"
+                                   = triggers snapshot creation
+```
+
+### Key Rules
+
+1. **25% eligibility** triggers when `funding_status = "approved"` (Student Finance Application Done). Agent must have 5+ enrollments at this stage.
+2. **Remaining 75%** released when enrollment status = `"paid_by_university"` (new status). Agent sees **"Commission Ready to be Paid"**.
+3. Rates are **locked at snapshot time** — future tier changes do not affect existing snapshots.
+4. Owner can manually override any snapshot.
+
+### Admin Commission
+- Configurable rate per admin (default £100/student from their agents' enrollments).
+- Same eligibility triggers as agent commission.
 
 ---
 
-## Rezumat Executiv
+## Database Changes
 
-Scanarea de securitate a identificat **4 probleme critice (error)** si **7 avertizmente (warn)**. De asemenea, exista o eroare React in consola (ref pe Badge). Mai jos, fiecare problema este clasificata cu prioritate si solutie propusa.
+### Migration 1: `commission_snapshots` table
 
----
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid | PK |
+| enrollment_id | uuid | FK, unique — one snapshot per enrollment |
+| agent_id | uuid | Agent who owns the student |
+| admin_id | uuid | Nullable — admin of the agent |
+| university_id | uuid | Reference |
+| agent_rate | numeric | Locked £/student for agent |
+| admin_rate | numeric | Locked £/student for admin |
+| rate_source | text | e.g. "Global: Gold", "Custom" |
+| snapshot_status | text | `pending_25` → `paying_25` → `ready_full` → `paid` |
+| eligible_at | timestamptz | When funding_status hit "approved" |
+| full_release_at | timestamptz | When status hit "paid_by_university" |
+| created_at | timestamptz | |
 
-## A. Probleme Critice (ERROR) — Necesita rezolvare inainte de lansare
+RLS: Owner ALL; Admin SELECT team; Agent SELECT own.
 
-### 1. Security Definer View (`public_agent_profiles`)
-- **Problema**: View-ul ruleaza cu permisiunile creatorului, nu ale utilizatorului.
-- **Fix**: Recrearea view-ului fara `SECURITY DEFINER`, sau cu `SECURITY INVOKER`.
+### Migration 2: `commission_payments` table
 
-### 2. Student Finance Forms — Agent ALL policy prea permisiva
-- **Problema**: Politica `ALL` permite agentilor sa si stearga formularele financiare. Datele contin NI numbers, parole, share codes — date extrem de sensibile.
-- **Fix**: Inlocuirea politicii `ALL` cu politici granulare (`SELECT`, `INSERT`, `UPDATE`). Eliminarea `DELETE` pentru agenti. Verificarea ca parolele nu sunt stocate in clar.
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid | PK |
+| snapshot_id | uuid | FK |
+| recipient_id | uuid | Agent or Admin |
+| recipient_role | text | 'agent' / 'admin' |
+| amount | numeric | |
+| payment_type | text | '25_percent_monthly' / 'remaining_75' / 'manual' |
+| period_label | text | e.g. "April 2026" |
+| paid_at | timestamptz | |
+| paid_by | uuid | Owner who recorded |
+| notes | text | |
 
-### 3. Profile expuse partenerilor de conversatie
-- **Problema**: Oricine e intr-o conversatie poate citi telefonul, adresa si postcode-ul celuilalt.
-- **Fix**: Crearea unui view `conversation_partner_view` cu doar `id`, `full_name`, `avatar_url`, `slug`. Inlocuirea politicii RLS cu acces la view in loc de tabela `profiles`.
+RLS: Owner ALL; Admin SELECT team; Agent SELECT own.
 
-### 4. Politici INSERT pe `students` aplicate rolului `{public}`
-- **Problema**: Politicile INSERT/UPDATE pentru agenti si admini pe tabela `students` sunt pe rolul `public` in loc de `authenticated`, ceea ce teoretic permite acces fara autentificare.
-- **Fix**: Modificarea tuturor politicilor relevante de pe `{public}` la `{authenticated}`.
+### Migration 3: `admin_commission_settings` table
 
----
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid | PK |
+| admin_id | uuid | Unique per admin |
+| rate_per_student | numeric | Default 100 |
+| updated_at | timestamptz | |
 
-## B. Avertizmente (WARN) — Recomandate pentru lansare
+RLS: Owner ALL; Admin SELECT own.
 
-### 5. Leaked Password Protection dezactivata
-- **Fix**: Activarea HIBP check din Cloud → Users → Auth Settings → Email → Password HIBP Check.
+### Migration 4: Add new enrollment status + funding status
 
-### 6. Generated-images bucket — upload fara verificare de ownership
-- **Problema**: Orice utilizator autentificat poate uploada in folderul altui utilizator.
-- **Fix**: Adaugarea conditiei `(storage.foldername(name))[1] = auth.uid()::text` in politica INSERT.
-
-### 7. Realtime direct_messages — fara restrictie pe canal
-- **Problema**: Orice utilizator autentificat poate asculta orice canal Realtime.
-- **Impact**: Moderat — datele sunt filtrate de RLS la nivel Postgres, dar metadata canalului e vizibila.
-- **Fix**: Adaugarea de politici RLS pe `realtime.messages` (necesita configurare avansata, poate fi amanata post-lansare).
-
-### 8. Agent streaks vizibile pentru toti
-- **Impact**: Scazut — intentionat pentru leaderboard. Acceptabil.
-
-### 9. Consent tokens in clar
-- **Impact**: Moderat — tokenurile sunt read-only de agentul creator. Riscul e limitat.
-- **Fix post-lansare**: Hash-uirea tokenurilor stocate.
-
-### 10. Email send log fara retentie
-- **Impact**: Scazut — doar owner si service_role au acces.
-- **Fix post-lansare**: Politica de retentie automata (DELETE dupa 90 zile).
-
-### 11. Suppressed emails fara DELETE policy
-- **Impact**: Scazut.
-- **Fix post-lansare**: Adaugarea politicii DELETE pentru owner.
-
----
-
-## C. Eroare React in Consola
-
-- **Problema**: `UniversitiesCoursesPage` paseaza un `ref` catre `Badge` si `CourseDetailsInfoCard` care nu folosesc `forwardRef`.
-- **Fix**: Adaugarea `React.forwardRef` pe componenta `CourseDetailsInfoCard`, sau eliminarea ref-ului.
+- Add `"paid_by_university"` to the STATUSES arrays in UI code (EnrollmentsPage, StudentEnrollmentsTab, StudentNotesTab).
+- Add `"commission_ready"` display label in StatusBadge for agent view.
 
 ---
 
-## D. Verificari Suplimentare Confirmate OK
+## Snapshot Auto-Creation Logic
 
-| Zona | Status |
-|------|--------|
-| RBAC (Owner/Admin/Agent) | OK — `user_roles` + `has_role()` security definer |
-| Signup public blocat | OK — doar `create-owner` edge function |
-| Idle timeout 30 min | OK — cu warning la 25 min |
-| Rate limiting login | OK — 5 incercari/min, lockout 60s |
-| Audit log + triggers | OK — INSERT/UPDATE/DELETE pe students, enrollments, documents, notes |
-| Audit log protejat | OK — INSERT doar `service_role` |
-| Agent field locks | OK — first_name, last_name, DOB, immigration_status blocate server-side (trigger) + UI |
-| Enrollment workflow locks | OK — agentii nu pot edita daca enrollment e in status final |
-| Anti-copy (watermark, shortcuts) | OK |
-| Document versioning | OK — `version` + `is_current` pe `student_documents` |
-| Consent extern functional | OK — `/sign-consent/:token` via Edge Functions |
-| Domain live | OK — `agents-eduforyou.co.uk` |
-| Export CSV restrictionat | OK — doar owner/admin |
+A database trigger on `enrollments` UPDATE:
+- When `funding_status` changes to `"approved"` → create a `commission_snapshot` row with:
+  - Current agent rate (resolved from tiers/university_commissions)
+  - Current admin rate (from `admin_commission_settings`)
+  - `snapshot_status = 'pending_25'`
+
+When enrollment `status` changes to `"paid_by_university"`:
+- Update snapshot: `snapshot_status = 'ready_full'`, set `full_release_at = now()`
 
 ---
 
-## E. Plan de Implementare
+## UI Changes
 
-### Inainte de lansare (Prioritate 1-4)
+### Owner Commissions Page (redesign)
+- **Summary cards**: Total Owed, Total Paid, Remaining, Eligible Agents
+- **Agent table**: Per-agent with eligible students, total commission, 25% paid, remaining, "Record Payment" button
+- **Expand row**: Per-enrollment breakdown with locked rate, snapshot status, payment history
+- **Admin section**: Admin commission summary aggregated from their team
+- **Payment history tab**: Full ledger of all payments
 
-1. **Migratia SQL**: Modificarea politicilor RLS pe `students` de la `{public}` la `{authenticated}`
-2. **Migratia SQL**: Splitarea politicii `ALL` pe `student_finance_forms` in SELECT + INSERT + UPDATE (fara DELETE pentru agenti)
-3. **Migratia SQL**: Crearea view-ului `conversation_partner_view` si ajustarea politicii de profil
-4. **Migratia SQL**: Recrearea view-ului `public_agent_profiles` ca `SECURITY INVOKER`
-5. **Migratia SQL**: Adaugarea conditiei de ownership pe bucket-ul `generated-images`
-6. **Activare HIBP**: Din interfata Cloud → Auth Settings
-7. **Fix React warning**: `CourseDetailsInfoCard` forwardRef
+### Agent Dashboard
+- Commission card: "£X total | £Y paid | £Z remaining"
+- 25% eligibility: "3/5 students — 2 more to qualify" progress indicator
+- Per-enrollment: status badge showing "Funded — 25% eligible" or "Paid by Uni — Ready for full payment"
 
-### Post-lansare (Prioritate 5+)
+### Admin Dashboard
+- Team commission overview with per-agent breakdown
+- Admin's own commission (£100 × eligible students from team)
 
-8. Realtime channel restrictions
-9. Token hashing pe consent_signing_tokens
-10. Email log retention policy
+### Settings Page
+- Admin commission rate configuration section (owner only)
 
 ---
 
-## Estimare
+## Code Changes Summary
 
-- Fixuri pre-lansare: **5-6 migratii SQL + 1 fix React minor**
-- Timp estimat: **~1 sesiune de implementare**
-- Risc daca nu se rezolva: **Ridicat** pentru punctele 2-4 (date PII expuse/modificabile)
+1. **4 SQL migrations** (3 new tables + trigger for auto-snapshot)
+2. **Update `src/lib/commissions.ts`** — add snapshot-based calculation helpers
+3. **Redesign `CommissionsPage.tsx`** — payment tracking UI with "Record Payment" dialog
+4. **Update `AgentDashboard.tsx`** — commission summary + eligibility progress
+5. **Update `AdminDashboard.tsx`** — team commission view (create if needed)
+6. **Update `SettingsPage.tsx`** — admin commission rate config
+7. **Update status arrays** in EnrollmentsPage, StudentEnrollmentsTab, StudentNotesTab, StatusBadge — add `paid_by_university`
+8. **Update `StudentFundingTab.tsx`** — funding_status options remain as-is (`approved` = "done")
+
+---
+
+## Post-Sprint: Invoicing Feature (noted for next sprint)
+
+- Agent/Admin can generate an invoice from within the app for their commission
+- Owner sees invoice with statuses: `submitted` → `received` → `in_review` → `paid`
+- New `commission_invoices` table with PDF generation
+- Will be planned in detail after this commission sprint is complete
 
