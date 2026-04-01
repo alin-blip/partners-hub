@@ -338,7 +338,9 @@ export default function OwnerDashboard() {
                             <TableRow>
                               <TableHead>Agent</TableHead>
                               <TableHead className="text-right">Students</TableHead>
+                              <TableHead className="text-right">Leads</TableHead>
                               <TableHead className="text-right">Enrollments</TableHead>
+                              <TableHead className="text-right">Conversion</TableHead>
                               <TableHead className="text-right">Commission</TableHead>
                               <TableHead>Status</TableHead>
                             </TableRow>
@@ -348,7 +350,13 @@ export default function OwnerDashboard() {
                               <TableRow key={a.name}>
                                 <TableCell className="font-medium">{a.name}</TableCell>
                                 <TableCell className="text-right">{a.students}</TableCell>
+                                <TableCell className="text-right">{a.leads}</TableCell>
                                 <TableCell className="text-right">{a.enrollments}</TableCell>
+                                <TableCell className="text-right">
+                                  <span className={a.conversionRate >= 50 ? "text-green-600 font-medium" : a.conversionRate >= 25 ? "text-amber-600 font-medium" : "text-muted-foreground"}>
+                                    {a.conversionRate}%
+                                  </span>
+                                </TableCell>
                                 <TableCell className="text-right font-medium">£{a.commission.toLocaleString()}</TableCell>
                                 <TableCell>
                                   <Badge variant={a.isActive ? "default" : "destructive"} className="text-xs">
