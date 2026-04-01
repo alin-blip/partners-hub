@@ -16,6 +16,7 @@ import { template as newStudentAssigned } from './new-student-assigned.tsx'
 import { template as consentSigningLink } from './consent-signing-link.tsx'
 import { template as regentApplicationLink } from './regent-application-link.tsx'
 import { template as adminDeleteCode } from './admin-delete-code.tsx'
+import { template as welcomeAgent } from './welcome-agent.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'note-notification': noteNotification,
@@ -25,4 +26,5 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'consent-signing-link': consentSigningLink,
   'regent-application-link': regentApplicationLink,
   'admin-delete-code': adminDeleteCode,
+  'welcome-agent': welcomeAgent,
 }
