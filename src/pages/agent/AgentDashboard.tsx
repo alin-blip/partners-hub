@@ -168,7 +168,7 @@ export default function AgentDashboard() {
                 </Badge>
               )}
             </div>
-            <Progress value={Math.min((snapshots.length / 5) * 100, 100)} className="h-2" />
+            <Progress value={Math.min(((bestIntake?.count || 0) / 5) * 100, 100)} className="h-2" />
             {readyForFull > 0 && (
               <p className="text-xs text-green-700">
                 {readyForFull} enrollment(s) ready for full commission payment
