@@ -81,6 +81,16 @@ export default function OwnerDashboard() {
     },
   });
 
+  const { data: leads = [] } = useQuery({
+    queryKey: ["owner-leads-all"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("leads")
+        .select("id, status, agent_id");
+      return data || [];
+    },
+  });
+
   const { data: roles = [] } = useQuery({
     queryKey: ["owner-roles"],
     queryFn: async () => {
