@@ -1,80 +1,24 @@
 
 
-# Comisioane calculate pe Intake (nu global pe agent)
+# Eliminare referințe "Ask33" din baza de date
 
-## Ce se schimbă
+## Problema
+Textul "Our Ask33 CV template can be used" apare în 3 locuri — toate legate de LSC:
 
-Acum tier-ul se aplică pe numărul total de studenți ai agentului. Cerința: tier-ul și comisionul se calculează **per intake** — un agent cu 3 studenți pe Intake A și 4 pe Intake B nu are 7 studenți pentru tier, ci 3 și 4 separat.
+| Locație | Tabel | ID |
+|---------|-------|----|
+| CertHe in Business Studies with FY — personal_statement_guidelines | course_details | `0665e12c-...` |
+| CertHe in Health and Social Care with FY — personal_statement_guidelines | course_details | `e183ea65-...` |
+| LSC Course Details (Requirements) | ai_knowledge_base | `4aca298a-...` |
 
-## Modificări necesare
+## Plan
 
-### 1. Migrare DB — Rescriere `create_commission_snapshot()`
+### 1. Migrare SQL — Update `course_details`
+Înlocuim "Our Ask33 CV template can be used" cu "Our CV template can be used" în câmpul `personal_statement_guidelines` pentru ambele cursuri LSC.
 
-Funcția trigger trebuie modificată astfel:
-- Când numără studenții pentru tier matching, filtrează și pe `intake_id` (din enrollment-ul curent)
-- Contorizarea: `WHERE s.agent_id = _agent_id AND e.intake_id = NEW.intake_id AND e.university_id = _uni_id AND e.status IN (...)`
-- Tier upgrade detection: compară per intake, nu global
-- Admin rate counting: tot per intake
+### 2. Migrare SQL — Update `ai_knowledge_base`
+Înlocuim orice referință "Ask33" din conținutul articolului de knowledge base LSC cu text neutru (fără brand terț).
 
-Același principiu pentru toate cele 3 priorități (uni tiers, uni commission, global tiers).
-
-### 2. Frontend — CommissionsPage.tsx
-
-- Grupare snapshots per agent + per intake (nu doar per agent)
-- Afișare breakdown pe intake în tabelul expandat
-- Eligibilitatea 25% (5+ studenți) se calculează per intake
-- Fetch intake info din enrollments join (adăugăm `intakes(label)` la query-ul de snapshots)
-
-### 3. Frontend — AgentDashboard.tsx
-
-- `qualifiesFor25` trebuie calculat per intake, nu pe total snapshots
-- Groupare snapshots pe intake_id, verificare 5+ per fiecare
-
-### 4. Frontend — AdminDashboard.tsx
-
-- Similar: commission summary per intake
-
-### 5. Lib — commissions.ts
-
-- `calcCommission` și `calcCommissionByEnrollments` primesc intake_id ca parametru de grupare
-- `buildUniversityBreakdown` devine `buildIntakeBreakdown` sau adaugă intake dimension
-
-## Detalii tehnice
-
-### DB function changes (pseudo-SQL)
-```sql
--- Instead of counting all agent enrollments:
-SELECT count(*) INTO _count 
-FROM enrollments e JOIN students s ON e.student_id = s.id
-WHERE s.agent_id = _agent_id 
-  AND e.university_id = _uni_id
-  AND e.intake_id = NEW.intake_id  -- NEW: filter by intake
-  AND e.status IN ('funding','enrolled','active','paid_by_university');
-```
-
-### Commission snapshot table
-- Nu necesită coloane noi — deja are `enrollment_id` care linkuieste la `enrollments.intake_id`
-- Query-urile frontend pot join-ui `enrollments.intake_id → intakes.label`
-
-### UI changes
-- CommissionsPage: snapshots grouped by `agent → intake`, eligibility shown per intake
-- Expanded row shows intake label alongside university
-- "5+ needed" badge shown per intake group
-
-## Pași de implementare
-
-1. **Migrare SQL**: Rescriere `create_commission_snapshot()` cu logică per-intake
-2. **CommissionsPage.tsx**: Query include `intakes(label)`, groupare per intake, UI breakdown
-3. **AgentDashboard.tsx**: Eligibilitate per intake
-4. **AdminDashboard.tsx**: Commission totals per intake
-5. **commissions.ts**: Update utility functions pentru intake grouping
-
-## Verificare
-
-```text
-Test 1: Agent cu 3 studenți pe Intake A, 4 pe Intake B → tier Starter (nu Silver)
-Test 2: Agent cu 5+ studenți pe un singur intake → qualifies for 25% pe acel intake
-Test 3: CommissionsPage afișează breakdown pe intake
-Test 4: Snapshot-urile noi folosesc rate calculat per intake
-```
+### Rezultat
+Zero mențiuni "Ask33" în toată baza de date.
 
