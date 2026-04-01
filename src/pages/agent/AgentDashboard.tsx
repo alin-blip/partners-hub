@@ -164,7 +164,7 @@ export default function AgentDashboard() {
                 </Badge>
               ) : (
                 <Badge className="bg-amber-500/10 text-amber-700 border-amber-200" variant="outline">
-                  {snapshots.length}/5 students
+                  {bestIntake ? `${bestIntake.count}/5 (${bestIntake.label})` : `${snapshots.length}/5`} students
                 </Badge>
               )}
             </div>
