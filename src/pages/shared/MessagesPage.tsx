@@ -63,7 +63,10 @@ export default function MessagesPage() {
       // Fetch profiles
       let query = supabase.from("profiles").select("id, full_name, email, avatar_url, admin_id").neq("id", user!.id);
       if (searchUsers.trim()) {
-        query = query.or(`full_name.ilike.%${searchUsers}%,email.ilike.%${searchUsers}%`);
+        const sanitized = searchUsers.trim().replace(/[%_\\]/g, '');
+        if (sanitized) {
+          query = query.or(`full_name.ilike.%${sanitized}%,email.ilike.%${sanitized}%`);
+        }
       }
       const { data: profiles } = await query.order("full_name").limit(50);
       if (!profiles || profiles.length === 0) return [];
