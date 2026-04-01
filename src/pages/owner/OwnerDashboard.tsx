@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Users, UserCheck, ClipboardList, PoundSterling } from "lucide-react";
+import { Users, UserCheck, ClipboardList, PoundSterling, TrendingUp, Target } from "lucide-react";
 import { calcCommission } from "@/lib/commissions";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -81,6 +81,16 @@ export default function OwnerDashboard() {
     },
   });
 
+  const { data: leads = [] } = useQuery({
+    queryKey: ["owner-leads-all"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("leads")
+        .select("id, status, agent_id");
+      return data || [];
+    },
+  });
+
   const { data: roles = [] } = useQuery({
     queryKey: ["owner-roles"],
     queryFn: async () => {
@@ -127,6 +137,21 @@ export default function OwnerDashboard() {
   // Pipeline
   const pipelineCount = allEnrollments.filter((e: any) => !["active", "rejected"].includes(e.status)).length;
 
+  // Lead-to-enrollment conversion
+  const totalLeads = leads.length;
+  const convertedLeads = leads.filter((l: any) => l.status === "converted").length;
+  const conversionRate = totalLeads > 0 ? Math.round((convertedLeads / totalLeads) * 100) : 0;
+
+  // Leads per agent
+  const agentLeadCounts = new Map<string, number>();
+  for (const l of leads) {
+    agentLeadCounts.set((l as any).agent_id, (agentLeadCounts.get((l as any).agent_id) || 0) + 1);
+  }
+  const agentConvertedLeads = new Map<string, number>();
+  for (const l of leads.filter((l: any) => l.status === "converted")) {
+    agentConvertedLeads.set((l as any).agent_id, (agentConvertedLeads.get((l as any).agent_id) || 0) + 1);
+  }
+
   // Total revenue
   const totalRevenue = activeAgents.reduce((sum: number, agent: any) => {
     const count = agentActiveEnrollments.get(agent.id) || 0;
@@ -142,11 +167,16 @@ export default function OwnerDashboard() {
       const studentCount = agentStudentCounts.get(agent.id) || 0;
       const enrollmentCount = agentTotalEnrollments.get(agent.id) || 0;
       const activeCount = agentActiveEnrollments.get(agent.id) || 0;
+      const leadCount = agentLeadCounts.get(agent.id) || 0;
+      const converted = agentConvertedLeads.get(agent.id) || 0;
+      const agentConvRate = leadCount > 0 ? Math.round((converted / leadCount) * 100) : 0;
       const { amount } = calcCommission(activeCount, tiers);
       return {
         name: agent.full_name || agent.email,
         students: studentCount,
         enrollments: enrollmentCount,
+        leads: leadCount,
+        conversionRate: agentConvRate,
         commission: amount,
         isActive: agent.is_active,
       };
@@ -201,10 +231,17 @@ export default function OwnerDashboard() {
         <DashboardSearchCard />
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <MetricCard title="Total Students" value={students.length} icon={Users} />
           <MetricCard title="Active Agents" value={activeAgents.length} icon={UserCheck} />
           <MetricCard title="In Pipeline" value={pipelineCount} icon={ClipboardList} />
+          <MetricCard title="Total Leads" value={totalLeads} icon={Target} />
+          <MetricCard
+            title="Conversion Rate"
+            value={`${conversionRate}%`}
+            icon={TrendingUp}
+            description={`${convertedLeads} of ${totalLeads} leads converted`}
+          />
           <MetricCard
             title="Est. Revenue"
             value={`£${totalRevenue.toLocaleString()}`}
@@ -301,7 +338,9 @@ export default function OwnerDashboard() {
                             <TableRow>
                               <TableHead>Agent</TableHead>
                               <TableHead className="text-right">Students</TableHead>
+                              <TableHead className="text-right">Leads</TableHead>
                               <TableHead className="text-right">Enrollments</TableHead>
+                              <TableHead className="text-right">Conversion</TableHead>
                               <TableHead className="text-right">Commission</TableHead>
                               <TableHead>Status</TableHead>
                             </TableRow>
@@ -311,7 +350,13 @@ export default function OwnerDashboard() {
                               <TableRow key={a.name}>
                                 <TableCell className="font-medium">{a.name}</TableCell>
                                 <TableCell className="text-right">{a.students}</TableCell>
+                                <TableCell className="text-right">{a.leads}</TableCell>
                                 <TableCell className="text-right">{a.enrollments}</TableCell>
+                                <TableCell className="text-right">
+                                  <span className={a.conversionRate >= 50 ? "text-green-600 font-medium" : a.conversionRate >= 25 ? "text-amber-600 font-medium" : "text-muted-foreground"}>
+                                    {a.conversionRate}%
+                                  </span>
+                                </TableCell>
                                 <TableCell className="text-right font-medium">£{a.commission.toLocaleString()}</TableCell>
                                 <TableCell>
                                   <Badge variant={a.isActive ? "default" : "destructive"} className="text-xs">
@@ -343,7 +388,9 @@ export default function OwnerDashboard() {
                     <TableRow>
                       <TableHead>Agent</TableHead>
                       <TableHead className="text-right">Students</TableHead>
+                      <TableHead className="text-right">Leads</TableHead>
                       <TableHead className="text-right">Enrollments</TableHead>
+                      <TableHead className="text-right">Conversion</TableHead>
                       <TableHead className="text-right">Commission</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
@@ -353,7 +400,13 @@ export default function OwnerDashboard() {
                       <TableRow key={a.name}>
                         <TableCell className="font-medium">{a.name}</TableCell>
                         <TableCell className="text-right">{a.students}</TableCell>
+                        <TableCell className="text-right">{a.leads}</TableCell>
                         <TableCell className="text-right">{a.enrollments}</TableCell>
+                        <TableCell className="text-right">
+                          <span className={a.conversionRate >= 50 ? "text-green-600 font-medium" : a.conversionRate >= 25 ? "text-amber-600 font-medium" : "text-muted-foreground"}>
+                            {a.conversionRate}%
+                          </span>
+                        </TableCell>
                         <TableCell className="text-right font-medium">£{a.commission.toLocaleString()}</TableCell>
                         <TableCell>
                           <Badge variant={a.isActive ? "default" : "destructive"} className="text-xs">
