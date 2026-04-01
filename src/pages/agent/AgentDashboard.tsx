@@ -136,11 +136,36 @@ export default function AgentDashboard() {
           </div>
         </div>
 
-        <div data-onboarding="step-stats" className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div data-onboarding="step-stats" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard title="My Students" value={students.length} icon={Users} />
           <MetricCard title="Active Enrollments" value={activeEnrollments} icon={ClipboardList} />
-          <MetricCard title="Commission Tier" value={currentTier?.tier_name || "—"} icon={Trophy} description={`£${commissionAmount.toLocaleString()} earned`} />
+          <MetricCard title="Total Commission" value={`£${totalCommission.toLocaleString()}`} icon={PoundSterling} description={`£${totalPaid.toLocaleString()} paid`} />
+          <MetricCard title="Remaining" value={`£${totalRemaining.toLocaleString()}`} icon={Clock} />
         </div>
+
+        {/* Commission eligibility card */}
+        <Card className="border bg-card">
+          <CardContent className="py-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">25% Monthly Payout Eligibility</span>
+              {qualifiesFor25 ? (
+                <Badge className="bg-green-500/10 text-green-700 border-green-200" variant="outline">
+                  <CheckCircle2 className="w-3 h-3 mr-1" /> Eligible
+                </Badge>
+              ) : (
+                <Badge className="bg-amber-500/10 text-amber-700 border-amber-200" variant="outline">
+                  {snapshots.length}/5 students
+                </Badge>
+              )}
+            </div>
+            <Progress value={Math.min((snapshots.length / 5) * 100, 100)} className="h-2" />
+            {readyForFull > 0 && (
+              <p className="text-xs text-green-700">
+                {readyForFull} enrollment(s) ready for full commission payment
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
         <div data-onboarding="step-target" className="rounded-lg border bg-card p-5">
           <div className="flex items-center justify-between mb-2">
