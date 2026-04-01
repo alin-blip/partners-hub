@@ -538,10 +538,12 @@ function AgentRow({
                     <TableRow>
                       <TableHead className="text-xs">Student</TableHead>
                       <TableHead className="text-xs">University</TableHead>
-                      <TableHead className="text-xs">Rate</TableHead>
-                      <TableHead className="text-xs">Source</TableHead>
+                      <TableHead className="text-xs text-right">Rate</TableHead>
+                      <TableHead className="text-xs text-right">25%</TableHead>
+                      <TableHead className="text-xs text-right">75%</TableHead>
                       <TableHead className="text-xs">Status</TableHead>
                       <TableHead className="text-xs text-right">Paid</TableHead>
+                      <TableHead className="text-xs text-right">Remaining</TableHead>
                       <TableHead className="text-xs">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -551,7 +553,11 @@ function AgentRow({
                       const agentPaid = snapshotPayments
                         .filter((p: any) => p.recipient_role === "agent")
                         .reduce((s: number, p: any) => s + Number(p.amount), 0);
-                      const remaining = Number(snap.agent_rate) - agentPaid;
+                      const rate = Number(snap.agent_rate);
+                      const amount25 = Math.round(rate * 0.25 * 100) / 100;
+                      const amount75 = Math.round(rate * 0.75 * 100) / 100;
+                      const remaining = rate - agentPaid;
+                      const isReadyFull = snap.snapshot_status === "ready_full" || snap.snapshot_status === "paid";
                       const statusInfo = SNAPSHOT_STATUS_LABELS[snap.snapshot_status] || { label: snap.snapshot_status, color: "" };
 
                       return (
@@ -560,9 +566,18 @@ function AgentRow({
                             {snap.enrollments?.students?.first_name} {snap.enrollments?.students?.last_name}
                           </TableCell>
                           <TableCell className="text-sm">{snap.enrollments?.universities?.name || "—"}</TableCell>
-                          <TableCell className="text-sm tabular-nums">£{Number(snap.agent_rate).toLocaleString()}</TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className="text-xs font-normal">{snap.rate_source}</Badge>
+                          <TableCell className="text-sm text-right tabular-nums font-medium">£{rate.toLocaleString()}</TableCell>
+                          <TableCell className="text-sm text-right tabular-nums">
+                            <span className={agent.qualifiesFor25 ? "text-green-700 dark:text-green-400 font-medium" : "text-muted-foreground"}>
+                              £{amount25.toLocaleString()}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-sm text-right tabular-nums">
+                            {isReadyFull ? (
+                              <span className="text-blue-700 dark:text-blue-400 font-medium">£{amount75.toLocaleString()}</span>
+                            ) : (
+                              <span className="text-muted-foreground">£{amount75.toLocaleString()}</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline" className={`text-xs ${statusInfo.color}`}>
@@ -571,9 +586,9 @@ function AgentRow({
                           </TableCell>
                           <TableCell className="text-sm text-right tabular-nums">
                             £{agentPaid.toLocaleString()}
-                            {remaining > 0 && (
-                              <span className="text-muted-foreground"> / £{Number(snap.agent_rate).toLocaleString()}</span>
-                            )}
+                          </TableCell>
+                          <TableCell className="text-sm text-right tabular-nums font-semibold">
+                            {remaining > 0 ? `£${remaining.toLocaleString()}` : <span className="text-green-600">✓ Paid</span>}
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-1">
@@ -588,7 +603,7 @@ function AgentRow({
                                   }}
                                 >
                                   <CreditCard className="w-3 h-3 mr-1" />
-                                  Pay Agent
+                                  Pay
                                 </Button>
                               )}
                               {snap.admin_id && Number(snap.admin_rate) > 0 && (
