@@ -45,13 +45,13 @@ export default function CommissionsPage() {
   const [payPeriod, setPayPeriod] = useState("");
   const [payNotes, setPayNotes] = useState("");
 
-  // Fetch snapshots
+  // Fetch snapshots with intake info
   const { data: snapshots = [] } = useQuery({
     queryKey: ["commission-snapshots"],
     queryFn: async () => {
       const { data } = await supabase
         .from("commission_snapshots")
-        .select("*, enrollments(status, funding_status, students(first_name, last_name, agent_id), universities(name), courses(name))")
+        .select("*, enrollments(status, funding_status, intake_id, students(first_name, last_name, agent_id), universities(name), courses(name), intakes(label))")
         .order("created_at", { ascending: false });
       return (data || []) as any[];
     },
