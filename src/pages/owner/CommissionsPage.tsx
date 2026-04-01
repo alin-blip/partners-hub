@@ -166,6 +166,16 @@ export default function CommissionsPage() {
     const qualifiesFor25 = eligibleCount >= 5;
     const readyForFull = snaps.filter((s: any) => s.snapshot_status === "ready_full").length;
 
+    // 25% / 75% automatic breakdown per snapshot
+    const agent25Total = snaps.reduce((s: number, snap: any) => s + Math.round(Number(snap.agent_rate) * 0.25 * 100) / 100, 0);
+    const agent75Total = snaps.reduce((s: number, snap: any) => {
+      if (snap.snapshot_status === "ready_full" || snap.snapshot_status === "paid") {
+        return s + Math.round(Number(snap.agent_rate) * 0.75 * 100) / 100;
+      }
+      return s;
+    }, 0);
+    const agent25Remaining = Math.max(0, Math.round((agent25Total - totalAgentPaid) * 100) / 100);
+
     return {
       agentId,
       agentName: profile?.full_name || "Unknown",
@@ -182,7 +192,10 @@ export default function CommissionsPage() {
       totalAdminOwed,
       totalAdminPaid,
       adminRemaining: totalAdminOwed - totalAdminPaid,
-      monthly25Amount: qualifiesFor25 ? Math.round((totalAgentOwed - totalAgentPaid) * 0.25 * 100) / 100 : 0,
+      agent25Total,
+      agent75Total,
+      agent25Remaining,
+      monthly25Amount: qualifiesFor25 ? agent25Remaining : 0,
     };
   }).sort((a, b) => b.agentRemaining - a.agentRemaining);
 
@@ -300,14 +313,15 @@ export default function CommissionsPage() {
           <TabsContent value="agents" className="space-y-4 mt-4">
             <div className="rounded-lg border bg-card">
               <Table>
-                <TableHeader>
+                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-8"></TableHead>
                     <TableHead>Agent</TableHead>
                     <TableHead>Admin</TableHead>
-                    <TableHead className="text-right">Eligible</TableHead>
-                    <TableHead className="text-right">25% Status</TableHead>
-                    <TableHead className="text-right">Owed</TableHead>
+                    <TableHead className="text-right">Students</TableHead>
+                    <TableHead className="text-right">25% Due</TableHead>
+                    <TableHead className="text-right">75% Due</TableHead>
+                    <TableHead className="text-right">Total Owed</TableHead>
                     <TableHead className="text-right">Paid</TableHead>
                     <TableHead className="text-right">Remaining</TableHead>
                   </TableRow>
@@ -332,8 +346,8 @@ export default function CommissionsPage() {
                   })}
                   {agentSummaries.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                        No commission snapshots yet. Snapshots are created when funding status is approved.
+                      <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                        No commission snapshots yet. Snapshots are created when enrollment status reaches funding.
                       </TableCell>
                     </TableRow>
                   )}
@@ -476,15 +490,18 @@ function AgentRow({
         </TableCell>
         <TableCell className="text-muted-foreground">{agent.adminName}</TableCell>
         <TableCell className="text-right tabular-nums">{agent.eligibleCount}</TableCell>
-        <TableCell className="text-right">
+        <TableCell className="text-right tabular-nums">
           {agent.qualifiesFor25 ? (
-            <Badge className="bg-green-500/10 text-green-700 border-green-200" variant="outline">
-              Eligible (£{agent.monthly25Amount})
-            </Badge>
+            <span className="font-medium text-green-700 dark:text-green-400">£{agent.agent25Total.toLocaleString()}</span>
           ) : (
-            <Badge className="bg-amber-500/10 text-amber-700 border-amber-200" variant="outline">
-              {agent.eligibleCount}/5 students
-            </Badge>
+            <span className="text-muted-foreground text-xs">{agent.eligibleCount}/5 needed</span>
+          )}
+        </TableCell>
+        <TableCell className="text-right tabular-nums">
+          {agent.readyForFull > 0 ? (
+            <span className="font-medium text-blue-700 dark:text-blue-400">£{agent.agent75Total.toLocaleString()}</span>
+          ) : (
+            <span className="text-muted-foreground text-xs">—</span>
           )}
         </TableCell>
         <TableCell className="text-right font-medium tabular-nums">£{agent.totalAgentOwed.toLocaleString()}</TableCell>
@@ -496,8 +513,7 @@ function AgentRow({
 
       {isExpanded && (
         <TableRow className="bg-muted/20 hover:bg-muted/30">
-          <TableCell></TableCell>
-          <TableCell colSpan={7} className="py-3">
+          <TableCell colSpan={9} className="py-3">
             <div className="space-y-3">
               {/* Admin commission summary */}
               {agent.adminId && (
@@ -522,10 +538,12 @@ function AgentRow({
                     <TableRow>
                       <TableHead className="text-xs">Student</TableHead>
                       <TableHead className="text-xs">University</TableHead>
-                      <TableHead className="text-xs">Rate</TableHead>
-                      <TableHead className="text-xs">Source</TableHead>
+                      <TableHead className="text-xs text-right">Rate</TableHead>
+                      <TableHead className="text-xs text-right">25%</TableHead>
+                      <TableHead className="text-xs text-right">75%</TableHead>
                       <TableHead className="text-xs">Status</TableHead>
                       <TableHead className="text-xs text-right">Paid</TableHead>
+                      <TableHead className="text-xs text-right">Remaining</TableHead>
                       <TableHead className="text-xs">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -535,7 +553,11 @@ function AgentRow({
                       const agentPaid = snapshotPayments
                         .filter((p: any) => p.recipient_role === "agent")
                         .reduce((s: number, p: any) => s + Number(p.amount), 0);
-                      const remaining = Number(snap.agent_rate) - agentPaid;
+                      const rate = Number(snap.agent_rate);
+                      const amount25 = Math.round(rate * 0.25 * 100) / 100;
+                      const amount75 = Math.round(rate * 0.75 * 100) / 100;
+                      const remaining = rate - agentPaid;
+                      const isReadyFull = snap.snapshot_status === "ready_full" || snap.snapshot_status === "paid";
                       const statusInfo = SNAPSHOT_STATUS_LABELS[snap.snapshot_status] || { label: snap.snapshot_status, color: "" };
 
                       return (
@@ -544,9 +566,18 @@ function AgentRow({
                             {snap.enrollments?.students?.first_name} {snap.enrollments?.students?.last_name}
                           </TableCell>
                           <TableCell className="text-sm">{snap.enrollments?.universities?.name || "—"}</TableCell>
-                          <TableCell className="text-sm tabular-nums">£{Number(snap.agent_rate).toLocaleString()}</TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className="text-xs font-normal">{snap.rate_source}</Badge>
+                          <TableCell className="text-sm text-right tabular-nums font-medium">£{rate.toLocaleString()}</TableCell>
+                          <TableCell className="text-sm text-right tabular-nums">
+                            <span className={agent.qualifiesFor25 ? "text-green-700 dark:text-green-400 font-medium" : "text-muted-foreground"}>
+                              £{amount25.toLocaleString()}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-sm text-right tabular-nums">
+                            {isReadyFull ? (
+                              <span className="text-blue-700 dark:text-blue-400 font-medium">£{amount75.toLocaleString()}</span>
+                            ) : (
+                              <span className="text-muted-foreground">£{amount75.toLocaleString()}</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline" className={`text-xs ${statusInfo.color}`}>
@@ -555,9 +586,9 @@ function AgentRow({
                           </TableCell>
                           <TableCell className="text-sm text-right tabular-nums">
                             £{agentPaid.toLocaleString()}
-                            {remaining > 0 && (
-                              <span className="text-muted-foreground"> / £{Number(snap.agent_rate).toLocaleString()}</span>
-                            )}
+                          </TableCell>
+                          <TableCell className="text-sm text-right tabular-nums font-semibold">
+                            {remaining > 0 ? `£${remaining.toLocaleString()}` : <span className="text-green-600">✓ Paid</span>}
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-1">
@@ -572,7 +603,7 @@ function AgentRow({
                                   }}
                                 >
                                   <CreditCard className="w-3 h-3 mr-1" />
-                                  Pay Agent
+                                  Pay
                                 </Button>
                               )}
                               {snap.admin_id && Number(snap.admin_rate) > 0 && (
