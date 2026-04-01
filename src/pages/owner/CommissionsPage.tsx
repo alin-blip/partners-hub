@@ -22,7 +22,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   PoundSterling, Users, TrendingUp, ChevronDown, ChevronRight,
-  CreditCard, Clock, CheckCircle2, AlertCircle,
+  CreditCard, Clock, CheckCircle2, AlertCircle, ArrowUpCircle, X,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
