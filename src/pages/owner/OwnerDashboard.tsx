@@ -167,11 +167,16 @@ export default function OwnerDashboard() {
       const studentCount = agentStudentCounts.get(agent.id) || 0;
       const enrollmentCount = agentTotalEnrollments.get(agent.id) || 0;
       const activeCount = agentActiveEnrollments.get(agent.id) || 0;
+      const leadCount = agentLeadCounts.get(agent.id) || 0;
+      const converted = agentConvertedLeads.get(agent.id) || 0;
+      const agentConvRate = leadCount > 0 ? Math.round((converted / leadCount) * 100) : 0;
       const { amount } = calcCommission(activeCount, tiers);
       return {
         name: agent.full_name || agent.email,
         students: studentCount,
         enrollments: enrollmentCount,
+        leads: leadCount,
+        conversionRate: agentConvRate,
         commission: amount,
         isActive: agent.is_active,
       };
