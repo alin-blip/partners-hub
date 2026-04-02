@@ -22,7 +22,6 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Verify the caller using anon key client with their token
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
   const supabaseAuth = createClient(supabaseUrl, anonKey, {
     global: { headers: { Authorization: authHeader } },
@@ -38,7 +37,6 @@ Deno.serve(async (req) => {
 
   const callerId = userData.user.id;
 
-  // --- Role Authorization ---
   const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
   const { data: callerRole } = await supabaseAdmin
@@ -54,9 +52,71 @@ Deno.serve(async (req) => {
     });
   }
 
-  const { email, password, full_name, role = "owner", admin_id, postcode, address } = await req.json();
+  const body = await req.json();
 
-  // Validate role value
+  // ── Change Role action (owner only) ──
+  if (body.action === "change_role") {
+    if (callerRole.role !== "owner") {
+      return new Response(JSON.stringify({ error: "Forbidden: only owner can change roles" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { user_id, new_role } = body;
+    if (!user_id || !["admin", "agent"].includes(new_role)) {
+      return new Response(JSON.stringify({ error: "Invalid user_id or new_role" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Don't allow changing the owner's own role
+    const { data: targetRole } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user_id)
+      .single();
+
+    if (targetRole?.role === "owner") {
+      return new Response(JSON.stringify({ error: "Cannot change owner role" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Update the role
+    const { error: roleError } = await supabaseAdmin
+      .from("user_roles")
+      .update({ role: new_role })
+      .eq("user_id", user_id);
+
+    if (roleError) {
+      return new Response(JSON.stringify({ error: roleError.message }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Side effects
+    if (new_role === "admin") {
+      // Agent → Admin: clear their admin_id (no longer under an admin)
+      await supabaseAdmin.from("profiles").update({ admin_id: null }).eq("id", user_id);
+    } else if (new_role === "agent") {
+      // Admin → Agent: unassign agents that were under this admin
+      await supabaseAdmin.from("profiles").update({ admin_id: null }).eq("admin_id", user_id);
+      // Also clear their own admin_id
+      await supabaseAdmin.from("profiles").update({ admin_id: null }).eq("id", user_id);
+    }
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // ── Original create user flow ──
+  const { email, password, full_name, role = "owner", admin_id, postcode, address } = body;
+
   const validRoles = ["owner", "admin", "agent"];
   if (!validRoles.includes(role)) {
     return new Response(JSON.stringify({ error: "Invalid role" }), {
@@ -65,10 +125,6 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Authorization rules:
-  // - Owner can create any role (owner, admin, agent)
-  // - Admin can only create agents (with their own admin_id)
-  // - Agents cannot create accounts
   if (callerRole.role === "agent") {
     return new Response(JSON.stringify({ error: "Forbidden: agents cannot create accounts" }), {
       status: 403,
@@ -83,10 +139,8 @@ Deno.serve(async (req) => {
     });
   }
 
-  // For admins, force admin_id to their own ID
   const effectiveAdminId = callerRole.role === "admin" ? callerId : admin_id;
 
-  // Create user
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
@@ -101,7 +155,6 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Assign role
   const { error: roleError } = await supabaseAdmin.from("user_roles").insert({
     user_id: authData.user.id,
     role,
@@ -114,7 +167,6 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Update profile with admin_id, postcode, address
   const profileUpdate: Record<string, unknown> = {};
   if (effectiveAdminId) profileUpdate.admin_id = effectiveAdminId;
   if (postcode) profileUpdate.postcode = postcode;
@@ -134,9 +186,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Send welcome email for new agents
   if (role === "agent") {
-    // Fetch caller's name for the email
     const { data: callerProfile } = await supabaseAdmin
       .from("profiles")
       .select("full_name")
@@ -156,7 +206,6 @@ Deno.serve(async (req) => {
         },
       });
     } catch (e) {
-      // Non-blocking — log but don't fail account creation
       console.error("Failed to send welcome email:", e);
     }
   }
