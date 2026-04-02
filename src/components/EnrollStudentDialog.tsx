@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, Check, Calendar, Upload, FileText, X, ShieldCheck, Eye } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Calendar, Upload, FileText, X, ShieldCheck, Eye, MessageSquare, AlertTriangle } from "lucide-react";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { CourseDetailsInfoCard } from "@/components/CourseDetailsInfoCard";
 import { SignatureCanvas } from "@/components/SignatureCanvas";
 import { syncToDrive } from "@/lib/drive-sync";
@@ -84,6 +85,8 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [consentPreviewUrl, setConsentPreviewUrl] = useState<string | null>(null);
   const [previewingConsent, setPreviewingConsent] = useState(false);
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
+  const [contactingAdmin, setContactingAdmin] = useState(false);
 
   const nonMarketingClauses = CONSENT_CLAUSES.filter((c) => !c.isMarketing);
   const allConsentsChecked = nonMarketingClauses.every((c) => consentChecks[c.id]);
@@ -99,6 +102,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
     setNokName(""); setNokPhone(""); setNokRelationship("");
     setDocFiles([]); setSelectedDocType("Passport");
     setConsentChecks({}); setMarketingChecks({...DEFAULT_MARKETING_CHECKS}); setConsentSignature(""); setSignatureDataUrl(null); setConsentPreviewUrl(null);
+    setDuplicateError(null);
   };
 
   const { data: universities = [] } = useQuery({
@@ -264,7 +268,18 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
           .ilike("email", email.trim())
           .limit(1);
         if (existingByEmail?.length) {
-          throw new Error("A student with this email already exists in the system. Please contact your admin or owner.");
+          throw new Error("DUPLICATE:A student with this email already exists in the system.");
+        }
+      }
+      // Duplicate check by phone
+      if (phone.trim()) {
+        const { data: existingByPhone } = await supabase
+          .from("students")
+          .select("id")
+          .eq("phone", phone.trim())
+          .limit(1);
+        if (existingByPhone?.length) {
+          throw new Error("DUPLICATE:A student with this phone number already exists in the system.");
         }
       }
       // Duplicate check by name + DOB
@@ -277,7 +292,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
           .eq("date_of_birth", dob)
           .limit(1);
         if (existingByName?.length) {
-          throw new Error("A student with this name and date of birth already exists in the system. Please contact your admin or owner.");
+          throw new Error("DUPLICATE:A student with this name and date of birth already exists in the system.");
         }
       }
 
@@ -337,9 +352,79 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
     },
     onError: (error: Error) => {
       console.error("Enrollment error:", error);
-      toast.error(error.message);
+      if (error.message.startsWith("DUPLICATE:")) {
+        setDuplicateError(error.message.replace("DUPLICATE:", ""));
+      } else {
+        toast.error(error.message);
+      }
     },
   });
+
+  const handleContactAdmin = async () => {
+    if (!user) return;
+    setContactingAdmin(true);
+    try {
+      // Get agent's admin_id
+      const { data: agentProfile } = await supabase
+        .from("profiles")
+        .select("admin_id, full_name")
+        .eq("id", user.id)
+        .single();
+
+      let targetId: string | null = agentProfile?.admin_id || null;
+
+      // If no admin, find the owner
+      if (!targetId) {
+        const { data: ownerRoles } = await supabase
+          .from("user_roles")
+          .select("user_id")
+          .eq("role", "owner")
+          .limit(1);
+        if (ownerRoles?.length) targetId = ownerRoles[0].user_id;
+      }
+
+      if (!targetId) {
+        toast.error("No admin or owner found to contact.");
+        return;
+      }
+
+      // Find or create conversation
+      const { data: existingConv } = await supabase
+        .from("direct_conversations")
+        .select("id")
+        .or(`and(participant_1.eq.${user.id},participant_2.eq.${targetId}),and(participant_1.eq.${targetId},participant_2.eq.${user.id})`)
+        .limit(1);
+
+      let conversationId: string;
+      if (existingConv?.length) {
+        conversationId = existingConv[0].id;
+      } else {
+        const { data: newConv, error: convErr } = await supabase
+          .from("direct_conversations")
+          .insert({ participant_1: user.id, participant_2: targetId })
+          .select("id")
+          .single();
+        if (convErr || !newConv) throw convErr || new Error("Failed to create conversation");
+        conversationId = newConv.id;
+      }
+
+      // Send message
+      const agentName = agentProfile?.full_name || user.email || "An agent";
+      await supabase.from("direct_messages").insert({
+        conversation_id: conversationId,
+        sender_id: user.id,
+        content: `⚠️ Duplicate student detected: ${agentName} has a student that shows as duplicate (${firstName} ${lastName}${email ? ', ' + email : ''}${phone ? ', ' + phone : ''}). Please check and contact the agent.`,
+      });
+
+      toast.success("Message sent to admin successfully!");
+      setDuplicateError(null);
+    } catch (err) {
+      console.error("Failed to contact admin:", err);
+      toast.error("Failed to send message. Please try again.");
+    } finally {
+      setContactingAdmin(false);
+    }
+  };
 
   const canProceedStep1 = universityId && courseId;
   const canProceedStep2 = firstName && lastName;
@@ -353,6 +438,30 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
     <Dialog open={open} onOpenChange={(o) => { if (!o) resetForm(); onOpenChange(o); }}>
       <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader><DialogTitle>New Student Enrollment</DialogTitle></DialogHeader>
+
+        {duplicateError && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Duplicate Student Detected</AlertTitle>
+            <AlertDescription className="space-y-3">
+              <p>{duplicateError}</p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleContactAdmin}
+                  disabled={contactingAdmin}
+                >
+                  <MessageSquare className="w-4 h-4 mr-1" />
+                  {contactingAdmin ? "Sending..." : "Contact Admin"}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setDuplicateError(null)}>
+                  Dismiss
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Step indicator */}
         <div className="flex items-center gap-1 sm:gap-2 pb-2 overflow-x-auto">

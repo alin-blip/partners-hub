@@ -15,7 +15,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, ArrowRight, Check, Calendar, Upload, FileText, X, ShieldCheck, Eye } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Calendar, Upload, FileText, X, ShieldCheck, Eye, MessageSquare, AlertTriangle } from "lucide-react";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { CourseDetailsInfoCard } from "@/components/CourseDetailsInfoCard";
 import { SignatureCanvas } from "@/components/SignatureCanvas";
 import { syncToDrive } from "@/lib/drive-sync";
@@ -86,6 +87,8 @@ export default function EnrollStudent() {
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [consentPreviewUrl, setConsentPreviewUrl] = useState<string | null>(null);
   const [previewingConsent, setPreviewingConsent] = useState(false);
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
+  const [contactingAdmin, setContactingAdmin] = useState(false);
 
   const nonMarketingClauses = CONSENT_CLAUSES.filter((c) => !c.isMarketing);
   const allConsentsChecked = nonMarketingClauses.every((c) => consentChecks[c.id]);
@@ -258,7 +261,18 @@ export default function EnrollStudent() {
           .ilike("email", email.trim())
           .limit(1);
         if (existingByEmail?.length) {
-          throw new Error("A student with this email already exists in the system. Please contact your admin or owner.");
+          throw new Error("DUPLICATE:A student with this email already exists in the system.");
+        }
+      }
+      // Duplicate check by phone
+      if (phone.trim()) {
+        const { data: existingByPhone } = await supabase
+          .from("students")
+          .select("id")
+          .eq("phone", phone.trim())
+          .limit(1);
+        if (existingByPhone?.length) {
+          throw new Error("DUPLICATE:A student with this phone number already exists in the system.");
         }
       }
       // Duplicate check by name + DOB
@@ -271,7 +285,7 @@ export default function EnrollStudent() {
           .eq("date_of_birth", dob)
           .limit(1);
         if (existingByName?.length) {
-          throw new Error("A student with this name and date of birth already exists in the system. Please contact your admin or owner.");
+          throw new Error("DUPLICATE:A student with this name and date of birth already exists in the system.");
         }
       }
 
@@ -424,9 +438,75 @@ export default function EnrollStudent() {
       navigate(`${navPrefix}/students/${studentId}`);
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      if (error.message?.startsWith("DUPLICATE:")) {
+        setDuplicateError(error.message.replace("DUPLICATE:", ""));
+      } else {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      }
     },
   });
+
+  const handleContactAdmin = async () => {
+    if (!user) return;
+    setContactingAdmin(true);
+    try {
+      const { data: agentProfile } = await supabase
+        .from("profiles")
+        .select("admin_id, full_name")
+        .eq("id", user.id)
+        .single();
+
+      let targetId: string | null = agentProfile?.admin_id || null;
+
+      if (!targetId) {
+        const { data: ownerRoles } = await supabase
+          .from("user_roles")
+          .select("user_id")
+          .eq("role", "owner")
+          .limit(1);
+        if (ownerRoles?.length) targetId = ownerRoles[0].user_id;
+      }
+
+      if (!targetId) {
+        toast({ title: "Error", description: "No admin or owner found to contact.", variant: "destructive" });
+        return;
+      }
+
+      const { data: existingConv } = await supabase
+        .from("direct_conversations")
+        .select("id")
+        .or(`and(participant_1.eq.${user.id},participant_2.eq.${targetId}),and(participant_1.eq.${targetId},participant_2.eq.${user.id})`)
+        .limit(1);
+
+      let conversationId: string;
+      if (existingConv?.length) {
+        conversationId = existingConv[0].id;
+      } else {
+        const { data: newConv, error: convErr } = await supabase
+          .from("direct_conversations")
+          .insert({ participant_1: user.id, participant_2: targetId })
+          .select("id")
+          .single();
+        if (convErr || !newConv) throw convErr || new Error("Failed to create conversation");
+        conversationId = newConv.id;
+      }
+
+      const agentName = agentProfile?.full_name || user.email || "An agent";
+      await supabase.from("direct_messages").insert({
+        conversation_id: conversationId,
+        sender_id: user.id,
+        content: `⚠️ Duplicate student detected: ${agentName} has a student that shows as duplicate (${firstName} ${lastName}${email ? ', ' + email : ''}${phone ? ', ' + phone : ''}). Please check and contact the agent.`,
+      });
+
+      toast({ title: "Message sent!", description: "Your admin has been notified about the duplicate student." });
+      setDuplicateError(null);
+    } catch (err) {
+      console.error("Failed to contact admin:", err);
+      toast({ title: "Error", description: "Failed to send message. Please try again.", variant: "destructive" });
+    } finally {
+      setContactingAdmin(false);
+    }
+  };
 
   const canProceedStep1 = universityId && courseId;
   const canProceedStep2 = firstName && lastName;
@@ -448,6 +528,30 @@ export default function EnrollStudent() {
           </Button>
           <h1 className="text-2xl font-bold tracking-tight">New Student Enrollment</h1>
         </div>
+
+        {duplicateError && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Duplicate Student Detected</AlertTitle>
+            <AlertDescription className="space-y-3">
+              <p>{duplicateError}</p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleContactAdmin}
+                  disabled={contactingAdmin}
+                >
+                  <MessageSquare className="w-4 h-4 mr-1" />
+                  {contactingAdmin ? "Sending..." : "Contact Admin"}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setDuplicateError(null)}>
+                  Dismiss
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Step indicator */}
         <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto">
