@@ -2316,6 +2316,7 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      get_my_admin_id: { Args: never; Returns: string }
       get_team_lead_counts: {
         Args: { _admin_id: string }
         Returns: {
