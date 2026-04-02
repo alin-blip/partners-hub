@@ -244,9 +244,9 @@ export default function MessagesPage() {
 
   return (
     <DashboardLayout>
-      <div className="flex h-[calc(100vh-6rem)] gap-0 border rounded-lg bg-card overflow-hidden">
+      <div className="flex h-[calc(100vh-5rem)] sm:h-[calc(100vh-6rem)] gap-0 border rounded-lg bg-card overflow-hidden">
         {/* Conversation list */}
-        <div className="w-80 border-r flex flex-col shrink-0">
+        <div className={`${isMobile && activeConvo ? "hidden" : "flex"} ${isMobile ? "w-full" : "w-80"} border-r flex-col shrink-0`}>
           <div className="p-3 border-b flex items-center justify-between">
             <h2 className="font-semibold text-sm">Messages</h2>
             <Dialog open={newConvoOpen} onOpenChange={setNewConvoOpen}>
