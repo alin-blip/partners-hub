@@ -273,7 +273,7 @@ export default function LeadsPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
+                          <div className="flex items-center justify-end gap-1 flex-wrap">
                             <Button
                               variant="ghost"
                               size="sm"
