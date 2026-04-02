@@ -1,30 +1,27 @@
 
 
-# Add Duplicate Detection to Lead Conversion
+# Add Lead Notifications — Bell + Sidebar Badge
 
-## Problem
-The LeadsPage "Convert" flow inserts a student directly without checking for duplicates. The enrollment dialog already has this check, but the lead conversion does not.
+## What changes
 
-## Changes
+1. **Sidebar badge on Leads** — show count of "new" (unread) leads, same pattern as Messages and Tasks badges
+2. **Notification bell** — include new leads in the notification dropdown so admins/agents see them alongside messages and tasks
 
-### `src/pages/shared/LeadsPage.tsx`
+## Technical plan
 
-1. **Add duplicate check before insert** in `convertToStudent` mutation:
-   - Query `students` by email (case-insensitive) and phone before inserting
-   - If duplicate found, throw `DUPLICATE:` prefixed error with the existing student's agent info
+### 1. Sidebar lead badge (`src/components/AppSidebar.tsx`)
+- Add a `useQuery` for `newLeadsCount` querying `leads` table where `status = 'new'`
+- For agents: filter by `agent_id = user.id`
+- Add `badge: newLeadsCount` to the Leads item in `mainItems`
 
-2. **Add `duplicateError` state and `contactingAdmin` state**
+### 2. Notification bell (`src/components/NotificationBell.tsx`)
+- Add a 5th notification source: query `leads` where `status = 'new'`, ordered by `created_at desc`, limit 5
+- For agents: filter by `agent_id = user.id`
+- Fetch agent names for display
+- Push items with type `"lead"`, title `"New lead: {name}"`, description with email/phone, link to `${prefix}/leads`
+- Add `lead: "📥"` to the `typeIcon` map
 
-3. **Replace convert dialog** to show a duplicate alert when detected:
-   - Show: "This student already exists in the database and belongs to another agent."
-   - Show a "Contact Admin" button
+### Files to modify
+1. `src/components/AppSidebar.tsx` — add new leads count query + badge
+2. `src/components/NotificationBell.tsx` — add leads as notification source
 
-4. **Add `handleContactAdmin` function** (same pattern as EnrollStudentDialog):
-   - Find agent's `admin_id` from profiles, or fall back to owner
-   - Create/find direct conversation
-   - Send message: `"⚠️ Duplicate student detected: I tried to enrol [Student Name] ([email], [phone]) but they appear as a duplicate. Please guide me. — [Agent Name]"`
-   - Show success toast and clear the duplicate error
-
-5. **Handle the `onError`** of `convertToStudent` to detect `DUPLICATE:` prefix and show the popup instead of a generic toast
-
-No database changes needed.
