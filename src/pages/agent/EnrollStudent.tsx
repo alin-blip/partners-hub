@@ -584,7 +584,7 @@ export default function EnrollStudent() {
                 <div className="space-y-2"><Label>UK Entry Date</Label><Input type="date" value={ukEntryDate} onChange={(e) => setUkEntryDate(e.target.value)} /></div>
               </div>
               <AddressLookupInput postcode={postcode} address={fullAddress} onPostcodeChange={setPostcode} onAddressChange={setFullAddress} />
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Immigration Status</Label>
                   <Select value={immigrationStatus} onValueChange={setImmigrationStatus}>
