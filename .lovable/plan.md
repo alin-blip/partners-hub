@@ -1,49 +1,41 @@
 
 
-# Plan: Duplicate student prevention + Fix public application form
+# Plan: Fix 3 Platform Issues
 
-## Issue 1: Public application form silently fails
-**Root cause**: The `leads` table anon INSERT policy contains a subquery: `agent_id IN (SELECT profiles.id FROM profiles WHERE profiles.is_active = true)`. However, the `profiles` table has **no anon SELECT policy**, so this subquery always returns zero rows for anonymous users, causing every public application insert to be silently rejected by RLS.
+## Issue 1: Consent form not auto-sent after enrollment (UWTSD)
+**Root cause**: After enrollment submission, the consent PDF is generated and saved, but no consent signing link is automatically emailed to the student. The agent must manually click "Email Link" in the Documents tab.
 
-**Fix**: Create a database migration adding a **restricted anon SELECT policy** on `profiles` that only exposes `id` and `is_active` — just enough for the RLS subquery to work, without leaking sensitive data. The policy will be scoped: `FOR SELECT TO anon USING (is_active = true)`.
+**Fix**: After successful enrollment in `EnrollStudent.tsx`, automatically create a consent token and email the signing link to the student (if they have an email). This happens in the `onSuccess` callback, after `generateAndUploadConsentPdf`.
 
-## Issue 2: Prevent duplicate students
-**What counts as duplicate**: Same `email` (case-insensitive), OR same `first_name + last_name + date_of_birth` combo, regardless of which agent created them.
+**File**: `src/pages/agent/EnrollStudent.tsx` — add auto-send logic in `onSuccess` after enrollment.
 
-**Changes**:
+---
 
-### Database migration
-- Add a unique index on `LOWER(email)` on the `students` table (partial, where email is not null)
-- This prevents exact email duplicates at the DB level
+## Issue 2: Documents disappear after application submitted
+**Root cause**: The `student_documents` table has NO `cancelled_at` column, but the frontend queries filter with `.is("cancelled_at" as any, null)`. Because this column doesn't exist, the Supabase API returns an error (silently), resulting in an empty document list.
 
-### Frontend (both enrollment paths)
-Before inserting into `students`, query for existing students matching the email OR (first_name + last_name + DOB). If found, show an error toast: "A student with this email/name already exists in the system. Please contact your admin or owner."
+**Fix**:
+1. **Database migration**: Add `cancelled_at` and `cancelled_by` columns to `student_documents`.
+2. No frontend changes needed — the existing code already uses these columns correctly.
 
-**Files modified**:
-1. **Database migration** — anon SELECT on profiles + unique email index on students
-2. **`src/components/EnrollStudentDialog.tsx`** — add duplicate check before insert
-3. **`src/pages/agent/EnrollStudent.tsx`** — add same duplicate check before insert
+**File**: New database migration.
 
-### Duplicate check logic (added to both submit mutations)
-```typescript
-// Check duplicate by email
-const { data: existingByEmail } = await supabase
-  .from("students")
-  .select("id")
-  .ilike("email", email.trim())
-  .limit(1);
+---
 
-// Check duplicate by name + DOB  
-const { data: existingByName } = await supabase
-  .from("students")
-  .select("id")
-  .ilike("first_name", firstName.trim())
-  .ilike("last_name", lastName.trim())
-  .eq("date_of_birth", dob)
-  .limit(1);
+## Issue 3: Poster generation puts the raw prompt text on the image
+**Root cause**: The `generate-image` edge function passes the user's prompt as `Content/Theme: ${prompt}`. The AI model interprets this literally and puts the exact text on the poster (e.g., "Fa-mi un poster pentru certhe în business").
 
-if (existingByEmail?.length || existingByName?.length) {
-  throw new Error("This student already exists in the system. Please contact your admin or owner.");
-}
-```
+**Fix**: Update the prompt in `generate-image/index.ts` to:
+1. Instruct the AI that the prompt is a **creative brief/description**, NOT literal text to display
+2. Tell it to generate appropriate, professional text based on the theme
+3. Add explicit instruction: "Do NOT copy the user's prompt text onto the image. Create your own professional, relevant text."
+
+**File**: `supabase/functions/generate-image/index.ts` — modify `fullPrompt` construction around line 78.
+
+---
+
+## Files modified
+1. `src/pages/agent/EnrollStudent.tsx` — auto-send consent link after enrollment
+2. `supabase/functions/generate-image/index.ts` — fix prompt to not echo user text
+3. Database migration — add `cancelled_at`/`cancelled_by` columns to `student_documents`
 
