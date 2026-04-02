@@ -134,10 +134,10 @@ export default function StudentsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Immigration</TableHead>
-                <TableHead>Created</TableHead>
+                <TableHead className="hidden sm:table-cell">Email</TableHead>
+                <TableHead className="hidden md:table-cell">Phone</TableHead>
+                <TableHead className="hidden md:table-cell">Immigration</TableHead>
+                <TableHead className="hidden sm:table-cell">Created</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
