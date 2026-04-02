@@ -115,13 +115,22 @@ export default function MessagesPage() {
       }));
 
       // Filter based on current user's role
-      if (role === "admin") {
+      if (role === "agent") {
+        // Agent can only message their admin
+        const { data: myProfile } = await supabase
+          .from("profiles").select("admin_id").eq("id", user!.id).single();
+        if (myProfile?.admin_id) {
+          enriched = enriched.filter((u: any) => u.id === myProfile.admin_id);
+        } else {
+          enriched = [];
+        }
+      } else if (role === "admin") {
         // Admin can message: their agents + owner
         enriched = enriched.filter((u: any) =>
           u.role === "owner" || u.admin_id === user!.id
         );
       }
-      // Owner and agent see all users (owner sees everyone, agent sees who they can)
+      // Owner sees everyone
 
       return enriched;
     },
