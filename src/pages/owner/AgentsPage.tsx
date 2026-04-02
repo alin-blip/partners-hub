@@ -201,7 +201,7 @@ export default function AgentsPage() {
               {profiles.map((p: any) => (
                 <TableRow key={p.id}>
                   <TableCell className="font-medium">{p.full_name}</TableCell>
-                  <TableCell className="text-muted-foreground">{p.email}</TableCell>
+                  <TableCell className="hidden sm:table-cell text-muted-foreground">{p.email}</TableCell>
                   <TableCell>
                     {(roleMap.get(p.id) as string) === "owner" ? (
                       <Badge variant="secondary" className="capitalize text-xs">owner</Badge>
