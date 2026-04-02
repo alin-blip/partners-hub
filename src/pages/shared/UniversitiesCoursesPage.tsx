@@ -20,6 +20,7 @@ import {
   ArrowRight,
   ScanSearch,
   Loader2,
+  MapPin,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -121,6 +122,35 @@ export default function UniversitiesCoursesPage() {
     },
   });
 
+  const { data: campuses = [] } = useQuery({
+    queryKey: ["campuses-all"],
+    queryFn: async () => {
+      const { data } = await supabase.from("campuses").select("*");
+      return data || [];
+    },
+  });
+
+  const { data: courseTimetableGroups = [] } = useQuery({
+    queryKey: ["course-timetable-groups-all"],
+    queryFn: async () => {
+      const { data } = await supabase.from("course_timetable_groups").select("course_id, campus_id");
+      return data || [];
+    },
+  });
+
+  const campusMap = new Map(campuses.map((c: any) => [c.id, c]));
+  const courseCampusMap = new Map<string, { name: string; city: string | null }[]>();
+  for (const ctg of courseTimetableGroups) {
+    if (!ctg.campus_id) continue;
+    const campus = campusMap.get(ctg.campus_id);
+    if (!campus) continue;
+    const existing = courseCampusMap.get(ctg.course_id) || [];
+    if (!existing.some((e) => e.name === campus.name)) {
+      existing.push({ name: campus.name, city: campus.city });
+    }
+    courseCampusMap.set(ctg.course_id, existing);
+  }
+
   const activeUniversities = universities.filter((u: any) => u.is_active);
   const displayUniversities = showInactive ? universities : activeUniversities;
 
@@ -140,12 +170,19 @@ export default function UniversitiesCoursesPage() {
     if (search) {
       const term = search.toLowerCase();
       const uniName = (uniMap.get(c.university_id) || "").toLowerCase();
+      const campusLocations = courseCampusMap.get(c.id) || [];
+      const campusMatch = campusLocations.some(
+        (loc) =>
+          loc.name.toLowerCase().includes(term) ||
+          loc.city?.toLowerCase().includes(term)
+      );
       return (
         c.name.toLowerCase().includes(term) ||
         uniName.includes(term) ||
         c.level?.toLowerCase().includes(term) ||
         c.study_mode?.toLowerCase().includes(term) ||
-        c.duration?.toLowerCase().includes(term)
+        c.duration?.toLowerCase().includes(term) ||
+        campusMatch
       );
     }
     return true;
@@ -342,6 +379,19 @@ export default function UniversitiesCoursesPage() {
                             </span>
                           </div>
                         )}
+                        {(() => {
+                          const locs = courseCampusMap.get(course.id) || [];
+                          if (locs.length === 0) return null;
+                          const display = locs.slice(0, 3).map((l) => l.city ? `${l.name} (${l.city})` : l.name).join(", ");
+                          return (
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
+                              <span className="truncate">
+                                {display}{locs.length > 3 && ` +${locs.length - 3}`}
+                              </span>
+                            </div>
+                          );
+                        })()}
                         {course.fees && (
                           <div className="flex items-center gap-2">
                             <PoundSterling className="h-3.5 w-3.5 text-primary shrink-0" />
