@@ -177,6 +177,9 @@ export default function StudentsPage() {
               ))}
               {!isLoading && students.map((s: any) => {
                 const urgentCount = urgentCounts[s.id] || 0;
+                const agentInfo = (agentProfiles as any)[s.agent_id];
+                const agentName = agentInfo?.full_name || "—";
+                const adminName = agentInfo?.admin_id ? (adminProfiles as any)[agentInfo.admin_id] || "—" : "—";
                 return (
                   <TableRow
                     key={s.id}
@@ -196,6 +199,8 @@ export default function StudentsPage() {
                     </TableCell>
                     <TableCell className="hidden sm:table-cell text-muted-foreground">{s.email || "—"}</TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground">{s.phone || "—"}</TableCell>
+                    <TableCell className="hidden lg:table-cell text-muted-foreground">{agentName}</TableCell>
+                    <TableCell className="hidden lg:table-cell text-muted-foreground">{adminName}</TableCell>
                     <TableCell className="hidden md:table-cell">{s.immigration_status || "—"}</TableCell>
                     <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
                       {s.created_at ? format(new Date(s.created_at), "dd MMM yyyy") : "—"}
