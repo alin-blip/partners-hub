@@ -1,26 +1,35 @@
 
 
-# Plan: Fix location display + campus search fallback
+# Plan: Role switching (Agent ↔ Admin) for Owner
 
-## Problem 1: Location display is inline (comma-separated)
-Currently locations show as one truncated line. User wants bullet points, one per line.
+## What it does
+Owner can change a user's role between agent and admin directly from the Manage Users table. Students stay assigned to the user regardless of role change.
 
-## Problem 2: UWTSD campus search doesn't work
-UWTSD has 4 campuses in `campuses` table but **zero entries** in `course_timetable_groups` linking courses to campuses. The current logic only builds `courseCampusMap` from `course_timetable_groups`, so UWTSD courses have no campus data.
+## Changes
 
-## Solution
+### 1. Edge function: `create-owner/index.ts`
+Add a new action `change_role` alongside the existing create flow:
+- Accept `{ action: "change_role", user_id, new_role }` in the request body
+- Verify caller is owner
+- Update `user_roles` table: `UPDATE user_roles SET role = new_role WHERE user_id = target_user_id`
+- If changing agent → admin: clear `admin_id` on their profile (they're no longer under an admin)
+- If changing admin → agent: optionally set `admin_id`; also clear `admin_id` on any agents that were under this admin (reassign to null)
+- Students table uses `agent_id` which references the user's profile ID — this doesn't change, so students remain assigned
 
-### File: `src/pages/shared/UniversitiesCoursesPage.tsx`
+### 2. Frontend: `AgentsPage.tsx`
+- Add a role-change dropdown/select in the Actions column (or a separate dialog)
+- For each non-owner user row, show a Select with "Agent" / "Admin" options
+- On change, call the edge function with `action: "change_role"`
+- Invalidate queries on success
+- Don't allow changing owner's role
 
-**1. Fallback logic for campus mapping (lines 141-152)**
-After building `courseCampusMap` from `course_timetable_groups`, add a fallback: for any course that has NO entries in the map, inherit all campuses from its university. This way UWTSD courses (and any others without timetable groups) will show their university's campuses.
+## Technical details
+- `user_roles` has a UNIQUE constraint on `(user_id, role)` — we UPDATE the existing row, not insert a new one
+- `students.agent_id` is just a UUID reference to profiles — no schema change needed, students stay put
+- When admin becomes agent, their former team agents get `admin_id = null` (unassigned) — owner can reassign them later
+- Only the owner role can perform this action (enforced server-side)
 
-**2. Location display as bullet list (lines 382-394)**
-Replace the single-line `<span className="truncate">` with a vertical list:
-- Icon `MapPin` aligned to top
-- Each location on its own line as a bullet point
-- No truncation, show all locations
-
-### File: `src/components/DashboardSearchCard.tsx`
-Apply the same fallback logic for campus mapping so search works there too.
+## Files modified
+1. **`supabase/functions/create-owner/index.ts`** — add `change_role` action branch
+2. **`src/pages/owner/AgentsPage.tsx`** — add role Select in table + mutation
 
