@@ -165,6 +165,7 @@ export default function EnrollmentsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Student</TableHead>
+                <TableHead className="hidden lg:table-cell">Agent</TableHead>
                 <TableHead>University</TableHead>
                 <TableHead>Course</TableHead>
                 <TableHead>Status</TableHead>
