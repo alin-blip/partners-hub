@@ -438,9 +438,75 @@ export default function EnrollStudent() {
       navigate(`${navPrefix}/students/${studentId}`);
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      if (error.message?.startsWith("DUPLICATE:")) {
+        setDuplicateError(error.message.replace("DUPLICATE:", ""));
+      } else {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      }
     },
   });
+
+  const handleContactAdmin = async () => {
+    if (!user) return;
+    setContactingAdmin(true);
+    try {
+      const { data: agentProfile } = await supabase
+        .from("profiles")
+        .select("admin_id, full_name")
+        .eq("id", user.id)
+        .single();
+
+      let targetId: string | null = agentProfile?.admin_id || null;
+
+      if (!targetId) {
+        const { data: ownerRoles } = await supabase
+          .from("user_roles")
+          .select("user_id")
+          .eq("role", "owner")
+          .limit(1);
+        if (ownerRoles?.length) targetId = ownerRoles[0].user_id;
+      }
+
+      if (!targetId) {
+        toast({ title: "Error", description: "No admin or owner found to contact.", variant: "destructive" });
+        return;
+      }
+
+      const { data: existingConv } = await supabase
+        .from("direct_conversations")
+        .select("id")
+        .or(`and(participant_1.eq.${user.id},participant_2.eq.${targetId}),and(participant_1.eq.${targetId},participant_2.eq.${user.id})`)
+        .limit(1);
+
+      let conversationId: string;
+      if (existingConv?.length) {
+        conversationId = existingConv[0].id;
+      } else {
+        const { data: newConv, error: convErr } = await supabase
+          .from("direct_conversations")
+          .insert({ participant_1: user.id, participant_2: targetId })
+          .select("id")
+          .single();
+        if (convErr || !newConv) throw convErr || new Error("Failed to create conversation");
+        conversationId = newConv.id;
+      }
+
+      const agentName = agentProfile?.full_name || user.email || "An agent";
+      await supabase.from("direct_messages").insert({
+        conversation_id: conversationId,
+        sender_id: user.id,
+        content: `⚠️ Duplicate student detected: ${agentName} has a student that shows as duplicate (${firstName} ${lastName}${email ? ', ' + email : ''}${phone ? ', ' + phone : ''}). Please check and contact the agent.`,
+      });
+
+      toast({ title: "Message sent!", description: "Your admin has been notified about the duplicate student." });
+      setDuplicateError(null);
+    } catch (err) {
+      console.error("Failed to contact admin:", err);
+      toast({ title: "Error", description: "Failed to send message. Please try again.", variant: "destructive" });
+    } finally {
+      setContactingAdmin(false);
+    }
+  };
 
   const canProceedStep1 = universityId && courseId;
   const canProceedStep2 = firstName && lastName;
