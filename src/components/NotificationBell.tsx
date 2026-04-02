@@ -15,7 +15,7 @@ type NotificationType = "message" | "task" | "enrollment" | "lead";
 
 type NotificationItem = {
   id: string;
-  type: "message" | "task" | "enrollment";
+  type: NotificationType;
   title: string;
   description: string;
   time: string;
