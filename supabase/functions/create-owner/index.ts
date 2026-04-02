@@ -186,7 +186,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  if (role === "agent") {
+  if (role === "agent" || role === "admin") {
     const { data: callerProfile } = await supabaseAdmin
       .from("profiles")
       .select("full_name")
