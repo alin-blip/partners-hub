@@ -207,10 +207,8 @@ export default function MessagesPage() {
     return convo.p1;
   };
 
-  const getUnreadCount = (convo: any) => {
-    // We'd need a separate query for unread counts, but for simplicity
-    // we'll just check the messages array when it's the active convo
-    return 0;
+  const getUnreadForConvo = (convoId: string) => {
+    return (unreadMap as Record<string, number>)[convoId] || 0;
   };
 
   // Render @mentions as highlighted spans
