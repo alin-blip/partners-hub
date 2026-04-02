@@ -12,8 +12,9 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { notifyAgentOfStatusChange } from "@/lib/enrollment-emails";
 import { CourseDetailsInfoCard } from "@/components/CourseDetailsInfoCard";
-import { ChevronDown, ChevronUp, ArrowRightLeft } from "lucide-react";
+import { ChevronDown, ChevronUp, ArrowRightLeft, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const STATUSES = [
   "applied", "documents_pending", "documents_submitted", "processing",
@@ -63,6 +64,20 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
     },
   });
 
+  // Check if student has a signed consent form
+  const { data: hasSignedConsent = false } = useQuery({
+    queryKey: ["student-consent-signed", studentId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("consent_signing_tokens")
+        .select("id")
+        .eq("student_id", studentId)
+        .eq("status", "signed")
+        .limit(1);
+      return (data?.length || 0) > 0;
+    },
+  });
+
   // Universities, campuses, courses, intakes for transfer
   const { data: universities = [] } = useQuery({
     queryKey: ["universities-active"],
@@ -86,7 +101,6 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
     queryKey: ["courses-for-campus", transferUniId, transferCampusId],
     queryFn: async () => {
       if (transferCampusId) {
-        // Get courses linked to this campus via course_timetable_groups
         const { data: ctgs } = await supabase
           .from("course_timetable_groups")
           .select("course_id")
@@ -97,7 +111,6 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
           const { data } = await supabase.from("courses").select("id, name").in("id", courseIds).eq("is_active", true).order("name");
           return data || [];
         }
-        // Fallback: all courses for this uni
         const { data } = await supabase.from("courses").select("id, name").eq("university_id", transferUniId).eq("is_active", true).order("name");
         return data || [];
       }
@@ -164,11 +177,28 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
     }
   };
 
+  // If consent not signed, only allow "applied" status
+  const getAvailableStatuses = (currentStatus: string) => {
+    if (hasSignedConsent) return STATUSES;
+    // Without consent, only allow "applied"
+    return ["applied"];
+  };
+
   return (
     <>
       <Card>
         <CardHeader><CardTitle className="text-base">Enrollment History</CardTitle></CardHeader>
         <CardContent className="p-0">
+          {!hasSignedConsent && canChangeStatus && (
+            <div className="px-4 pt-3">
+              <Alert className="border-yellow-500/50 bg-yellow-500/10">
+                <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                <AlertDescription className="text-sm text-yellow-700">
+                  Consent form must be signed before the status can progress beyond <strong>Applied</strong>.
+                </AlertDescription>
+              </Alert>
+            </div>
+          )}
           <Table>
             <TableHeader>
               <TableRow>
@@ -180,50 +210,53 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {enrollments.map((e: any) => (
-                <React.Fragment key={e.id}>
-                  <TableRow>
-                    <TableCell className="font-medium">{e.universities?.name}</TableCell>
-                    <TableCell>{e.courses?.name}</TableCell>
-                    <TableCell>
-                      {canChangeStatus ? (
-                        <Select value={e.status} onValueChange={(v) => updateStatus.mutate({ id: e.id, status: v, oldStatus: e.status })}>
-                          <SelectTrigger className="w-[180px] h-8">
-                            <StatusBadge status={e.status} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {STATUSES.map((s) => (
-                              <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <StatusBadge status={e.status} />
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{format(new Date(e.created_at), "dd MMM yyyy")}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        {canTransfer && (
-                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Transfer to another university" onClick={() => openTransferDialog(e)}>
-                            <ArrowRightLeft className="w-4 h-4" />
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpandedId(expandedId === e.id ? null : e.id)}>
-                          {expandedId === e.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                  {expandedId === e.id && e.course_id && (
+              {enrollments.map((e: any) => {
+                const availableStatuses = getAvailableStatuses(e.status);
+                return (
+                  <React.Fragment key={e.id}>
                     <TableRow>
-                      <TableCell colSpan={5} className="p-2">
-                        <CourseDetailsInfoCard courseId={e.course_id} compact />
+                      <TableCell className="font-medium">{e.universities?.name}</TableCell>
+                      <TableCell>{e.courses?.name}</TableCell>
+                      <TableCell>
+                        {canChangeStatus ? (
+                          <Select value={e.status} onValueChange={(v) => updateStatus.mutate({ id: e.id, status: v, oldStatus: e.status })}>
+                            <SelectTrigger className="w-[180px] h-8">
+                              <StatusBadge status={e.status} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableStatuses.map((s) => (
+                                <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <StatusBadge status={e.status} />
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">{format(new Date(e.created_at), "dd MMM yyyy")}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          {canTransfer && (
+                            <Button variant="ghost" size="icon" className="h-7 w-7" title="Transfer to another university" onClick={() => openTransferDialog(e)}>
+                              <ArrowRightLeft className="w-4 h-4" />
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpandedId(expandedId === e.id ? null : e.id)}>
+                            {expandedId === e.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
-                  )}
-                </React.Fragment>
-              ))}
+                    {expandedId === e.id && e.course_id && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="p-2">
+                          <CourseDetailsInfoCard courseId={e.course_id} compact />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </React.Fragment>
+                );
+              })}
               {enrollments.length === 0 && (
                 <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No enrollments</TableCell></TableRow>
               )}
