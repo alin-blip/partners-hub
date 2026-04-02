@@ -170,12 +170,19 @@ export default function UniversitiesCoursesPage() {
     if (search) {
       const term = search.toLowerCase();
       const uniName = (uniMap.get(c.university_id) || "").toLowerCase();
+      const campusLocations = courseCampusMap.get(c.id) || [];
+      const campusMatch = campusLocations.some(
+        (loc) =>
+          loc.name.toLowerCase().includes(term) ||
+          loc.city?.toLowerCase().includes(term)
+      );
       return (
         c.name.toLowerCase().includes(term) ||
         uniName.includes(term) ||
         c.level?.toLowerCase().includes(term) ||
         c.study_mode?.toLowerCase().includes(term) ||
-        c.duration?.toLowerCase().includes(term)
+        c.duration?.toLowerCase().includes(term) ||
+        campusMatch
       );
     }
     return true;
