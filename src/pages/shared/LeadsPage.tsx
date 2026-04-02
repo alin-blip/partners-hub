@@ -116,6 +116,7 @@ export default function LeadsPage() {
             .select("id, first_name, last_name, agent_id")
             .ilike("email", lead.email)
             .limit(1)
+            .then(r => r)
         );
       }
 
@@ -126,6 +127,7 @@ export default function LeadsPage() {
             .select("id, first_name, last_name, agent_id")
             .eq("phone", lead.phone)
             .limit(1)
+            .then(r => r)
         );
       }
 
