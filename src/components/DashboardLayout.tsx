@@ -6,6 +6,7 @@ import { AIChatPanel } from "@/components/AIChatPanel";
 import { NotificationBell } from "@/components/NotificationBell";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
+import { PresenceProvider } from "@/contexts/PresenceContext";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -83,6 +84,7 @@ export function DashboardLayout({ children, allowedRoles }: DashboardLayoutProps
   }
 
   return (
+    <PresenceProvider>
     <SidebarProvider>
       <div className="min-h-screen flex w-full protected-content">
         <AppSidebar />
@@ -118,5 +120,6 @@ export function DashboardLayout({ children, allowedRoles }: DashboardLayoutProps
         )}
       </div>
     </SidebarProvider>
+    </PresenceProvider>
   );
 }

@@ -17,11 +17,13 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Plus } from "lucide-react";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { AddressLookupInput } from "@/components/AddressLookupInput";
+import { usePresenceMap } from "@/contexts/PresenceContext";
 
 export default function AgentsPage() {
   const { toast } = useToast();
+  const presenceMap = usePresenceMap();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [newEmail, setNewEmail] = useState("");
@@ -189,6 +191,7 @@ export default function AgentsPage() {
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Online</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Joined</TableHead>
                 <TableHead>Actions</TableHead>
@@ -217,6 +220,18 @@ export default function AgentsPage() {
                         </SelectContent>
                       </Select>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-block w-2.5 h-2.5 rounded-full ${presenceMap[p.id]?.is_online ? "bg-green-500" : "bg-muted-foreground/30"}`} />
+                      <span className="text-xs text-muted-foreground">
+                        {presenceMap[p.id]?.is_online
+                          ? "Online"
+                          : presenceMap[p.id]?.last_seen_at
+                            ? formatDistanceToNow(new Date(presenceMap[p.id].last_seen_at), { addSuffix: true })
+                            : "Never"}
+                      </span>
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Badge variant={p.is_active ? "default" : "destructive"} className="text-xs">
