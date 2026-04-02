@@ -189,11 +189,11 @@ export default function AgentsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
+                <TableHead className="hidden sm:table-cell">Email</TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead>Online</TableHead>
+                <TableHead className="hidden md:table-cell">Online</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Joined</TableHead>
+                <TableHead className="hidden md:table-cell">Joined</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
