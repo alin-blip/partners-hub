@@ -238,7 +238,7 @@ export default function AgentsPage() {
                       {p.is_active ? "Active" : "Inactive"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
+                  <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
                     {format(new Date(p.created_at), "dd MMM yyyy")}
                   </TableCell>
                   <TableCell>

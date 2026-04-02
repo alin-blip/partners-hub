@@ -120,7 +120,7 @@ export default function StudentsPage() {
             />
           </div>
           <Select value={immigrationFilter} onValueChange={(v) => { setImmigrationFilter(v); setPage(0); }}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Immigration" />
             </SelectTrigger>
             <SelectContent>
