@@ -22,7 +22,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   PoundSterling, Users, TrendingUp, ChevronDown, ChevronRight,
-  CreditCard, Clock, CheckCircle2, AlertCircle, ArrowUpCircle, X,
+  CreditCard, Clock, CheckCircle2, AlertCircle, ArrowUpCircle, X, Percent, Edit2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -44,15 +44,30 @@ export default function CommissionsPage() {
   const [payType, setPayType] = useState("25_percent_monthly");
   const [payPeriod, setPayPeriod] = useState("");
   const [payNotes, setPayNotes] = useState("");
+  const [overrideDialog, setOverrideDialog] = useState<{ snapshotId: string; currentRate: number; studentName: string } | null>(null);
+  const [overrideAmount, setOverrideAmount] = useState("");
+  const [overridePercentage, setOverridePercentage] = useState("");
 
-  // Fetch snapshots with intake info
+  // Fetch snapshots with intake info + override fields
   const { data: snapshots = [] } = useQuery({
     queryKey: ["commission-snapshots"],
     queryFn: async () => {
       const { data } = await supabase
         .from("commission_snapshots")
-        .select("*, enrollments(status, funding_status, intake_id, students(first_name, last_name, agent_id), universities(name), courses(name), intakes(label))")
+        .select("*, enrollments(status, funding_status, intake_id, course_id, students(first_name, last_name, agent_id), universities(name), courses(name, fees, tuition_fee_percentage), intakes(label))")
         .order("created_at", { ascending: false });
+      return (data || []) as any[];
+    },
+  });
+
+  // Fetch courses for fee % settings
+  const { data: courses = [] } = useQuery({
+    queryKey: ["commission-courses"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("courses")
+        .select("id, name, fees, tuition_fee_percentage, university_id, universities(name)")
+        .order("name");
       return (data || []) as any[];
     },
   });
@@ -124,6 +139,44 @@ export default function CommissionsPage() {
       qc.invalidateQueries({ queryKey: ["commission-snapshots"] });
       toast({ title: "Status updated" });
     },
+  });
+
+  // Update course tuition fee percentage
+  const updateCourseFeePercentage = useMutation({
+    mutationFn: async ({ courseId, percentage }: { courseId: string; percentage: number | null }) => {
+      const { error } = await supabase
+        .from("courses")
+        .update({ tuition_fee_percentage: percentage } as any)
+        .eq("id", courseId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["commission-courses"] });
+      toast({ title: "Course fee % updated" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  // Override snapshot commission
+  const overrideSnapshotCommission = useMutation({
+    mutationFn: async ({ id, override_amount, override_percentage }: { id: string; override_amount: number | null; override_percentage: number | null }) => {
+      const updateData: any = { override_amount, override_percentage };
+      // If override_amount is set, also update agent_rate for consistency in calculations
+      if (override_amount != null) {
+        updateData.agent_rate = override_amount;
+      }
+      const { error } = await supabase.from("commission_snapshots").update(updateData).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["commission-snapshots"] });
+      qc.invalidateQueries({ queryKey: ["owner-revenue-snapshots"] });
+      toast({ title: "Commission override saved" });
+      setOverrideDialog(null);
+      setOverrideAmount("");
+      setOverridePercentage("");
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   function resetPaymentForm() {
@@ -334,6 +387,7 @@ export default function CommissionsPage() {
           <TabsList>
             <TabsTrigger value="agents">Agent Breakdown</TabsTrigger>
             <TabsTrigger value="payments">Payment History</TabsTrigger>
+            <TabsTrigger value="course-fees">Course Fee %</TabsTrigger>
           </TabsList>
 
           <TabsContent value="agents" className="space-y-4 mt-4">
@@ -367,6 +421,9 @@ export default function CommissionsPage() {
                         }
                         onUpdateStatus={(id, status) => updateSnapshotStatus.mutate({ id, status })}
                         profileMap={profileMap}
+                        onOverride={(snapshotId, currentRate, studentName) =>
+                          setOverrideDialog({ snapshotId, currentRate, studentName })
+                        }
                       />
                     );
                   })}
@@ -420,6 +477,65 @@ export default function CommissionsPage() {
                 </TableBody>
               </Table>
             </div>
+          </TabsContent>
+
+          <TabsContent value="course-fees" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Percent className="w-4 h-4" />
+                  Tuition Fee Commission % per Course
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Set what percentage of each course's tuition fees you receive as commission. Leave empty to use the default tier/custom rate.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-lg border bg-card">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>University</TableHead>
+                        <TableHead>Course</TableHead>
+                        <TableHead className="text-right">Tuition Fee</TableHead>
+                        <TableHead className="text-right w-[140px]">Fee %</TableHead>
+                        <TableHead className="text-right">Commission</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {courses.map((course: any) => {
+                        const feeStr = course.fees || "";
+                        const feeNum = parseFloat(feeStr.replace(/[^0-9.]/g, "")) || 0;
+                        const pct = course.tuition_fee_percentage;
+                        const commission = pct != null && feeNum > 0 ? Math.round(feeNum * pct / 100) : null;
+                        return (
+                          <TableRow key={course.id}>
+                            <TableCell className="text-sm">{course.universities?.name || "—"}</TableCell>
+                            <TableCell className="text-sm font-medium">{course.name}</TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">{feeNum > 0 ? `£${feeNum.toLocaleString()}` : "—"}</TableCell>
+                            <TableCell className="text-right">
+                              <CourseFeeInput
+                                courseId={course.id}
+                                currentValue={pct}
+                                onSave={(courseId, value) => updateCourseFeePercentage.mutate({ courseId, percentage: value })}
+                              />
+                            </TableCell>
+                            <TableCell className="text-right text-sm tabular-nums font-medium">
+                              {commission != null ? `£${commission.toLocaleString()}` : <span className="text-muted-foreground">—</span>}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      {courses.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">No courses found</TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
@@ -483,6 +599,68 @@ export default function CommissionsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Override Commission Dialog */}
+      <Dialog open={!!overrideDialog} onOpenChange={(open) => { if (!open) { setOverrideDialog(null); setOverrideAmount(""); setOverridePercentage(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Override Commission — {overrideDialog?.studentName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Current rate: £{overrideDialog?.currentRate?.toLocaleString()}. Set a custom amount or percentage.
+            </p>
+            <div>
+              <Label>Fixed Amount (£)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={overrideAmount}
+                onChange={(e) => {
+                  setOverrideAmount(e.target.value);
+                  setOverridePercentage("");
+                }}
+                placeholder="e.g. 750"
+              />
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span className="flex-1 border-t" /> or <span className="flex-1 border-t" />
+            </div>
+            <div>
+              <Label>Percentage of tuition fee (%)</Label>
+              <Input
+                type="number"
+                step="0.1"
+                value={overridePercentage}
+                onChange={(e) => {
+                  setOverridePercentage(e.target.value);
+                  setOverrideAmount("");
+                }}
+                placeholder="e.g. 15"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Will calculate from the course's tuition fee if available</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setOverrideDialog(null); setOverrideAmount(""); setOverridePercentage(""); }}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (!overrideDialog) return;
+                const amt = overrideAmount ? Number(overrideAmount) : null;
+                const pct = overridePercentage ? Number(overridePercentage) : null;
+                overrideSnapshotCommission.mutate({
+                  id: overrideDialog.snapshotId,
+                  override_amount: amt,
+                  override_percentage: pct,
+                });
+              }}
+              disabled={!overrideAmount && !overridePercentage}
+            >
+              Save Override
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
@@ -490,7 +668,7 @@ export default function CommissionsPage() {
 /* ──── Agent Row with expand ──── */
 
 function AgentRow({
-  agent, isExpanded, onToggle, paymentsBySnapshot, onRecordPayment, onUpdateStatus, profileMap,
+  agent, isExpanded, onToggle, paymentsBySnapshot, onRecordPayment, onUpdateStatus, profileMap, onOverride,
 }: {
   agent: any;
   isExpanded: boolean;
@@ -499,6 +677,7 @@ function AgentRow({
   onRecordPayment: (snapshotId: string, recipientId: string, recipientRole: string, maxAmount: number) => void;
   onUpdateStatus: (id: string, status: string) => void;
   profileMap: Map<string, any>;
+  onOverride: (snapshotId: string, currentRate: number, studentName: string) => void;
 }) {
   return (
     <>
@@ -603,7 +782,12 @@ function AgentRow({
                                 {snap.enrollments?.students?.first_name} {snap.enrollments?.students?.last_name}
                               </TableCell>
                               <TableCell className="text-sm">{snap.enrollments?.universities?.name || "—"}</TableCell>
-                              <TableCell className="text-sm text-right tabular-nums font-medium">£{rate.toLocaleString()}</TableCell>
+                              <TableCell className="text-sm text-right tabular-nums font-medium">
+                                £{rate.toLocaleString()}
+                                {snap.override_amount != null && (
+                                  <Badge variant="outline" className="ml-1 text-[10px] px-1">override</Badge>
+                                )}
+                              </TableCell>
                               <TableCell className="text-sm text-right tabular-nums">
                                 <span className={ib.qualifies ? "text-green-700 dark:text-green-400 font-medium" : "text-muted-foreground"}>
                                   £{amount25.toLocaleString()}
@@ -628,7 +812,20 @@ function AgentRow({
                                 {remaining > 0 ? `£${remaining.toLocaleString()}` : <span className="text-green-600">✓ Paid</span>}
                               </TableCell>
                               <TableCell>
-                                <div className="flex gap-1">
+                                <div className="flex gap-1 flex-wrap">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 text-xs"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const studentName = `${snap.enrollments?.students?.first_name} ${snap.enrollments?.students?.last_name}`;
+                                      onOverride(snap.id, rate, studentName);
+                                    }}
+                                  >
+                                    <Edit2 className="w-3 h-3 mr-1" />
+                                    Override
+                                  </Button>
                                   {remaining > 0 && (
                                     <Button
                                       size="sm"
@@ -694,5 +891,51 @@ function AgentRow({
         </TableRow>
       )}
     </>
+  );
+}
+
+/* ──── Inline Course Fee % Input ──── */
+
+function CourseFeeInput({ courseId, currentValue, onSave }: {
+  courseId: string;
+  currentValue: number | null;
+  onSave: (courseId: string, value: number | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(currentValue != null ? String(currentValue) : "");
+
+  if (!editing) {
+    return (
+      <button
+        className="inline-flex items-center gap-1 text-sm tabular-nums hover:text-primary transition-colors"
+        onClick={() => { setValue(currentValue != null ? String(currentValue) : ""); setEditing(true); }}
+      >
+        {currentValue != null ? `${currentValue}%` : <span className="text-muted-foreground">Set %</span>}
+        <Edit2 className="w-3 h-3 text-muted-foreground" />
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      <Input
+        type="number"
+        step="0.1"
+        className="h-7 w-20 text-sm"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            onSave(courseId, value ? Number(value) : null);
+            setEditing(false);
+          }
+          if (e.key === "Escape") setEditing(false);
+        }}
+        autoFocus
+      />
+      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { onSave(courseId, value ? Number(value) : null); setEditing(false); }}>
+        ✓
+      </Button>
+    </div>
   );
 }

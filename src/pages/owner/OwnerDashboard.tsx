@@ -43,6 +43,27 @@ export default function OwnerDashboard() {
     },
   });
 
+  // Revenue from commission snapshots
+  const { data: snapshots = [] } = useQuery({
+    queryKey: ["owner-revenue-snapshots"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("commission_snapshots")
+        .select("id, agent_rate, admin_rate, override_amount, snapshot_status");
+      return (data || []) as any[];
+    },
+  });
+
+  const { data: snapshotPayments = [] } = useQuery({
+    queryKey: ["owner-revenue-payments"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("commission_payments")
+        .select("id, amount");
+      return (data || []) as any[];
+    },
+  });
+
   const { data: profiles = [] } = useQuery({
     queryKey: ["owner-profiles"],
     queryFn: async () => {
@@ -152,7 +173,14 @@ export default function OwnerDashboard() {
     agentConvertedLeads.set((l as any).agent_id, (agentConvertedLeads.get((l as any).agent_id) || 0) + 1);
   }
 
-  // Total revenue
+  // Total revenue from snapshots (actual locked-in commissions)
+  const totalSnapshotRevenue = snapshots.reduce((sum: number, s: any) => {
+    const effectiveRate = s.override_amount != null ? Number(s.override_amount) : Number(s.agent_rate);
+    return sum + effectiveRate + Number(s.admin_rate);
+  }, 0);
+  const totalPaidOut = snapshotPayments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+
+  // Estimated revenue (old method as fallback for agents without snapshots)
   const totalRevenue = activeAgents.reduce((sum: number, agent: any) => {
     const count = agentActiveEnrollments.get(agent.id) || 0;
     const { amount } = calcCommission(count, tiers);
@@ -231,7 +259,7 @@ export default function OwnerDashboard() {
         <DashboardSearchCard />
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
           <MetricCard title="Total Students" value={students.length} icon={Users} />
           <MetricCard title="Active Agents" value={activeAgents.length} icon={UserCheck} />
           <MetricCard title="In Pipeline" value={pipelineCount} icon={ClipboardList} />
@@ -243,10 +271,22 @@ export default function OwnerDashboard() {
             description={`${convertedLeads} of ${totalLeads} leads converted`}
           />
           <MetricCard
-            title="Est. Revenue"
-            value={`£${totalRevenue.toLocaleString()}`}
+            title="Revenue (Locked)"
+            value={`£${totalSnapshotRevenue.toLocaleString()}`}
             icon={PoundSterling}
-            description="Based on commission tiers"
+            description={`${snapshots.length} snapshots`}
+          />
+          <MetricCard
+            title="Paid Out"
+            value={`£${totalPaidOut.toLocaleString()}`}
+            icon={PoundSterling}
+            description="Total payments made"
+          />
+          <MetricCard
+            title="Outstanding"
+            value={`£${(totalSnapshotRevenue - totalPaidOut).toLocaleString()}`}
+            icon={PoundSterling}
+            description="Remaining to pay"
           />
         </div>
 
