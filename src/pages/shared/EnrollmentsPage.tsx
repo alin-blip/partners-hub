@@ -53,7 +53,7 @@ export default function EnrollmentsPage() {
         .from("enrollments")
         .select(`
           id, status, created_at, updated_at, notes, student_id,
-          students!inner(first_name, last_name),
+          students!inner(first_name, last_name, agent_id),
           universities!inner(name),
           courses!inner(name)
         `, { count: "exact" });
@@ -72,6 +72,19 @@ export default function EnrollmentsPage() {
       if (error) throw error;
       return { enrollments: data || [], total: count || 0 };
     },
+  });
+
+  // Resolve agent names for enrollments
+  const enrollmentAgentIds = [...new Set((data?.enrollments || []).map((e: any) => e.students?.agent_id).filter(Boolean))];
+  const { data: enrollmentAgentProfiles = {} } = useQuery({
+    queryKey: ["agent-profiles-for-enrollments", enrollmentAgentIds],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("id, full_name").in("id", enrollmentAgentIds);
+      const map: Record<string, string> = {};
+      (data || []).forEach((p: any) => { map[p.id] = p.full_name; });
+      return map;
+    },
+    enabled: enrollmentAgentIds.length > 0,
   });
 
   const enrollments = data?.enrollments || [];
@@ -152,6 +165,7 @@ export default function EnrollmentsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Student</TableHead>
+                <TableHead className="hidden lg:table-cell">Agent</TableHead>
                 <TableHead>University</TableHead>
                 <TableHead>Course</TableHead>
                 <TableHead>Status</TableHead>
@@ -161,7 +175,7 @@ export default function EnrollmentsPage() {
             <TableBody>
               {isLoading && Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={`skel-${i}`}>
-                  {Array.from({ length: 5 }).map((_, j) => (
+                  {Array.from({ length: 6 }).map((_, j) => (
                     <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                   ))}
                 </TableRow>
@@ -173,6 +187,7 @@ export default function EnrollmentsPage() {
                   onClick={() => navigate(`${prefix}/students/${e.student_id}`)}
                 >
                   <TableCell className="font-medium">{e.students?.first_name} {e.students?.last_name}</TableCell>
+                  <TableCell className="hidden lg:table-cell text-muted-foreground">{(enrollmentAgentProfiles as any)[e.students?.agent_id] || "—"}</TableCell>
                   <TableCell>{e.universities?.name}</TableCell>
                   <TableCell>{e.courses?.name}</TableCell>
                   <TableCell onClick={(ev) => ev.stopPropagation()}>
@@ -201,7 +216,7 @@ export default function EnrollmentsPage() {
               ))}
               {!isLoading && enrollments.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                     No enrollments found
                   </TableCell>
                 </TableRow>
