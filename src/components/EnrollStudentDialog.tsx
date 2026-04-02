@@ -85,6 +85,8 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [consentPreviewUrl, setConsentPreviewUrl] = useState<string | null>(null);
   const [previewingConsent, setPreviewingConsent] = useState(false);
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
+  const [contactingAdmin, setContactingAdmin] = useState(false);
 
   const nonMarketingClauses = CONSENT_CLAUSES.filter((c) => !c.isMarketing);
   const allConsentsChecked = nonMarketingClauses.every((c) => consentChecks[c.id]);
