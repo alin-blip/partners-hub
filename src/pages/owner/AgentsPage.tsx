@@ -23,6 +23,7 @@ import { usePresenceMap } from "@/contexts/PresenceContext";
 
 export default function AgentsPage() {
   const { toast } = useToast();
+  const presenceMap = usePresenceMap();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [newEmail, setNewEmail] = useState("");
