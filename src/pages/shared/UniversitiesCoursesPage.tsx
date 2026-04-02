@@ -20,6 +20,7 @@ import {
   ArrowRight,
   ScanSearch,
   Loader2,
+  MapPin,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
