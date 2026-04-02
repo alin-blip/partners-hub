@@ -107,7 +107,7 @@ export default function LeadsPage() {
   const convertToStudent = useMutation({
     mutationFn: async (lead: any) => {
       // Duplicate check by email (case-insensitive)
-      const checks: Promise<any>[] = [];
+      const checks: PromiseLike<any>[] = [];
 
       if (lead.email) {
         checks.push(
