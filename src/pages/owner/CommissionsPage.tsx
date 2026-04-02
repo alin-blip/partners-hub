@@ -665,7 +665,7 @@ export default function CommissionsPage() {
 /* ──── Agent Row with expand ──── */
 
 function AgentRow({
-  agent, isExpanded, onToggle, paymentsBySnapshot, onRecordPayment, onUpdateStatus, profileMap,
+  agent, isExpanded, onToggle, paymentsBySnapshot, onRecordPayment, onUpdateStatus, profileMap, onOverride,
 }: {
   agent: any;
   isExpanded: boolean;
@@ -674,6 +674,7 @@ function AgentRow({
   onRecordPayment: (snapshotId: string, recipientId: string, recipientRole: string, maxAmount: number) => void;
   onUpdateStatus: (id: string, status: string) => void;
   profileMap: Map<string, any>;
+  onOverride: (snapshotId: string, currentRate: number, studentName: string) => void;
 }) {
   return (
     <>
