@@ -139,6 +139,14 @@ export default function UniversitiesCoursesPage() {
   });
 
   const campusMap = new Map(campuses.map((c: any) => [c.id, c]));
+  const uniCampusMap = new Map<string, { name: string; city: string | null }[]>();
+  for (const c of campuses) {
+    const existing = uniCampusMap.get(c.university_id) || [];
+    if (!existing.some((e: any) => e.name === c.name)) {
+      existing.push({ name: c.name, city: c.city });
+    }
+    uniCampusMap.set(c.university_id, existing);
+  }
   const courseCampusMap = new Map<string, { name: string; city: string | null }[]>();
   for (const ctg of courseTimetableGroups) {
     if (!ctg.campus_id) continue;
@@ -149,6 +157,12 @@ export default function UniversitiesCoursesPage() {
       existing.push({ name: campus.name, city: campus.city });
     }
     courseCampusMap.set(ctg.course_id, existing);
+  }
+  // Fallback: courses without timetable group entries inherit university campuses
+  for (const course of allCourses) {
+    if (!courseCampusMap.has(course.id) && uniCampusMap.has(course.university_id)) {
+      courseCampusMap.set(course.id, uniCampusMap.get(course.university_id)!);
+    }
   }
 
   const activeUniversities = universities.filter((u: any) => u.is_active);
