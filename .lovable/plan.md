@@ -1,66 +1,65 @@
 
 
-# Enrollment Transfer with History Preservation and Approval Flow
+# Auto Welcome Message + Agent Messaging Fix
 
-## Current problem
-The transfer overwrites the existing enrollment record (UPDATE in place), so the history of the previous university/course is lost.
+## Summary
+Two changes in one:
+1. **Fix**: Agent can only message their admin (from the previous plan — RLS policy + UI filter)
+2. **New**: When an admin creates an agent, automatically create a direct conversation and send a welcome message ("Welcome to the team! Any questions, please ask here.")
 
-## New behavior
+## Changes
 
-### 1. Preserve history
-Instead of updating the old enrollment, mark it with a new status `"transferred"` and **create a new enrollment** record for the destination university/course. Both records stay visible in the Enrollment History table, so you can always see the student was previously at Regent, for example.
+### 1. Database: RLS policy on `profiles` for agent→admin visibility
+New SELECT policy so agents can see their admin's profile:
+```sql
+CREATE POLICY "Agent reads own admin profile" ON public.profiles
+FOR SELECT TO authenticated
+USING (id = (SELECT p.admin_id FROM public.profiles p WHERE p.id = auth.uid()));
+```
 
-### 2. Approval chain via email code
-- **Agent** cannot transfer directly — they request a transfer, which sends a code to their **Admin** for approval
-- **Admin** cannot transfer directly — they request a transfer, which sends a code to the **Owner** for approval
-- **Owner** can transfer directly without a code
+### 2. UI: Filter agent recipients to only their admin
+In `MessagesPage.tsx`, add agent-specific filtering in the `availableUsers` query (around line 117):
+```typescript
+if (role === "agent") {
+  const { data: myProfile } = await supabase
+    .from("profiles").select("admin_id").eq("id", user!.id).single();
+  if (myProfile?.admin_id) {
+    enriched = enriched.filter((u: any) => u.id === myProfile.admin_id);
+  } else {
+    enriched = [];
+  }
+}
+```
 
-This reuses the existing `delete_confirmation_codes` table and `request-delete-code` / `verify-delete-code` edge functions pattern, generalized for transfer approvals.
+### 3. Auto welcome message on agent creation
+In `AdminAgentsPage.tsx`, after successful agent creation (`onSuccess`):
+- Create a `direct_conversations` record between admin and the new agent
+- Insert a welcome message from the admin: *"Welcome to the team! 🎉 If you have any questions, please ask here."*
+- The new agent's ID comes from the `create-owner` edge function response (`data.user_id` or similar)
 
----
+Need to check what the edge function returns:
 
-## Technical changes
-
-### Database migration
-1. Add `"transferred"` to the known statuses displayed in the UI
-2. Create a `transfer_requests` table to hold pending transfer requests:
-   - `id`, `enrollment_id`, `requested_by`, `new_university_id`, `new_campus_id`, `new_course_id`, `new_intake_id`, `status` (pending/approved/rejected), `code` (6-char), `approver_id`, `created_at`, `approved_at`
-   - RLS: requester can INSERT + SELECT own; approver can SELECT + UPDATE; owner can ALL
-3. No need to reuse `delete_confirmation_codes` — a dedicated table is cleaner for this flow
-
-### New Edge Function: `request-transfer-code`
-- Called by agent or admin when they initiate a transfer
-- Generates a 6-char code, stores in `transfer_requests`
-- Sends email to the approver (admin for agent requests, owner for admin requests) using a new transactional email template `transfer-approval-code`
-- Returns success
-
-### New Edge Function: `verify-transfer-code`
-- Called when the approver enters the code
-- Validates code, marks `transfer_requests` as approved
-- Executes the actual transfer: sets old enrollment to `"transferred"`, inserts new enrollment with status `"applied"`
-- Returns success
-
-### New email template: `transfer-approval-code`
-- Similar to `admin-delete-code` template
-- Shows: who requested, student name, from university/course → to university/course, the code
-
-### UI changes (`StudentEnrollmentsTab.tsx`)
-1. Transfer dialog gets a code verification step:
-   - **Owner**: clicks Transfer → executes immediately (old enrollment → "transferred", new enrollment inserted)
-   - **Admin**: clicks Transfer → calls `request-transfer-code` → shows "Code sent to owner, enter code" input → on submit calls `verify-transfer-code`
-   - **Agent**: clicks Transfer → calls `request-transfer-code` → shows "Code sent to admin, enter code" input → on submit calls `verify-transfer-code`
-   - Allow agents to also see the transfer button (currently `canTransfer` is owner+admin only) — agents should be able to initiate
-2. "transferred" status gets a badge style (e.g., gray/neutral)
-3. Old enrollment rows with status "transferred" show the history — no deletion
-
-### Files to create
-1. `supabase/migrations/...transfer_requests.sql` — new table + RLS
-2. `supabase/functions/request-transfer-code/index.ts` — generate code + email
-3. `supabase/functions/verify-transfer-code/index.ts` — verify + execute transfer
-4. `supabase/functions/_shared/transactional-email-templates/transfer-approval-code.tsx` — email template
-5. Update `supabase/functions/_shared/transactional-email-templates/registry.ts` — register template
+```typescript
+onSuccess: async (data) => {
+  // Create conversation
+  const { data: convo } = await supabase.from("direct_conversations").insert({
+    participant_1: user!.id,
+    participant_2: data.user_id,
+  }).select().single();
+  
+  if (convo) {
+    await supabase.from("direct_messages").insert({
+      conversation_id: convo.id,
+      sender_id: user!.id,
+      content: "Welcome to the team! 🎉 If you have any questions, please ask here.",
+    });
+  }
+  // ... existing cleanup
+}
+```
 
 ### Files to modify
-1. `src/components/student-detail/StudentEnrollmentsTab.tsx` — new approval flow UI, preserve history logic for owner
-2. `src/components/StatusBadge.tsx` — add "transferred" badge style
+1. **Migration** — new RLS policy on `profiles` (agent reads admin)
+2. `src/pages/shared/MessagesPage.tsx` — agent filter for recipients
+3. `src/pages/admin/AdminAgentsPage.tsx` — auto-create conversation + welcome message in `onSuccess`
 
