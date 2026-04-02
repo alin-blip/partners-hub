@@ -432,7 +432,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
         {/* Step 2 */}
         {step === 2 && (
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2"><Label>Title</Label><Select value={title} onValueChange={setTitle}><SelectTrigger><SelectValue placeholder="Title" /></SelectTrigger><SelectContent>{TITLE_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select></div>
               <div className="space-y-2"><Label>First Name *</Label><Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="John" /></div>
               <div className="space-y-2"><Label>Last Name *</Label><Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Smith" /></div>
