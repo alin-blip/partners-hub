@@ -167,10 +167,10 @@ export default function StudentsPage() {
                         )}
                       </span>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{s.email || "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">{s.phone || "—"}</TableCell>
-                    <TableCell>{s.immigration_status || "—"}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
+                    <TableCell className="hidden sm:table-cell text-muted-foreground">{s.email || "—"}</TableCell>
+                    <TableCell className="hidden md:table-cell text-muted-foreground">{s.phone || "—"}</TableCell>
+                    <TableCell className="hidden md:table-cell">{s.immigration_status || "—"}</TableCell>
+                    <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
                       {s.created_at ? format(new Date(s.created_at), "dd MMM yyyy") : "—"}
                     </TableCell>
                   </TableRow>
