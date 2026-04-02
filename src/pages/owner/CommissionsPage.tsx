@@ -421,6 +421,9 @@ export default function CommissionsPage() {
                         }
                         onUpdateStatus={(id, status) => updateSnapshotStatus.mutate({ id, status })}
                         profileMap={profileMap}
+                        onOverride={(snapshotId, currentRate, studentName) =>
+                          setOverrideDialog({ snapshotId, currentRate, studentName })
+                        }
                       />
                     );
                   })}
