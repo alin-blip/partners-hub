@@ -141,6 +141,44 @@ export default function CommissionsPage() {
     },
   });
 
+  // Update course tuition fee percentage
+  const updateCourseFeePercentage = useMutation({
+    mutationFn: async ({ courseId, percentage }: { courseId: string; percentage: number | null }) => {
+      const { error } = await supabase
+        .from("courses")
+        .update({ tuition_fee_percentage: percentage } as any)
+        .eq("id", courseId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["commission-courses"] });
+      toast({ title: "Course fee % updated" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  // Override snapshot commission
+  const overrideSnapshotCommission = useMutation({
+    mutationFn: async ({ id, override_amount, override_percentage }: { id: string; override_amount: number | null; override_percentage: number | null }) => {
+      const updateData: any = { override_amount, override_percentage };
+      // If override_amount is set, also update agent_rate for consistency in calculations
+      if (override_amount != null) {
+        updateData.agent_rate = override_amount;
+      }
+      const { error } = await supabase.from("commission_snapshots").update(updateData).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["commission-snapshots"] });
+      qc.invalidateQueries({ queryKey: ["owner-revenue-snapshots"] });
+      toast({ title: "Commission override saved" });
+      setOverrideDialog(null);
+      setOverrideAmount("");
+      setOverridePercentage("");
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   function resetPaymentForm() {
     setPayAmount(""); setPayType("25_percent_monthly"); setPayPeriod(""); setPayNotes("");
   }
