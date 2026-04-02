@@ -84,6 +84,7 @@ export function DashboardLayout({ children, allowedRoles }: DashboardLayoutProps
   }
 
   return (
+    <PresenceProvider>
     <SidebarProvider>
       <div className="min-h-screen flex w-full protected-content">
         <AppSidebar />
