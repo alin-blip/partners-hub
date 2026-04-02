@@ -53,7 +53,7 @@ export default function EnrollmentsPage() {
         .from("enrollments")
         .select(`
           id, status, created_at, updated_at, notes, student_id,
-          students!inner(first_name, last_name),
+          students!inner(first_name, last_name, agent_id),
           universities!inner(name),
           courses!inner(name)
         `, { count: "exact" });
@@ -72,6 +72,19 @@ export default function EnrollmentsPage() {
       if (error) throw error;
       return { enrollments: data || [], total: count || 0 };
     },
+  });
+
+  // Resolve agent names for enrollments
+  const enrollmentAgentIds = [...new Set((data?.enrollments || []).map((e: any) => e.students?.agent_id).filter(Boolean))];
+  const { data: enrollmentAgentProfiles = {} } = useQuery({
+    queryKey: ["agent-profiles-for-enrollments", enrollmentAgentIds],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("id, full_name").in("id", enrollmentAgentIds);
+      const map: Record<string, string> = {};
+      (data || []).forEach((p: any) => { map[p.id] = p.full_name; });
+      return map;
+    },
+    enabled: enrollmentAgentIds.length > 0,
   });
 
   const enrollments = data?.enrollments || [];
