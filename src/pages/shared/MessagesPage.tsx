@@ -40,6 +40,28 @@ export default function MessagesPage() {
     },
   });
 
+  // Fetch unread counts per conversation
+  const { data: unreadMap = {} } = useQuery({
+    queryKey: ["unread-per-convo", user?.id],
+    queryFn: async () => {
+      if (!user || conversations.length === 0) return {};
+      const convoIds = conversations.map((c: any) => c.id);
+      const { data, error } = await supabase
+        .from("direct_messages")
+        .select("id, conversation_id")
+        .in("conversation_id", convoIds)
+        .neq("sender_id", user.id)
+        .is("read_at", null);
+      if (error) return {};
+      const counts: Record<string, number> = {};
+      for (const msg of data || []) {
+        counts[msg.conversation_id] = (counts[msg.conversation_id] || 0) + 1;
+      }
+      return counts;
+    },
+    enabled: !!user && conversations.length > 0,
+  });
+
   // Fetch messages for active conversation
   const { data: messages = [] } = useQuery({
     queryKey: ["direct-messages", activeConvo],
