@@ -1,35 +1,49 @@
 
 
-# Plan: Role switching (Agent ↔ Admin) for Owner
+# Plan: Duplicate student prevention + Fix public application form
 
-## What it does
-Owner can change a user's role between agent and admin directly from the Manage Users table. Students stay assigned to the user regardless of role change.
+## Issue 1: Public application form silently fails
+**Root cause**: The `leads` table anon INSERT policy contains a subquery: `agent_id IN (SELECT profiles.id FROM profiles WHERE profiles.is_active = true)`. However, the `profiles` table has **no anon SELECT policy**, so this subquery always returns zero rows for anonymous users, causing every public application insert to be silently rejected by RLS.
 
-## Changes
+**Fix**: Create a database migration adding a **restricted anon SELECT policy** on `profiles` that only exposes `id` and `is_active` — just enough for the RLS subquery to work, without leaking sensitive data. The policy will be scoped: `FOR SELECT TO anon USING (is_active = true)`.
 
-### 1. Edge function: `create-owner/index.ts`
-Add a new action `change_role` alongside the existing create flow:
-- Accept `{ action: "change_role", user_id, new_role }` in the request body
-- Verify caller is owner
-- Update `user_roles` table: `UPDATE user_roles SET role = new_role WHERE user_id = target_user_id`
-- If changing agent → admin: clear `admin_id` on their profile (they're no longer under an admin)
-- If changing admin → agent: optionally set `admin_id`; also clear `admin_id` on any agents that were under this admin (reassign to null)
-- Students table uses `agent_id` which references the user's profile ID — this doesn't change, so students remain assigned
+## Issue 2: Prevent duplicate students
+**What counts as duplicate**: Same `email` (case-insensitive), OR same `first_name + last_name + date_of_birth` combo, regardless of which agent created them.
 
-### 2. Frontend: `AgentsPage.tsx`
-- Add a role-change dropdown/select in the Actions column (or a separate dialog)
-- For each non-owner user row, show a Select with "Agent" / "Admin" options
-- On change, call the edge function with `action: "change_role"`
-- Invalidate queries on success
-- Don't allow changing owner's role
+**Changes**:
 
-## Technical details
-- `user_roles` has a UNIQUE constraint on `(user_id, role)` — we UPDATE the existing row, not insert a new one
-- `students.agent_id` is just a UUID reference to profiles — no schema change needed, students stay put
-- When admin becomes agent, their former team agents get `admin_id = null` (unassigned) — owner can reassign them later
-- Only the owner role can perform this action (enforced server-side)
+### Database migration
+- Add a unique index on `LOWER(email)` on the `students` table (partial, where email is not null)
+- This prevents exact email duplicates at the DB level
 
-## Files modified
-1. **`supabase/functions/create-owner/index.ts`** — add `change_role` action branch
-2. **`src/pages/owner/AgentsPage.tsx`** — add role Select in table + mutation
+### Frontend (both enrollment paths)
+Before inserting into `students`, query for existing students matching the email OR (first_name + last_name + DOB). If found, show an error toast: "A student with this email/name already exists in the system. Please contact your admin or owner."
+
+**Files modified**:
+1. **Database migration** — anon SELECT on profiles + unique email index on students
+2. **`src/components/EnrollStudentDialog.tsx`** — add duplicate check before insert
+3. **`src/pages/agent/EnrollStudent.tsx`** — add same duplicate check before insert
+
+### Duplicate check logic (added to both submit mutations)
+```typescript
+// Check duplicate by email
+const { data: existingByEmail } = await supabase
+  .from("students")
+  .select("id")
+  .ilike("email", email.trim())
+  .limit(1);
+
+// Check duplicate by name + DOB  
+const { data: existingByName } = await supabase
+  .from("students")
+  .select("id")
+  .ilike("first_name", firstName.trim())
+  .ilike("last_name", lastName.trim())
+  .eq("date_of_birth", dob)
+  .limit(1);
+
+if (existingByEmail?.length || existingByName?.length) {
+  throw new Error("This student already exists in the system. Please contact your admin or owner.");
+}
+```
 
