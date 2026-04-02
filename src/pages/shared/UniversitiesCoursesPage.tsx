@@ -159,7 +159,7 @@ export default function UniversitiesCoursesPage() {
     courseCampusMap.set(ctg.course_id, existing);
   }
   // Fallback: courses without timetable group entries inherit university campuses
-  for (const course of allCourses) {
+  for (const course of courses) {
     if (!courseCampusMap.has(course.id) && uniCampusMap.has(course.university_id)) {
       courseCampusMap.set(course.id, uniCampusMap.get(course.university_id)!);
     }
