@@ -327,6 +327,7 @@ export default function MessagesPage() {
                 {conversations.map((convo: any) => {
                   const other = getOtherParticipant(convo);
                   const isActive = activeConvo === convo.id;
+                  const unread = getUnreadForConvo(convo.id);
                   return (
                     <button
                       key={convo.id}
@@ -335,11 +336,18 @@ export default function MessagesPage() {
                         isActive ? "bg-accent/10" : "hover:bg-muted/50"
                       }`}
                     >
-                      <Avatar className="h-9 w-9 shrink-0">
-                        <AvatarFallback className="text-xs bg-accent/20 text-accent">{getInitials(other?.full_name)}</AvatarFallback>
-                      </Avatar>
+                      <div className="relative shrink-0">
+                        <Avatar className="h-9 w-9">
+                          <AvatarFallback className="text-xs bg-accent/20 text-accent">{getInitials(other?.full_name)}</AvatarFallback>
+                        </Avatar>
+                        {unread > 0 && (
+                          <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1">
+                            {unread > 99 ? "99+" : unread}
+                          </span>
+                        )}
+                      </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{other?.full_name || "Unknown"}</p>
+                        <p className={`text-sm truncate ${unread > 0 ? "font-semibold" : "font-medium"}`}>{other?.full_name || "Unknown"}</p>
                         <p className="text-xs text-muted-foreground">
                           {format(new Date(convo.updated_at), "dd MMM, HH:mm")}
                         </p>
