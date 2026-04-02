@@ -212,11 +212,11 @@ export default function LeadsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Nationality</TableHead>
-                  <TableHead>Interest</TableHead>
-                  <TableHead>Agent</TableHead>
-                  <TableHead>Date</TableHead>
+                  <TableHead className="hidden sm:table-cell">Contact</TableHead>
+                  <TableHead className="hidden md:table-cell">Nationality</TableHead>
+                  <TableHead className="hidden lg:table-cell">Interest</TableHead>
+                  <TableHead className="hidden md:table-cell">Agent</TableHead>
+                  <TableHead className="hidden sm:table-cell">Date</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
