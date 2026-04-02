@@ -487,6 +487,8 @@ export type Database = {
           enrollment_id: string
           full_release_at: string | null
           id: string
+          override_amount: number | null
+          override_percentage: number | null
           rate_source: string
           snapshot_status: string
           university_id: string
@@ -501,6 +503,8 @@ export type Database = {
           enrollment_id: string
           full_release_at?: string | null
           id?: string
+          override_amount?: number | null
+          override_percentage?: number | null
           rate_source?: string
           snapshot_status?: string
           university_id: string
@@ -515,6 +519,8 @@ export type Database = {
           enrollment_id?: string
           full_release_at?: string | null
           id?: string
+          override_amount?: number | null
+          override_percentage?: number | null
           rate_source?: string
           snapshot_status?: string
           university_id?: string
@@ -718,6 +724,7 @@ export type Database = {
           level: string
           name: string
           study_mode: string
+          tuition_fee_percentage: number | null
           university_id: string
         }
         Insert: {
@@ -729,6 +736,7 @@ export type Database = {
           level?: string
           name: string
           study_mode?: string
+          tuition_fee_percentage?: number | null
           university_id: string
         }
         Update: {
@@ -740,6 +748,7 @@ export type Database = {
           level?: string
           name?: string
           study_mode?: string
+          tuition_fee_percentage?: number | null
           university_id?: string
         }
         Relationships: [
