@@ -122,6 +122,35 @@ export default function UniversitiesCoursesPage() {
     },
   });
 
+  const { data: campuses = [] } = useQuery({
+    queryKey: ["campuses-all"],
+    queryFn: async () => {
+      const { data } = await supabase.from("campuses").select("*");
+      return data || [];
+    },
+  });
+
+  const { data: courseTimetableGroups = [] } = useQuery({
+    queryKey: ["course-timetable-groups-all"],
+    queryFn: async () => {
+      const { data } = await supabase.from("course_timetable_groups").select("course_id, campus_id");
+      return data || [];
+    },
+  });
+
+  const campusMap = new Map(campuses.map((c: any) => [c.id, c]));
+  const courseCampusMap = new Map<string, { name: string; city: string | null }[]>();
+  for (const ctg of courseTimetableGroups) {
+    if (!ctg.campus_id) continue;
+    const campus = campusMap.get(ctg.campus_id);
+    if (!campus) continue;
+    const existing = courseCampusMap.get(ctg.course_id) || [];
+    if (!existing.some((e) => e.name === campus.name)) {
+      existing.push({ name: campus.name, city: campus.city });
+    }
+    courseCampusMap.set(ctg.course_id, existing);
+  }
+
   const activeUniversities = universities.filter((u: any) => u.is_active);
   const displayUniversities = showInactive ? universities : activeUniversities;
 
