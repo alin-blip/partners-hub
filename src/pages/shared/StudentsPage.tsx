@@ -35,7 +35,7 @@ export default function StudentsPage() {
     queryFn: async () => {
       let query = supabase
         .from("students")
-        .select("id, first_name, last_name, email, phone, immigration_status, created_at", { count: "exact" });
+        .select("id, first_name, last_name, email, phone, immigration_status, created_at, agent_id", { count: "exact" });
 
       if (search.trim()) {
         query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`);
@@ -51,6 +51,31 @@ export default function StudentsPage() {
       if (error) throw error;
       return { students: data || [], total: count || 0 };
     },
+  });
+
+  // Resolve agent & admin names for displayed students
+  const agentIds = [...new Set((data?.students || []).map((s: any) => s.agent_id).filter(Boolean))];
+  const { data: agentProfiles = {} } = useQuery({
+    queryKey: ["agent-profiles-for-students", agentIds],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("id, full_name, admin_id").in("id", agentIds);
+      const map: Record<string, { full_name: string; admin_id: string | null }> = {};
+      (data || []).forEach((p: any) => { map[p.id] = { full_name: p.full_name, admin_id: p.admin_id }; });
+      return map;
+    },
+    enabled: agentIds.length > 0,
+  });
+
+  const adminIds = [...new Set(Object.values(agentProfiles).map((p: any) => p.admin_id).filter(Boolean))];
+  const { data: adminProfiles = {} } = useQuery({
+    queryKey: ["admin-profiles-for-students", adminIds],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("id, full_name").in("id", adminIds);
+      const map: Record<string, string> = {};
+      (data || []).forEach((p: any) => { map[p.id] = p.full_name; });
+      return map;
+    },
+    enabled: adminIds.length > 0,
   });
 
   // Fetch urgent note counts
