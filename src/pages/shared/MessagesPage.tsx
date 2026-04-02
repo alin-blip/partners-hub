@@ -28,6 +28,7 @@ import { usePresenceMap } from "@/contexts/PresenceContext";
 
 export default function MessagesPage() {
   const { user, role } = useAuth();
+  const isMobile = useIsMobile();
   const presenceMap = usePresenceMap();
   const { toast } = useToast();
   const qc = useQueryClient();
