@@ -200,9 +200,23 @@ export default function AgentsPage() {
                   <TableCell className="font-medium">{p.full_name}</TableCell>
                   <TableCell className="text-muted-foreground">{p.email}</TableCell>
                   <TableCell>
-                    <Badge variant="secondary" className="capitalize text-xs">
-                      {(roleMap.get(p.id) as string) || "—"}
-                    </Badge>
+                    {(roleMap.get(p.id) as string) === "owner" ? (
+                      <Badge variant="secondary" className="capitalize text-xs">owner</Badge>
+                    ) : (
+                      <Select
+                        value={(roleMap.get(p.id) as string) || ""}
+                        onValueChange={(val) => changeRole.mutate({ user_id: p.id, new_role: val })}
+                        disabled={changeRole.isPending}
+                      >
+                        <SelectTrigger className="w-[110px] h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="agent">Agent</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant={p.is_active ? "default" : "destructive"} className="text-xs">
