@@ -94,6 +94,25 @@ export default function AgentsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["all-profiles"] }),
   });
 
+  const changeRole = useMutation({
+    mutationFn: async ({ user_id, new_role }: { user_id: string; new_role: string }) => {
+      const { data, error } = await supabase.functions.invoke("create-owner", {
+        body: { action: "change_role", user_id, new_role },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all-profiles"] });
+      queryClient.invalidateQueries({ queryKey: ["all-roles"] });
+      toast({ title: "Role updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   return (
     <DashboardLayout allowedRoles={["owner"]}>
       <div className="space-y-6">
