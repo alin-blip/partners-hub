@@ -160,8 +160,8 @@ export default function LeadsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight">Lead Management</h1>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Lead Management</h1>
           <Badge variant="outline" className="text-sm">{leads.length} total leads</Badge>
         </div>
 
