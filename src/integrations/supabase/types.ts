@@ -1463,6 +1463,8 @@ export type Database = {
       student_documents: {
         Row: {
           agent_id: string
+          cancelled_at: string | null
+          cancelled_by: string | null
           created_at: string
           doc_type: string
           file_name: string
@@ -1476,6 +1478,8 @@ export type Database = {
         }
         Insert: {
           agent_id: string
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           doc_type?: string
           file_name: string
@@ -1489,6 +1493,8 @@ export type Database = {
         }
         Update: {
           agent_id?: string
+          cancelled_at?: string | null
+          cancelled_by?: string | null
           created_at?: string
           doc_type?: string
           file_name?: string

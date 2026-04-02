@@ -389,6 +389,38 @@ export default function EnrollStudent() {
         console.error("Failed to send new student notification:", err);
       }
 
+      // Auto-send consent signing link to student if they have an email
+      if (email.trim()) {
+        try {
+          const { data: tokenData, error: tokenError } = await supabase.functions.invoke("create-consent-token", {
+            body: { student_id: studentId },
+          });
+          if (!tokenError && tokenData?.signing_url) {
+            const studentFullName = `${title ? title + " " : ""}${firstName} ${lastName}`;
+            const { data: agentProfileData } = await supabase
+              .from("profiles")
+              .select("full_name")
+              .eq("id", user!.id)
+              .single();
+
+            await supabase.functions.invoke("send-transactional-email", {
+              body: {
+                templateName: "consent-signing-link",
+                recipientEmail: email.trim(),
+                idempotencyKey: `consent-link-${studentId}-${Date.now()}`,
+                templateData: {
+                  studentName: studentFullName,
+                  agentName: agentProfileData?.full_name || "EduForYou UK",
+                  signingUrl: tokenData.signing_url,
+                },
+              },
+            });
+          }
+        } catch (consentErr) {
+          console.error("Failed to auto-send consent link:", consentErr);
+        }
+      }
+
       navigate(`${navPrefix}/students/${studentId}`);
     },
     onError: (error: any) => {
