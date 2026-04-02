@@ -161,6 +161,8 @@ export default function StudentsPage() {
                 <TableHead>Name</TableHead>
                 <TableHead className="hidden sm:table-cell">Email</TableHead>
                 <TableHead className="hidden md:table-cell">Phone</TableHead>
+                <TableHead className="hidden lg:table-cell">Agent</TableHead>
+                <TableHead className="hidden lg:table-cell">Admin</TableHead>
                 <TableHead className="hidden md:table-cell">Immigration</TableHead>
                 <TableHead className="hidden sm:table-cell">Created</TableHead>
               </TableRow>
