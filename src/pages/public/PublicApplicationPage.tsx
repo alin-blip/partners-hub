@@ -24,8 +24,8 @@ export default function PublicApplicationPage() {
   const [submitted, setSubmitted] = useState(false);
   const [aiVoiceEnabled, setAiVoiceEnabled] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Form fields
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -33,7 +33,6 @@ export default function PublicApplicationPage() {
   const [nationality, setNationality] = useState("");
   const [gdprConsent, setGdprConsent] = useState(false);
 
-  // Cascading dropdowns
   const [universities, setUniversities] = useState<any[]>([]);
   const [campuses, setCampuses] = useState<any[]>([]);
   const [courses, setCourses] = useState<any[]>([]);
@@ -48,7 +47,6 @@ export default function PublicApplicationPage() {
 
   const [selectedUni, setSelectedUni] = useState<any>(null);
 
-  // Load agent + universities on mount
   useEffect(() => {
     if (!slug) return;
     (async () => {
@@ -58,7 +56,11 @@ export default function PublicApplicationPage() {
         .eq("slug", slug)
         .single() as { data: { id: string; full_name: string; avatar_url: string | null } | null; error: any };
 
-      if (!prof) { setNotFound(true); setLoading(false); return; }
+      if (!prof) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
 
       const { data: card } = await supabase
         .from("agent_card_settings")
@@ -67,9 +69,13 @@ export default function PublicApplicationPage() {
         .eq("is_public", true)
         .single();
 
-      if (!card) { setNotFound(true); setLoading(false); return; }
-      setAiVoiceEnabled(!!(card as any).ai_voice_enabled);
+      if (!card) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
 
+      setAiVoiceEnabled(!!(card as any).ai_voice_enabled);
       setAgent(prof);
 
       const { data: unis } = await supabase
@@ -82,7 +88,6 @@ export default function PublicApplicationPage() {
     })();
   }, [slug]);
 
-  // Load ElevenLabs widget script when AI voice is enabled
   useEffect(() => {
     if (!aiVoiceEnabled) return;
     const scriptId = "elevenlabs-convai-script";
@@ -98,16 +103,25 @@ export default function PublicApplicationPage() {
     };
   }, [aiVoiceEnabled]);
 
-  // Load campuses + courses + intakes + timetable when university changes
   useEffect(() => {
     if (!universityId) {
-      setCampuses([]); setCourses([]); setIntakes([]); setTimetableOptions([]);
-      setCampusId(""); setCourseId(""); setIntakeId(""); setTimetableOption("");
+      setCampuses([]);
+      setCourses([]);
+      setIntakes([]);
+      setTimetableOptions([]);
+      setCampusId("");
+      setCourseId("");
+      setIntakeId("");
+      setTimetableOption("");
       setSelectedUni(null);
       return;
     }
-    setCampusId(""); setCourseId(""); setIntakeId(""); setTimetableOption("");
-    setSelectedUni(universities.find(u => u.id === universityId) || null);
+
+    setCampusId("");
+    setCourseId("");
+    setIntakeId("");
+    setTimetableOption("");
+    setSelectedUni(universities.find((u) => u.id === universityId) || null);
 
     (async () => {
       const [campusRes, courseRes, intakeRes, ttRes] = await Promise.all([
@@ -125,70 +139,45 @@ export default function PublicApplicationPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!agent) return;
+    if (!agent || !slug) return;
+
     setSubmitting(true);
+    setSubmitError(null);
 
     try {
-      // Build course_interest text summary
-      const uniName = universities.find(u => u.id === universityId)?.name || "";
-      const campusName = campuses.find(c => c.id === campusId)?.name || "";
-      const courseName = courses.find(c => c.id === courseId)?.name || "";
-      const intakeLabel = intakes.find(i => i.id === intakeId)?.label || "";
-      const parts = [uniName, campusName, courseName, intakeLabel, timetableOption].filter(Boolean);
-
-      const leadId = crypto.randomUUID();
-
-      const { error } = await supabase.from("leads").insert({
-        id: leadId,
-        agent_id: agent.id,
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-        email: email.trim().toLowerCase(),
-        phone: phone.trim() || null,
-        nationality: nationality.trim() || null,
-        course_interest: parts.join(" — ") || null,
-        university_id: universityId || null,
-        campus_id: campusId || null,
-        course_id: courseId || null,
-        intake_id: intakeId || null,
-        timetable_option: timetableOption || null,
-        status: "new",
-      } as any);
-
-      if (error) {
-        console.error("Lead insert error:", error);
-        // Show a user-friendly error message
-        setSubmitting(false);
-        return;
-      }
-
-      // Send email notification to the agent via edge function
-      const leadName = `${firstName.trim()} ${lastName.trim()}`;
-      const courseInterest = parts.join(" — ") || undefined;
-
-      await supabase.functions.invoke("send-transactional-email", {
+      const { error, data } = await supabase.functions.invoke("submit-public-application", {
         body: {
-          templateName: "new-lead-notification",
-          recipientEmail: null,
-          agentId: agent.id,
-          idempotencyKey: `new-lead-${leadId}`,
-          templateData: {
-            leadName,
-            leadEmail: email.trim().toLowerCase(),
-            leadPhone: phone.trim() || undefined,
-            nationality: nationality.trim() || undefined,
-            courseInterest,
-            leadsUrl: `${window.location.origin}/agent/leads`,
-          },
+          slug,
+          firstName,
+          lastName,
+          email,
+          phone,
+          nationality,
+          universityId,
+          campusId,
+          courseId,
+          intakeId,
+          timetableOption,
+          gdprConsent,
+          origin: window.location.origin,
         },
       });
 
+      if (error) {
+        throw new Error(error.message || "Nu am putut salva aplicația.");
+      }
+
+      if (!data?.success) {
+        throw new Error("Nu am putut salva aplicația.");
+      }
+
       setSubmitted(true);
     } catch (err) {
-      console.error("Submit error:", err);
+      console.error("Public application submit error:", err);
+      setSubmitError("Aplicația nu a putut fi trimisă. Te rugăm să încerci din nou.");
+    } finally {
+      setSubmitting(false);
     }
-
-    setSubmitting(false);
   };
 
   if (loading) {
@@ -226,7 +215,7 @@ export default function PublicApplicationPage() {
     );
   }
 
-  const initials = agent.full_name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  const initials = agent.full_name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 
   return (
     <div className="min-h-screen bg-muted flex items-center justify-center p-4">
@@ -248,33 +237,31 @@ export default function PublicApplicationPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Personal info */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>First Name *</Label>
-                <Input value={firstName} onChange={e => setFirstName(e.target.value)} required maxLength={100} />
+                <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} required maxLength={100} />
               </div>
               <div className="space-y-2">
                 <Label>Last Name *</Label>
-                <Input value={lastName} onChange={e => setLastName(e.target.value)} required maxLength={100} />
+                <Input value={lastName} onChange={(e) => setLastName(e.target.value)} required maxLength={100} />
               </div>
             </div>
             <div className="space-y-2">
               <Label>Email *</Label>
-              <Input type="email" value={email} onChange={e => setEmail(e.target.value)} required maxLength={255} placeholder="your@email.com" />
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required maxLength={255} placeholder="your@email.com" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Phone</Label>
-                <Input value={phone} onChange={e => setPhone(e.target.value)} maxLength={20} placeholder="+44..." />
+                <Input value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={20} placeholder="+44..." />
               </div>
               <div className="space-y-2">
                 <Label>Nationality</Label>
-                <Input value={nationality} onChange={e => setNationality(e.target.value)} maxLength={100} placeholder="e.g. British" />
+                <Input value={nationality} onChange={(e) => setNationality(e.target.value)} maxLength={100} placeholder="e.g. British" />
               </div>
             </div>
 
-            {/* Course selection */}
             <div className="border-t pt-4 space-y-3">
               <h4 className="text-sm font-medium">Course Interest</h4>
 
@@ -283,7 +270,7 @@ export default function PublicApplicationPage() {
                 <Select value={universityId} onValueChange={setUniversityId}>
                   <SelectTrigger><SelectValue placeholder="Select university..." /></SelectTrigger>
                   <SelectContent>
-                    {universities.map(u => (
+                    {universities.map((u) => (
                       <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -296,7 +283,7 @@ export default function PublicApplicationPage() {
                   <Select value={campusId} onValueChange={setCampusId}>
                     <SelectTrigger><SelectValue placeholder="Select campus..." /></SelectTrigger>
                     <SelectContent>
-                      {campuses.map(c => (
+                      {campuses.map((c) => (
                         <SelectItem key={c.id} value={c.id}>
                           {c.name}{c.city ? ` — ${c.city}` : ""}
                         </SelectItem>
@@ -312,7 +299,7 @@ export default function PublicApplicationPage() {
                   <Select value={courseId} onValueChange={setCourseId}>
                     <SelectTrigger><SelectValue placeholder="Select course..." /></SelectTrigger>
                     <SelectContent>
-                      {courses.map(c => (
+                      {courses.map((c) => (
                         <SelectItem key={c.id} value={c.id}>
                           {c.name} ({c.level} — {c.study_mode})
                         </SelectItem>
@@ -328,7 +315,7 @@ export default function PublicApplicationPage() {
                   <Select value={intakeId} onValueChange={setIntakeId}>
                     <SelectTrigger><SelectValue placeholder="Select intake..." /></SelectTrigger>
                     <SelectContent>
-                      {intakes.map(i => (
+                      {intakes.map((i) => (
                         <SelectItem key={i.id} value={i.id}>{i.label}</SelectItem>
                       ))}
                     </SelectContent>
@@ -342,7 +329,7 @@ export default function PublicApplicationPage() {
                   <Select value={timetableOption} onValueChange={setTimetableOption}>
                     <SelectTrigger><SelectValue placeholder="Select timetable..." /></SelectTrigger>
                     <SelectContent>
-                      {timetableOptions.map(t => (
+                      {timetableOptions.map((t) => (
                         <SelectItem key={t.id} value={t.label}>{t.label}</SelectItem>
                       ))}
                     </SelectContent>
@@ -354,7 +341,6 @@ export default function PublicApplicationPage() {
               )}
             </div>
 
-            {/* GDPR Consent */}
             <div className="flex items-start gap-3 rounded-md border p-3 bg-muted/50">
               <Checkbox
                 id="gdpr"
@@ -370,6 +356,8 @@ export default function PublicApplicationPage() {
                 my consent at any time by contacting the agent directly.
               </label>
             </div>
+
+            {submitError ? <p className="text-sm text-destructive">{submitError}</p> : null}
 
             <Button type="submit" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" disabled={submitting || !gdprConsent}>
               {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
