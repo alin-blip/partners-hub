@@ -268,7 +268,18 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
           .ilike("email", email.trim())
           .limit(1);
         if (existingByEmail?.length) {
-          throw new Error("A student with this email already exists in the system. Please contact your admin or owner.");
+          throw new Error("DUPLICATE:A student with this email already exists in the system.");
+        }
+      }
+      // Duplicate check by phone
+      if (phone.trim()) {
+        const { data: existingByPhone } = await supabase
+          .from("students")
+          .select("id")
+          .eq("phone", phone.trim())
+          .limit(1);
+        if (existingByPhone?.length) {
+          throw new Error("DUPLICATE:A student with this phone number already exists in the system.");
         }
       }
       // Duplicate check by name + DOB
@@ -281,7 +292,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
           .eq("date_of_birth", dob)
           .limit(1);
         if (existingByName?.length) {
-          throw new Error("A student with this name and date of birth already exists in the system. Please contact your admin or owner.");
+          throw new Error("DUPLICATE:A student with this name and date of birth already exists in the system.");
         }
       }
 
