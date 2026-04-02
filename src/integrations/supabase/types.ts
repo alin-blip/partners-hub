@@ -2235,6 +2235,14 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      get_team_lead_counts: {
+        Args: { _admin_id: string }
+        Returns: {
+          agent_id: string
+          agent_name: string
+          lead_count: number
+        }[]
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
