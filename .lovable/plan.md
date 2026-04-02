@@ -1,52 +1,47 @@
 
 
-# Fix Owner Lookup, Remove Consent Step, Block Status, Make Fields Required
+# Restructure Lead Visibility by Role
 
-## Problems Identified
-
-1. **Admin can't find owner** when hitting duplicate — the `user_roles` table RLS only allows users to read their own role (`user_id = auth.uid()`). When an admin queries `user_roles` for `role = 'owner'`, it returns empty. This affects `handleContactAdmin` in all 3 files (LeadsPage, EnrollStudentDialog, EnrollStudent).
-
-2. **Consent form step** should be removed from enrollment forms — consent is sent automatically via email after enrollment.
-
-3. **Enrollment status** should not progress past "applied" until consent form is signed.
-
-4. **Fields should be mandatory** in the new student enrollment form.
-
----
+## Summary
+Currently admins can see all their team's lead details. The new rules:
+- **Agent**: sees only own leads (no change)
+- **Admin**: sees only own leads + a summary showing lead COUNT per agent (no details)
+- **Owner**: sees own leads separately + a full "All Leads" view with agent/admin attribution
 
 ## Changes
 
-### 1. Database: Add RLS policy so authenticated users can find owner role
-- Add a new SELECT policy on `user_roles`: *"Authenticated can find owner"* — `role = 'owner'` for all authenticated users. This allows admins/agents to look up who the owner is without exposing other roles.
+### 1. Database: Remove admin team lead access
+**Migration**: Drop two RLS policies on `leads`:
+- `Admin reads team leads` (SELECT)
+- `Admin updates team leads` (UPDATE)
 
-### 2. Fix `handleContactAdmin` — all 3 files
-Files: `src/pages/shared/LeadsPage.tsx`, `src/components/EnrollStudentDialog.tsx`, `src/pages/agent/EnrollStudent.tsx`
-- The owner lookup logic already works correctly in code — the fix is purely the RLS policy above. No code changes needed for this issue.
+Admins will now only see their own leads via the existing `Agent reads own leads` policy (which checks `agent_id = auth.uid()`).
 
-### 3. Remove consent step from enrollment forms (6 steps → 5 steps)
-Files: `src/components/EnrollStudentDialog.tsx`, `src/pages/agent/EnrollStudent.tsx`
-- Remove Step 5 (Consent Form) entirely — all consent state variables, UI, and the `generateAndUploadConsentPdf` call from the submit mutation
-- Renumber Step 6 (Review) → Step 5; update `totalSteps` from 6 to 5
-- Remove consent-related imports (SignatureCanvas, consent-clauses, signature-utils)
-- Remove the "Consent form signed by" section from the Review step
-- Keep the auto-send consent email logic in `onSuccess` (already exists in EnrollStudent.tsx)
-- Add auto-send consent email in `EnrollStudentDialog.tsx` onSuccess (same pattern as EnrollStudent.tsx)
+### 2. Database: Create function for admin lead counts
+A `SECURITY DEFINER` function so admins can see how many leads each of their agents has, without reading the actual lead rows:
 
-### 4. Block enrollment status change past "applied" without signed consent
-File: `src/components/student-detail/StudentEnrollmentsTab.tsx`
-- Fetch `consent_signing_tokens` for the student to check if any token has `status = 'signed'`
-- When rendering the status dropdown, if consent is not signed, filter STATUSES to only show "applied" (or show a tooltip/warning explaining why)
-- Show an info message: "Consent form must be signed before the status can progress beyond Applied."
+```sql
+CREATE FUNCTION get_team_lead_counts(_admin_id uuid)
+RETURNS TABLE(agent_id uuid, agent_name text, lead_count bigint)
+SECURITY DEFINER
+```
 
-### 5. Make all fields mandatory in enrollment form
-Files: `src/components/EnrollStudentDialog.tsx`, `src/pages/agent/EnrollStudent.tsx`
-- Update `canProceedStep2` validation to require: firstName, lastName, nationality, gender, dob, email, phone, fullAddress, immigrationStatus
-- Update labels to show `*` for all required fields
-- Next of Kin (Step 3): make nokName, nokPhone, nokRelationship required — add validation gate
+This queries `leads` joined with `profiles` where `profiles.admin_id = _admin_id`, grouped by agent.
+
+### 3. UI: Restructure `src/pages/shared/LeadsPage.tsx`
+
+**For Agent** (no change): Shows own leads table as before.
+
+**For Admin**: 
+- Top section: "Team Lead Summary" card grid showing each agent's name + lead count (from the new RPC function). No clickable details.
+- Below: "My Leads" table showing only the admin's own leads (same table as before).
+
+**For Owner**:
+- Tabs: **"My Leads"** | **"All Leads"**
+- "My Leads" tab: leads where `agent_id = user.id`
+- "All Leads" tab: full table with extra columns for Agent and Admin. Fetches agent profiles with `admin_id` to resolve the admin name. Same search/filter/actions as before.
 
 ### Files to modify
-1. **Migration** — new RLS policy on `user_roles`
-2. `src/components/EnrollStudentDialog.tsx` — remove consent step, make fields required, add auto-send consent email
-3. `src/pages/agent/EnrollStudent.tsx` — remove consent step, make fields required
-4. `src/components/student-detail/StudentEnrollmentsTab.tsx` — block status past "applied" without signed consent
+1. **Migration** — drop 2 RLS policies + create `get_team_lead_counts` function
+2. `src/pages/shared/LeadsPage.tsx` — role-based UI restructuring with tabs for owner, summary cards for admin
 
