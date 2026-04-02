@@ -15,6 +15,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   commission_ready: { label: "Commission Ready", className: "bg-teal-600/10 text-teal-800 border-teal-300" },
   rejected: { label: "Rejected", className: "bg-red-500/10 text-red-700 border-red-200" },
   withdrawn: { label: "Withdrawn", className: "bg-gray-500/10 text-gray-700 border-gray-200" },
+  transferred: { label: "Transferred", className: "bg-indigo-500/10 text-indigo-700 border-indigo-200" },
   // Funding statuses
   not_started: { label: "Not Started", className: "bg-gray-500/10 text-gray-600 border-gray-200" },
   application_submitted: { label: "Submitted", className: "bg-blue-500/10 text-blue-700 border-blue-200" },

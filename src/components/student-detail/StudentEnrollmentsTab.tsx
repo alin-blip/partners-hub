@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -40,7 +41,13 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
   const [transferIntakeId, setTransferIntakeId] = useState("");
   const [transferring, setTransferring] = useState(false);
 
-  const canTransfer = role === "owner" || role === "admin";
+  // Code verification state
+  const [transferStep, setTransferStep] = useState<"select" | "code">("select");
+  const [transferRequestId, setTransferRequestId] = useState<string | null>(null);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
+
+  const isOwner = role === "owner";
 
   const { data: profile } = useQuery({
     queryKey: ["my-profile-name"],
@@ -64,7 +71,6 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
     },
   });
 
-  // Check if student has a signed consent form
   const { data: hasSignedConsent = false } = useQuery({
     queryKey: ["student-consent-signed", studentId],
     queryFn: async () => {
@@ -149,26 +155,38 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
     setTransferCampusId("");
     setTransferCourseId("");
     setTransferIntakeId("");
+    setTransferStep("select");
+    setTransferRequestId(null);
+    setVerificationCode("");
   };
 
-  const handleTransfer = async () => {
+  // Owner: direct transfer (preserve history)
+  const handleOwnerTransfer = async () => {
     if (!transferEnrollment || !transferUniId || !transferCourseId) return;
     setTransferring(true);
     try {
-      const { error } = await supabase.from("enrollments").update({
-        university_id: transferUniId,
-        campus_id: transferCampusId || null,
-        course_id: transferCourseId,
-        intake_id: transferIntakeId || null,
-        status: "applied",
-      }).eq("id", transferEnrollment.id);
+      // Mark old enrollment as transferred
+      const { error: updateError } = await supabase
+        .from("enrollments")
+        .update({ status: "transferred" })
+        .eq("id", transferEnrollment.id);
+      if (updateError) throw updateError;
 
-      if (error) throw error;
+      // Create new enrollment
+      const { error: insertError } = await supabase
+        .from("enrollments")
+        .insert({
+          student_id: studentId,
+          university_id: transferUniId,
+          campus_id: transferCampusId || null,
+          course_id: transferCourseId,
+          intake_id: transferIntakeId || null,
+          status: "applied",
+        });
+      if (insertError) throw insertError;
 
-      toast({ title: "Student transferred", description: "Enrollment updated to the new university/course." });
+      toast({ title: "Student transferred", description: "Old enrollment preserved in history." });
       qc.invalidateQueries({ queryKey: ["student-enrollments", studentId] });
-      qc.invalidateQueries({ queryKey: ["student-documents", studentId] });
-      qc.invalidateQueries({ queryKey: ["student-documents-cancelled", studentId] });
       setTransferEnrollment(null);
     } catch (err: any) {
       toast({ title: "Transfer failed", description: err.message, variant: "destructive" });
@@ -177,10 +195,60 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
     }
   };
 
-  // If consent not signed, only allow "applied" status
+  // Agent/Admin: request transfer code
+  const handleRequestCode = async () => {
+    if (!transferEnrollment || !transferUniId || !transferCourseId) return;
+    setTransferring(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("request-transfer-code", {
+        body: {
+          enrollment_id: transferEnrollment.id,
+          new_university_id: transferUniId,
+          new_campus_id: transferCampusId || null,
+          new_course_id: transferCourseId,
+          new_intake_id: transferIntakeId || null,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setTransferRequestId(data.transfer_request_id);
+      setTransferStep("code");
+      const approverLabel = role === "agent" ? "admin" : "owner";
+      toast({ title: "Code sent", description: `Approval code sent to your ${approverLabel}. Enter it below.` });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setTransferring(false);
+    }
+  };
+
+  // Verify transfer code
+  const handleVerifyCode = async () => {
+    if (!transferRequestId || !verificationCode) return;
+    setVerifying(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("verify-transfer-code", {
+        body: {
+          transfer_request_id: transferRequestId,
+          code: verificationCode,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast({ title: "Transfer complete", description: "Student transferred successfully." });
+      qc.invalidateQueries({ queryKey: ["student-enrollments", studentId] });
+      setTransferEnrollment(null);
+    } catch (err: any) {
+      toast({ title: "Verification failed", description: err.message, variant: "destructive" });
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   const getAvailableStatuses = (currentStatus: string) => {
     if (hasSignedConsent) return STATUSES;
-    // Without consent, only allow "applied"
     return ["applied"];
   };
 
@@ -212,13 +280,14 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
             <TableBody>
               {enrollments.map((e: any) => {
                 const availableStatuses = getAvailableStatuses(e.status);
+                const isTransferred = e.status === "transferred";
                 return (
                   <React.Fragment key={e.id}>
-                    <TableRow>
+                    <TableRow className={isTransferred ? "opacity-60" : ""}>
                       <TableCell className="font-medium">{e.universities?.name}</TableCell>
                       <TableCell>{e.courses?.name}</TableCell>
                       <TableCell>
-                        {canChangeStatus ? (
+                        {canChangeStatus && !isTransferred ? (
                           <Select value={e.status} onValueChange={(v) => updateStatus.mutate({ id: e.id, status: v, oldStatus: e.status })}>
                             <SelectTrigger className="w-[180px] h-8">
                               <StatusBadge status={e.status} />
@@ -236,7 +305,7 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
                       <TableCell className="text-muted-foreground text-sm">{format(new Date(e.created_at), "dd MMM yyyy")}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          {canTransfer && (
+                          {!isTransferred && (
                             <Button variant="ghost" size="icon" className="h-7 w-7" title="Transfer to another university" onClick={() => openTransferDialog(e)}>
                               <ArrowRightLeft className="w-4 h-4" />
                             </Button>
@@ -275,11 +344,22 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
             </DialogTitle>
           </DialogHeader>
 
-          {transferEnrollment && (
+          {transferEnrollment && transferStep === "select" && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Transfer from <strong>{transferEnrollment.universities?.name}</strong> — <strong>{transferEnrollment.courses?.name}</strong> to a new university/course. Status will be reset to <strong>Applied</strong>.
+                Transfer from <strong>{transferEnrollment.universities?.name}</strong> — <strong>{transferEnrollment.courses?.name}</strong> to a new university/course. The current enrollment will be marked as <strong>Transferred</strong> and preserved in history.
               </p>
+
+              {!isOwner && (
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription className="text-sm">
+                    {role === "agent"
+                      ? "An approval code will be sent to your admin. You'll need to enter it to confirm."
+                      : "An approval code will be sent to the owner. You'll need to enter it to confirm."}
+                  </AlertDescription>
+                </Alert>
+              )}
 
               <div className="space-y-3">
                 <div>
@@ -340,11 +420,40 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="outline" onClick={() => setTransferEnrollment(null)}>Cancel</Button>
                 <Button
-                  onClick={handleTransfer}
+                  onClick={isOwner ? handleOwnerTransfer : handleRequestCode}
                   disabled={!transferUniId || !transferCourseId || transferring}
                   className="bg-accent text-accent-foreground hover:bg-accent/90"
                 >
-                  {transferring ? "Transferring…" : "Transfer Student"}
+                  {transferring ? "Processing…" : isOwner ? "Transfer Student" : "Request Transfer"}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {transferEnrollment && transferStep === "code" && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                An approval code has been sent to your {role === "agent" ? "admin" : "owner"}. Enter the code below to complete the transfer.
+              </p>
+
+              <div>
+                <Label>Approval Code</Label>
+                <Input
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value.toUpperCase())}
+                  placeholder="Enter 6-character code"
+                  maxLength={6}
+                  className="font-mono text-center text-lg tracking-widest"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setTransferEnrollment(null)}>Cancel</Button>
+                <Button
+                  onClick={handleVerifyCode}
+                  disabled={verificationCode.length < 6 || verifying}
+                >
+                  {verifying ? "Verifying…" : "Confirm Transfer"}
                 </Button>
               </div>
             </div>
