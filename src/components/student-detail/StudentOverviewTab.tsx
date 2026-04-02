@@ -25,7 +25,7 @@ interface Props {
   canEdit: boolean;
 }
 
-export function StudentOverviewTab({ student, agentName, canEdit }: Props) {
+export function StudentOverviewTab({ student, agentName, adminName, canEdit }: Props) {
   const { toast } = useToast();
   const { role } = useAuth();
   const qc = useQueryClient();
