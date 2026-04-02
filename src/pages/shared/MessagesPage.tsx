@@ -18,13 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { usePresenceMap } from "@/contexts/PresenceContext";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { MentionTextarea } from "@/components/MentionTextarea";
-import { Badge } from "@/components/ui/badge";
-import { format, formatDistanceToNow } from "date-fns";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
-} from "@/components/ui/dialog";
-import { usePresenceMap } from "@/contexts/PresenceContext";
+
 
 export default function MessagesPage() {
   const { user, role } = useAuth();
