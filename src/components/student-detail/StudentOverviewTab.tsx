@@ -21,6 +21,7 @@ const STUDY_PATTERNS_FALLBACK = ["Weekdays", "Weekend", "Evenings"];
 interface Props {
   student: any;
   agentName: string;
+  adminName?: string;
   canEdit: boolean;
 }
 
