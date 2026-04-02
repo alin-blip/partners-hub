@@ -807,7 +807,20 @@ function AgentRow({
                                 {remaining > 0 ? `£${remaining.toLocaleString()}` : <span className="text-green-600">✓ Paid</span>}
                               </TableCell>
                               <TableCell>
-                                <div className="flex gap-1">
+                                <div className="flex gap-1 flex-wrap">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 text-xs"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const studentName = `${snap.enrollments?.students?.first_name} ${snap.enrollments?.students?.last_name}`;
+                                      onOverride(snap.id, rate, studentName);
+                                    }}
+                                  >
+                                    <Edit2 className="w-3 h-3 mr-1" />
+                                    Override
+                                  </Button>
                                   {remaining > 0 && (
                                     <Button
                                       size="sm"
