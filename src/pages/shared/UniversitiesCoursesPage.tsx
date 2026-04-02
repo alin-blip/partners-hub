@@ -396,13 +396,16 @@ export default function UniversitiesCoursesPage() {
                         {(() => {
                           const locs = courseCampusMap.get(course.id) || [];
                           if (locs.length === 0) return null;
-                          const display = locs.slice(0, 3).map((l) => l.city ? `${l.name} (${l.city})` : l.name).join(", ");
                           return (
-                            <div className="flex items-center gap-2">
-                              <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
-                              <span className="truncate">
-                                {display}{locs.length > 3 && ` +${locs.length - 3}`}
-                              </span>
+                            <div className="flex gap-2">
+                              <MapPin className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                              <ul className="space-y-0.5">
+                                {locs.map((l, i) => (
+                                  <li key={i} className="text-sm text-muted-foreground">
+                                    • {l.city ? `${l.name} (${l.city})` : l.name}
+                                  </li>
+                                ))}
+                              </ul>
                             </div>
                           );
                         })()}
