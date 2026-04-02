@@ -475,6 +475,65 @@ export default function CommissionsPage() {
               </Table>
             </div>
           </TabsContent>
+
+          <TabsContent value="course-fees" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Percent className="w-4 h-4" />
+                  Tuition Fee Commission % per Course
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Set what percentage of each course's tuition fees you receive as commission. Leave empty to use the default tier/custom rate.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-lg border bg-card">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>University</TableHead>
+                        <TableHead>Course</TableHead>
+                        <TableHead className="text-right">Tuition Fee</TableHead>
+                        <TableHead className="text-right w-[140px]">Fee %</TableHead>
+                        <TableHead className="text-right">Commission</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {courses.map((course: any) => {
+                        const feeStr = course.fees || "";
+                        const feeNum = parseFloat(feeStr.replace(/[^0-9.]/g, "")) || 0;
+                        const pct = course.tuition_fee_percentage;
+                        const commission = pct != null && feeNum > 0 ? Math.round(feeNum * pct / 100) : null;
+                        return (
+                          <TableRow key={course.id}>
+                            <TableCell className="text-sm">{course.universities?.name || "—"}</TableCell>
+                            <TableCell className="text-sm font-medium">{course.name}</TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">{feeNum > 0 ? `£${feeNum.toLocaleString()}` : "—"}</TableCell>
+                            <TableCell className="text-right">
+                              <CourseFeeInput
+                                courseId={course.id}
+                                currentValue={pct}
+                                onSave={(courseId, value) => updateCourseFeePercentage.mutate({ courseId, percentage: value })}
+                              />
+                            </TableCell>
+                            <TableCell className="text-right text-sm tabular-nums font-medium">
+                              {commission != null ? `£${commission.toLocaleString()}` : <span className="text-muted-foreground">—</span>}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      {courses.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">No courses found</TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
 
