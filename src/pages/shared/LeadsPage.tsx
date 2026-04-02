@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -17,9 +17,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Search, UserPlus, ArrowRight, Phone, Mail, StickyNote,
+  Search, UserPlus, ArrowRight, Phone, Mail, StickyNote, AlertTriangle, MessageSquare,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { format } from "date-fns";
 
 const STATUSES = ["new", "contacted", "qualified", "converted"] as const;
@@ -34,13 +35,15 @@ const statusConfig: Record<LeadStatus, { label: string; color: string }> = {
 
 export default function LeadsPage() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [convertLead, setConvertLead] = useState<any | null>(null);
   const [notesLead, setNotesLead] = useState<any | null>(null);
   const [notesText, setNotesText] = useState("");
+  const [duplicateError, setDuplicateError] = useState<{ lead: any; existingAgentName: string } | null>(null);
+  const [contactingAdmin, setContactingAdmin] = useState(false);
 
   const { data: leads = [], isLoading } = useQuery({
     queryKey: ["leads"],
@@ -54,7 +57,6 @@ export default function LeadsPage() {
     },
   });
 
-  // Fetch agent names for display
   const agentIds = [...new Set(leads.map((l: any) => l.agent_id))];
   const { data: agents = [] } = useQuery({
     queryKey: ["lead-agents", agentIds.join(",")],
@@ -104,6 +106,46 @@ export default function LeadsPage() {
 
   const convertToStudent = useMutation({
     mutationFn: async (lead: any) => {
+      // Duplicate check by email (case-insensitive)
+      const checks: PromiseLike<any>[] = [];
+
+      if (lead.email) {
+        checks.push(
+          supabase
+            .from("students")
+            .select("id, first_name, last_name, agent_id")
+            .ilike("email", lead.email)
+            .limit(1)
+            .then(r => r)
+        );
+      }
+
+      if (lead.phone) {
+        checks.push(
+          supabase
+            .from("students")
+            .select("id, first_name, last_name, agent_id")
+            .eq("phone", lead.phone)
+            .limit(1)
+            .then(r => r)
+        );
+      }
+
+      const results = await Promise.all(checks);
+      const duplicate = results.flatMap((r) => r.data || []).find((s) => s);
+
+      if (duplicate) {
+        // Get agent name of existing student
+        const { data: existingAgent } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("id", duplicate.agent_id)
+          .single();
+
+        throw new Error(`DUPLICATE:${existingAgent?.full_name || "Unknown agent"}`);
+      }
+
+      // No duplicate — proceed with conversion
       const { data: student, error: studentErr } = await supabase.from("students").insert({
         agent_id: lead.agent_id,
         first_name: lead.first_name,
@@ -140,8 +182,92 @@ export default function LeadsPage() {
       toast({ title: "Lead converted to student!" });
       setConvertLead(null);
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => {
+      if (e.message?.startsWith("DUPLICATE:")) {
+        const agentName = e.message.replace("DUPLICATE:", "");
+        setDuplicateError({ lead: convertLead, existingAgentName: agentName });
+        setConvertLead(null);
+      } else {
+        toast({ title: "Error", description: e.message, variant: "destructive" });
+      }
+    },
   });
+
+  const handleContactAdmin = async () => {
+    if (!duplicateError || !user) return;
+    setContactingAdmin(true);
+    try {
+      const lead = duplicateError.lead;
+
+      // Find agent's admin_id
+      const { data: myProfile } = await supabase
+        .from("profiles")
+        .select("admin_id")
+        .eq("id", user.id)
+        .single();
+
+      let adminId = myProfile?.admin_id;
+
+      // Fallback to owner if no admin_id
+      if (!adminId) {
+        const { data: ownerRole } = await supabase
+          .from("user_roles")
+          .select("user_id")
+          .eq("role", "owner")
+          .limit(1)
+          .single();
+        adminId = ownerRole?.user_id;
+      }
+
+      if (!adminId) {
+        toast({ title: "Error", description: "Could not find an admin to contact.", variant: "destructive" });
+        return;
+      }
+
+      // Find or create conversation
+      const { data: existingConvo } = await supabase
+        .from("direct_conversations")
+        .select("id")
+        .or(`and(participant_1.eq.${user.id},participant_2.eq.${adminId}),and(participant_1.eq.${adminId},participant_2.eq.${user.id})`)
+        .limit(1)
+        .maybeSingle();
+
+      let conversationId = existingConvo?.id;
+
+      if (!conversationId) {
+        const { data: newConvo, error: convoErr } = await supabase
+          .from("direct_conversations")
+          .insert({ participant_1: user.id, participant_2: adminId })
+          .select("id")
+          .single();
+        if (convoErr) throw convoErr;
+        conversationId = newConvo.id;
+      }
+
+      // Send automated message
+      const studentName = `${lead.first_name} ${lead.last_name}`;
+      const agentName = profile?.full_name || "An agent";
+      const contactInfo = [lead.email, lead.phone].filter(Boolean).join(", ");
+
+      const message = `⚠️ Duplicate student detected\n\nI tried to enrol ${studentName} (${contactInfo}) but they appear as a duplicate in the system.\n\nPlease guide me on how to proceed.\n\n— ${agentName}`;
+
+      const { error: msgErr } = await supabase
+        .from("direct_messages")
+        .insert({
+          conversation_id: conversationId,
+          sender_id: user.id,
+          content: message,
+        });
+      if (msgErr) throw msgErr;
+
+      toast({ title: "Message sent", description: "Your admin has been notified about the duplicate." });
+      setDuplicateError(null);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setContactingAdmin(false);
+    }
+  };
 
   const filtered = leads.filter((lead: any) => {
     const matchesSearch =
@@ -151,7 +277,6 @@ export default function LeadsPage() {
     return matchesSearch && matchesStatus;
   });
 
-  // Pipeline counts
   const counts = STATUSES.reduce((acc, s) => {
     acc[s] = leads.filter((l: any) => l.status === s).length;
     return acc;
@@ -346,6 +471,47 @@ export default function LeadsPage() {
             >
               <UserPlus className="w-4 h-4 mr-1" />
               {convertToStudent.isPending ? "Converting..." : "Convert to Student"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Duplicate detected dialog */}
+      <Dialog open={!!duplicateError} onOpenChange={() => setDuplicateError(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+              Duplicate Student Detected
+            </DialogTitle>
+            <DialogDescription>
+              A student with the same contact details already exists in the system.
+            </DialogDescription>
+          </DialogHeader>
+          {duplicateError && (
+            <div className="space-y-4 py-2">
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>This student already exists in the database</AlertTitle>
+                <AlertDescription>
+                  <strong>{duplicateError.lead.first_name} {duplicateError.lead.last_name}</strong> ({duplicateError.lead.email})
+                  is already registered and belongs to another agent: <strong>{duplicateError.existingAgentName}</strong>.
+                </AlertDescription>
+              </Alert>
+              <p className="text-sm text-muted-foreground">
+                Please contact your admin for guidance on how to proceed with this student.
+              </p>
+            </div>
+          )}
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setDuplicateError(null)}>Close</Button>
+            <Button
+              onClick={handleContactAdmin}
+              disabled={contactingAdmin}
+              className="bg-accent text-accent-foreground hover:bg-accent/90"
+            >
+              <MessageSquare className="w-4 h-4 mr-1" />
+              {contactingAdmin ? "Sending..." : "Contact Admin"}
             </Button>
           </DialogFooter>
         </DialogContent>
