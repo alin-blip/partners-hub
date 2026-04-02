@@ -67,10 +67,14 @@ Deno.serve(async (req) => {
   const token = authHeader.replace('Bearer ', '')
   const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token)
   if (claimsError || !claimsData?.claims) {
-    return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    // Allow service-role calls from other edge functions
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    if (token !== serviceKey) {
+      return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
   }
 
 
