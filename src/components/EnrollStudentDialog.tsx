@@ -102,6 +102,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
     setNokName(""); setNokPhone(""); setNokRelationship("");
     setDocFiles([]); setSelectedDocType("Passport");
     setConsentChecks({}); setMarketingChecks({...DEFAULT_MARKETING_CHECKS}); setConsentSignature(""); setSignatureDataUrl(null); setConsentPreviewUrl(null);
+    setDuplicateError(null);
   };
 
   const { data: universities = [] } = useQuery({
