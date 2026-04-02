@@ -1,46 +1,38 @@
 
 
-# Fix: Welcome emails not sending for new agents/admins
+# Enhanced Duplicate Student Detection with Admin Notification
 
-## Root Cause
+## What changes
 
-When `create-owner` edge function calls `send-transactional-email` internally via `supabaseAdmin.functions.invoke()`, it passes the **service role key** as the Authorization bearer token. But `send-transactional-email` validates that token using `authClient.auth.getClaims()` with the anon key client — which **rejects** the service role JWT, returning "Invalid or expired token".
+When an agent tries to enroll a student whose **email** or **phone** already exists in the system, the enrollment is blocked with a clear message and a "Contact Admin" button. Clicking that button automatically sends a direct message to the agent's admin (or owner if no admin) saying the agent has a duplicate student and needs assistance.
 
-This same bug also affects the `submit-public-application` function (confirmed in logs: `"Public lead notification failed {"error":"Invalid or expired token"}"`).
+## Technical plan
 
-Additionally, welcome emails are only sent for `role === "agent"` — no email is sent when creating an admin.
+### 1. Add phone to duplicate checks (both enrollment forms)
 
-## Changes
+Currently duplicates only check email and name+DOB. Add a phone check:
+- If `phone` is non-empty, query `students` where `phone = phone.trim()`
+- If found, throw a special error (e.g. prefix with `DUPLICATE:`) so the UI can distinguish it from regular errors
 
-### 1. Fix `send-transactional-email` to accept service role JWT (lines 63-74)
+**Files**: `src/components/EnrollStudentDialog.tsx` (lines ~260-269), `src/pages/agent/EnrollStudent.tsx` (lines ~253-262)
 
-Add a fallback: if `getClaims` fails, check if the token is the service role key itself (by comparing with `SUPABASE_SERVICE_ROLE_KEY` env var). This allows edge-to-edge function calls while keeping auth validation for client-side calls.
+### 2. Custom duplicate error UI with "Contact Admin" button
 
-```typescript
-const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token)
-if (claimsError || !claimsData?.claims) {
-  // Allow service-role calls from other edge functions
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  if (token !== serviceKey) {
-    return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
-}
-```
+In both `EnrollStudentDialog` and `EnrollStudent`:
+- Add a `duplicateError` state (`string | null`)
+- In the mutation's `onError`, check if `error.message` starts with `DUPLICATE:` — if so, set `duplicateError` instead of just showing a toast
+- Render an alert/card when `duplicateError` is set, showing the message + a "Contact Admin" button
+- The button triggers a function that:
+  1. Fetches the agent's `admin_id` from `profiles` table
+  2. If no `admin_id`, fetches the owner (from `user_roles` where `role = 'owner'`)
+  3. Creates or finds existing `direct_conversations` between agent and admin/owner
+  4. Inserts a `direct_messages` record: *"This agent has a student that shows as duplicate. Please check and contact the agent."*
+  5. Shows a success toast: "Message sent to admin"
 
-### 2. Send welcome email for admins too in `create-owner` (lines 189-211)
+### 3. Files to modify
 
-Change `if (role === "agent")` to `if (role === "agent" || role === "admin")` so admins also receive the welcome email. The existing `welcome-agent` template works for both — the text is generic enough ("Your agent account has been created" → we'll also create a `welcome-admin` template or reuse with adjusted wording).
+1. **`src/components/EnrollStudentDialog.tsx`** — add phone duplicate check, `duplicateError` state, alert UI with Contact Admin button
+2. **`src/pages/agent/EnrollStudent.tsx`** — same changes for the full-page enrollment form
 
-Actually, simplest approach: extend the condition and reuse the same template (it says "Welcome" and "Log in"). The template name stays `welcome-agent` but it works for admins too. Optionally rename later.
-
-### 3. Redeploy both edge functions
-
-Deploy `send-transactional-email` and `create-owner`.
-
-## Files modified
-1. `supabase/functions/send-transactional-email/index.ts` — accept service role JWT
-2. `supabase/functions/create-owner/index.ts` — send welcome email for admin role too
+No database or edge function changes needed — uses existing `direct_conversations` and `direct_messages` tables with existing RLS policies.
 
