@@ -17,9 +17,6 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { usePresenceMap } from "@/contexts/PresenceContext";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
-} from "@/components/ui/dialog";
 
 export default function MessagesPage() {
   const { user, role } = useAuth();
