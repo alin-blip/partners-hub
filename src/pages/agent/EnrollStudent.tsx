@@ -529,6 +529,30 @@ export default function EnrollStudent() {
           <h1 className="text-2xl font-bold tracking-tight">New Student Enrollment</h1>
         </div>
 
+        {duplicateError && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Duplicate Student Detected</AlertTitle>
+            <AlertDescription className="space-y-3">
+              <p>{duplicateError}</p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleContactAdmin}
+                  disabled={contactingAdmin}
+                >
+                  <MessageSquare className="w-4 h-4 mr-1" />
+                  {contactingAdmin ? "Sending..." : "Contact Admin"}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setDuplicateError(null)}>
+                  Dismiss
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Step indicator */}
         <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto">
           {[1, 2, 3, 4, 5, 6].map((s) => (
