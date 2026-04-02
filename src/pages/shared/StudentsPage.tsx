@@ -94,8 +94,8 @@ export default function StudentsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight">Students</h1>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Students</h1>
           <div className="flex items-center gap-2">
             {(role === "owner" || role === "admin") && (
               <Button variant="outline" size="sm" onClick={handleExport}>
@@ -120,7 +120,7 @@ export default function StudentsPage() {
             />
           </div>
           <Select value={immigrationFilter} onValueChange={(v) => { setImmigrationFilter(v); setPage(0); }}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Immigration" />
             </SelectTrigger>
             <SelectContent>
@@ -134,10 +134,10 @@ export default function StudentsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Immigration</TableHead>
-                <TableHead>Created</TableHead>
+                <TableHead className="hidden sm:table-cell">Email</TableHead>
+                <TableHead className="hidden md:table-cell">Phone</TableHead>
+                <TableHead className="hidden md:table-cell">Immigration</TableHead>
+                <TableHead className="hidden sm:table-cell">Created</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -167,10 +167,10 @@ export default function StudentsPage() {
                         )}
                       </span>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{s.email || "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">{s.phone || "—"}</TableCell>
-                    <TableCell>{s.immigration_status || "—"}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
+                    <TableCell className="hidden sm:table-cell text-muted-foreground">{s.email || "—"}</TableCell>
+                    <TableCell className="hidden md:table-cell text-muted-foreground">{s.phone || "—"}</TableCell>
+                    <TableCell className="hidden md:table-cell">{s.immigration_status || "—"}</TableCell>
+                    <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
                       {s.created_at ? format(new Date(s.created_at), "dd MMM yyyy") : "—"}
                     </TableCell>
                   </TableRow>

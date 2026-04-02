@@ -189,11 +189,11 @@ export default function AgentsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
+                <TableHead className="hidden sm:table-cell">Email</TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead>Online</TableHead>
+                <TableHead className="hidden md:table-cell">Online</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Joined</TableHead>
+                <TableHead className="hidden md:table-cell">Joined</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -201,7 +201,7 @@ export default function AgentsPage() {
               {profiles.map((p: any) => (
                 <TableRow key={p.id}>
                   <TableCell className="font-medium">{p.full_name}</TableCell>
-                  <TableCell className="text-muted-foreground">{p.email}</TableCell>
+                  <TableCell className="hidden sm:table-cell text-muted-foreground">{p.email}</TableCell>
                   <TableCell>
                     {(roleMap.get(p.id) as string) === "owner" ? (
                       <Badge variant="secondary" className="capitalize text-xs">owner</Badge>
@@ -221,7 +221,7 @@ export default function AgentsPage() {
                       </Select>
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden md:table-cell">
                     <div className="flex items-center gap-2">
                       <span className={`inline-block w-2.5 h-2.5 rounded-full ${presenceMap[p.id]?.is_online ? "bg-green-500" : "bg-muted-foreground/30"}`} />
                       <span className="text-xs text-muted-foreground">
@@ -238,7 +238,7 @@ export default function AgentsPage() {
                       {p.is_active ? "Active" : "Inactive"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
+                  <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
                     {format(new Date(p.created_at), "dd MMM yyyy")}
                   </TableCell>
                   <TableCell>

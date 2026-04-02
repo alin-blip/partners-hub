@@ -101,7 +101,7 @@ export function DashboardLayout({ children, allowedRoles }: DashboardLayoutProps
               <span className="text-sm font-medium">{profile?.full_name}</span>
             </div>
           </header>
-          <main className="flex-1 overflow-auto bg-background p-6">
+          <main className="flex-1 overflow-auto bg-background p-3 sm:p-6">
             {children}
           </main>
         </div>

@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Plus, MessageCircle, Search, Users, Shield, UserCheck } from "lucide-react";
+import { Send, Plus, MessageCircle, Search, Users, Shield, UserCheck, ArrowLeft } from "lucide-react";
 import { MentionTextarea } from "@/components/MentionTextarea";
 import { Badge } from "@/components/ui/badge";
 import { format, formatDistanceToNow } from "date-fns";
@@ -17,9 +17,12 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { usePresenceMap } from "@/contexts/PresenceContext";
+import { useIsMobile } from "@/hooks/use-mobile";
+
 
 export default function MessagesPage() {
   const { user, role } = useAuth();
+  const isMobile = useIsMobile();
   const presenceMap = usePresenceMap();
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -235,9 +238,9 @@ export default function MessagesPage() {
 
   return (
     <DashboardLayout>
-      <div className="flex h-[calc(100vh-6rem)] gap-0 border rounded-lg bg-card overflow-hidden">
+      <div className="flex h-[calc(100vh-5rem)] sm:h-[calc(100vh-6rem)] gap-0 border rounded-lg bg-card overflow-hidden">
         {/* Conversation list */}
-        <div className="w-80 border-r flex flex-col shrink-0">
+        <div className={`${isMobile && activeConvo ? "hidden" : "flex"} ${isMobile ? "w-full" : "w-80"} border-r flex-col shrink-0`}>
           <div className="p-3 border-b flex items-center justify-between">
             <h2 className="font-semibold text-sm">Messages</h2>
             <Dialog open={newConvoOpen} onOpenChange={setNewConvoOpen}>
@@ -369,7 +372,7 @@ export default function MessagesPage() {
         </div>
 
         {/* Message area */}
-        <div className="flex-1 flex flex-col">
+        <div className={`${isMobile && !activeConvo ? "hidden" : "flex"} flex-1 flex-col`}>
           {!activeConvo ? (
             <div className="flex-1 flex items-center justify-center text-muted-foreground">
               <div className="text-center">
@@ -385,6 +388,11 @@ export default function MessagesPage() {
                 const other = convo ? getOtherParticipant(convo) : null;
                 return (
                   <div className="p-3 border-b flex items-center gap-3">
+                    {isMobile && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setActiveConvo(null)}>
+                        <ArrowLeft className="w-4 h-4" />
+                      </Button>
+                    )}
                     <div className="relative">
                       <Avatar className="h-8 w-8">
                         <AvatarFallback className="text-xs bg-accent/20 text-accent">{getInitials(other?.full_name)}</AvatarFallback>

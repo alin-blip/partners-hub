@@ -160,13 +160,13 @@ export default function LeadsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight">Lead Management</h1>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Lead Management</h1>
           <Badge variant="outline" className="text-sm">{leads.length} total leads</Badge>
         </div>
 
         {/* Pipeline summary */}
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {STATUSES.map((status) => (
             <Card
               key={status}
@@ -182,8 +182,8 @@ export default function LeadsPage() {
         </div>
 
         {/* Filters */}
-        <div className="flex gap-3">
-          <div className="relative flex-1 max-w-sm">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1 sm:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search leads..."
@@ -193,7 +193,7 @@ export default function LeadsPage() {
             />
           </div>
           <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger className="w-full sm:w-[160px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -212,11 +212,11 @@ export default function LeadsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Nationality</TableHead>
-                  <TableHead>Interest</TableHead>
-                  <TableHead>Agent</TableHead>
-                  <TableHead>Date</TableHead>
+                  <TableHead className="hidden sm:table-cell">Contact</TableHead>
+                  <TableHead className="hidden md:table-cell">Nationality</TableHead>
+                  <TableHead className="hidden lg:table-cell">Interest</TableHead>
+                  <TableHead className="hidden md:table-cell">Agent</TableHead>
+                  <TableHead className="hidden sm:table-cell">Date</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -247,7 +247,7 @@ export default function LeadsPage() {
                         <TableCell className="font-medium">
                           {lead.first_name} {lead.last_name}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden sm:table-cell">
                           <div className="flex flex-col gap-0.5 text-xs">
                             {lead.email && (
                               <a href={`mailto:${lead.email}`} className="flex items-center gap-1 text-muted-foreground hover:text-accent">
@@ -261,10 +261,10 @@ export default function LeadsPage() {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="text-sm">{lead.nationality || "—"}</TableCell>
-                        <TableCell className="text-sm max-w-[140px] truncate">{lead.course_interest || "—"}</TableCell>
-                        <TableCell className="text-sm">{agentMap[lead.agent_id] || "—"}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
+                        <TableCell className="hidden md:table-cell text-sm">{lead.nationality || "—"}</TableCell>
+                        <TableCell className="hidden lg:table-cell text-sm max-w-[140px] truncate">{lead.course_interest || "—"}</TableCell>
+                        <TableCell className="hidden md:table-cell text-sm">{agentMap[lead.agent_id] || "—"}</TableCell>
+                        <TableCell className="hidden sm:table-cell text-xs text-muted-foreground">
                           {format(new Date(lead.created_at), "dd MMM yyyy")}
                         </TableCell>
                         <TableCell>
@@ -273,7 +273,7 @@ export default function LeadsPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
+                          <div className="flex items-center justify-end gap-1 flex-wrap">
                             <Button
                               variant="ghost"
                               size="sm"
