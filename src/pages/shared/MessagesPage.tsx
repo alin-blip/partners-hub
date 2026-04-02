@@ -111,7 +111,11 @@ export default function MessagesPage() {
       .from("direct_messages")
       .update({ read_at: new Date().toISOString() } as any)
       .in("id", ids)
-      .then(() => qc.invalidateQueries({ queryKey: ["direct-conversations"] }));
+      .then(() => {
+        qc.invalidateQueries({ queryKey: ["direct-conversations"] });
+        qc.invalidateQueries({ queryKey: ["unread-messages-count"] });
+        qc.invalidateQueries({ queryKey: ["notifications-bell"] });
+      });
   }, [activeConvo, messages, user]);
 
   // Scroll to bottom on new messages
