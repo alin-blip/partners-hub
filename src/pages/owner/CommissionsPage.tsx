@@ -596,6 +596,68 @@ export default function CommissionsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Override Commission Dialog */}
+      <Dialog open={!!overrideDialog} onOpenChange={(open) => { if (!open) { setOverrideDialog(null); setOverrideAmount(""); setOverridePercentage(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Override Commission — {overrideDialog?.studentName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Current rate: £{overrideDialog?.currentRate?.toLocaleString()}. Set a custom amount or percentage.
+            </p>
+            <div>
+              <Label>Fixed Amount (£)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={overrideAmount}
+                onChange={(e) => {
+                  setOverrideAmount(e.target.value);
+                  setOverridePercentage("");
+                }}
+                placeholder="e.g. 750"
+              />
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span className="flex-1 border-t" /> or <span className="flex-1 border-t" />
+            </div>
+            <div>
+              <Label>Percentage of tuition fee (%)</Label>
+              <Input
+                type="number"
+                step="0.1"
+                value={overridePercentage}
+                onChange={(e) => {
+                  setOverridePercentage(e.target.value);
+                  setOverrideAmount("");
+                }}
+                placeholder="e.g. 15"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Will calculate from the course's tuition fee if available</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setOverrideDialog(null); setOverrideAmount(""); setOverridePercentage(""); }}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (!overrideDialog) return;
+                const amt = overrideAmount ? Number(overrideAmount) : null;
+                const pct = overridePercentage ? Number(overridePercentage) : null;
+                overrideSnapshotCommission.mutate({
+                  id: overrideDialog.snapshotId,
+                  override_amount: amt,
+                  override_percentage: pct,
+                });
+              }}
+              disabled={!overrideAmount && !overridePercentage}
+            >
+              Save Override
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
