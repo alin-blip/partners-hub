@@ -1,60 +1,32 @@
 
+# Fix: Add Student button visible on mobile dashboard
 
-# Plan: Mobile Optimization for All Pages and Forms
+The "New Student Enrollment" button is inside a `flex items-center justify-between` row with the title, but on small screens the long text and layout can push it off-screen or make it hard to tap.
 
-## Problem
-Most users access the platform from their phone. Currently, many pages use fixed-width layouts, multi-column grids, and desktop-oriented components that don't adapt well on small screens.
+## Change
 
-## Changes
+**File**: `src/pages/agent/AgentDashboard.tsx` (lines 123-147)
 
-### 1. DashboardLayout — Mobile padding + header
-- Reduce main padding from `p-6` to `p-4 sm:p-6`
-- Make header more compact on mobile
+- Make the header row wrap on mobile: `flex flex-col sm:flex-row items-start sm:items-center`
+- Shorten button text on mobile: show "+" icon only or "+ Add Student" instead of "+ New Student Enrollment"
+- Ensure the button is full-width on mobile for easy tapping
 
-### 2. MessagesPage — Mobile chat view
-- Currently: fixed `w-80` sidebar + message area side-by-side — breaks on mobile
-- Fix: On mobile, show conversation list full-width. When a conversation is selected, show only the message area with a back button. Toggle between the two views
-- Chat input area: make it sticky at the bottom, properly sized for touch
+```tsx
+<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+  <div className="flex items-center gap-3">
+    <h1 className="text-xl sm:text-2xl font-bold tracking-tight">My Dashboard</h1>
+    <Button variant="ghost" size="sm" ...>
+      <HelpCircle className="h-4 w-4 mr-1" /> Tour
+    </Button>
+  </div>
+  <div data-onboarding="step-new-student" className="w-full sm:w-auto">
+    <Button className="w-full sm:w-auto bg-accent ..." onClick={...}>
+      <Plus className="w-4 h-4 mr-1" />
+      <span className="sm:hidden">Add Student</span>
+      <span className="hidden sm:inline">New Student Enrollment</span>
+    </Button>
+  </div>
+</div>
+```
 
-### 3. EnrollStudentDialog — Responsive form grids
-- Change `grid-cols-3` to `grid-cols-1 sm:grid-cols-3` (Title/First/Last name)
-- Change all `grid-cols-2` to `grid-cols-1 sm:grid-cols-2`
-- Step indicator: make circles smaller on mobile (`w-6 h-6` vs `w-8 h-8`)
-
-### 4. EnrollStudent page — Same grid fixes
-- Same grid responsive changes as the dialog
-- All `grid-cols-2` → `grid-cols-1 sm:grid-cols-2`
-- All `grid-cols-3` → `grid-cols-1 sm:grid-cols-3`
-
-### 5. StudentsPage — Responsive table
-- On mobile: hide Phone and Immigration columns, keep Name/Email/Created
-- Make action buttons stack or wrap
-- Search + filter: stack vertically on mobile (already uses `flex-col sm:flex-row`)
-
-### 6. LeadsPage — Responsive table
-- Hide less important columns on mobile
-- Wrap header actions
-
-### 7. AgentsPage — Responsive table
-- Hide Online/Joined columns on mobile, keep Name/Role/Status/Actions
-
-### 8. OwnerDashboard — Metric cards + charts
-- Metric cards grid: ensure `grid-cols-2` on mobile (already likely works)
-- Charts: ensure `ResponsiveContainer` fills properly
-
-### 9. Global CSS touch improvements
-- Add touch-friendly tap targets (min 44px height for buttons/rows)
-- Ensure select triggers and inputs have adequate height on mobile
-
-## Files modified
-1. `src/components/DashboardLayout.tsx` — mobile padding
-2. `src/pages/shared/MessagesPage.tsx` — mobile chat toggle view
-3. `src/components/EnrollStudentDialog.tsx` — responsive grids
-4. `src/pages/agent/EnrollStudent.tsx` — responsive grids
-5. `src/pages/shared/StudentsPage.tsx` — hide columns on mobile
-6. `src/pages/shared/LeadsPage.tsx` — hide columns on mobile
-7. `src/pages/owner/AgentsPage.tsx` — hide columns on mobile
-8. `src/index.css` — touch target improvements
-
-The most impactful change is the MessagesPage mobile view, since chat is impossible to use on phone with the current side-by-side layout.
-
+Single file edit, ~5 lines changed.
