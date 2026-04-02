@@ -342,16 +342,22 @@ export default function MessagesPage() {
                         <Avatar className="h-9 w-9">
                           <AvatarFallback className="text-xs bg-accent/20 text-accent">{getInitials(other?.full_name)}</AvatarFallback>
                         </Avatar>
-                        {unread > 0 && (
+                        {presenceMap[other?.id]?.is_online ? (
+                          <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-card" />
+                        ) : unread > 0 ? (
                           <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1">
                             {unread > 99 ? "99+" : unread}
                           </span>
-                        )}
+                        ) : null}
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className={`text-sm truncate ${unread > 0 ? "font-semibold" : "font-medium"}`}>{other?.full_name || "Unknown"}</p>
                         <p className="text-xs text-muted-foreground">
-                          {format(new Date(convo.updated_at), "dd MMM, HH:mm")}
+                          {presenceMap[other?.id]?.is_online
+                            ? "Online"
+                            : presenceMap[other?.id]?.last_seen_at
+                              ? `Active ${formatDistanceToNow(new Date(presenceMap[other?.id].last_seen_at), { addSuffix: true })}`
+                              : format(new Date(convo.updated_at), "dd MMM, HH:mm")}
                         </p>
                       </div>
                     </button>
