@@ -136,6 +136,7 @@ export default function MessagesPage() {
       .then(() => {
         qc.invalidateQueries({ queryKey: ["direct-conversations"] });
         qc.invalidateQueries({ queryKey: ["unread-messages-count"] });
+        qc.invalidateQueries({ queryKey: ["unread-per-convo"] });
         qc.invalidateQueries({ queryKey: ["notifications-bell"] });
       });
   }, [activeConvo, messages, user]);
