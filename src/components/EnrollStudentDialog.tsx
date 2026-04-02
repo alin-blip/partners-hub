@@ -479,7 +479,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Next of Kin Details</h3>
             <div className="space-y-2"><Label>Full Name</Label><Input value={nokName} onChange={(e) => setNokName(e.target.value)} placeholder="Full name" /></div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2"><Label>Telephone</Label><Input value={nokPhone} onChange={(e) => setNokPhone(e.target.value)} placeholder="+44..." /></div>
               <div className="space-y-2"><Label>Relationship</Label><Select value={nokRelationship} onValueChange={setNokRelationship}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{RELATIONSHIP_OPTIONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent></Select></div>
             </div>

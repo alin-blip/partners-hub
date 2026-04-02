@@ -388,6 +388,11 @@ export default function MessagesPage() {
                 const other = convo ? getOtherParticipant(convo) : null;
                 return (
                   <div className="p-3 border-b flex items-center gap-3">
+                    {isMobile && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setActiveConvo(null)}>
+                        <ArrowLeft className="w-4 h-4" />
+                      </Button>
+                    )}
                     <div className="relative">
                       <Avatar className="h-8 w-8">
                         <AvatarFallback className="text-xs bg-accent/20 text-accent">{getInitials(other?.full_name)}</AvatarFallback>
