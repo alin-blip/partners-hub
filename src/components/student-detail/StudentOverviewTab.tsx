@@ -306,6 +306,9 @@ export function StudentOverviewTab({ student, agentName, adminName, canEdit }: P
                   </div>
                 )}
               </div>
+              {adminName && (
+                <div><p className="text-muted-foreground text-xs mb-0.5">Admin</p><p className="font-medium">{adminName || "—"}</p></div>
+              )}
               <div><p className="text-muted-foreground text-xs mb-0.5">Created</p><p className="font-medium">{format(new Date(student.created_at), "dd MMM yyyy")}</p></div>
               {student.notes && <div className="col-span-full"><p className="text-muted-foreground text-xs mb-0.5">Notes</p><p className="font-medium whitespace-pre-wrap">{student.notes}</p></div>}
             </div>

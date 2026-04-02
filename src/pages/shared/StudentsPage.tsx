@@ -210,7 +210,7 @@ export default function StudentsPage() {
               })}
               {students.length === 0 && !isLoading && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                     No students found
                   </TableCell>
                 </TableRow>

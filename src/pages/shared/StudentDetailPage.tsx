@@ -144,7 +144,7 @@ export default function StudentDetailPage() {
           </TabsList>
 
           <TabsContent value="overview">
-            <StudentOverviewTab student={student} agentName={agentProfile?.full_name || ""} canEdit={canEdit} />
+            <StudentOverviewTab student={student} agentName={agentProfile?.full_name || ""} adminName={adminProfile?.full_name || ""} canEdit={canEdit} />
           </TabsContent>
 
           <TabsContent value="documents">
