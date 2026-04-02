@@ -120,9 +120,9 @@ export default function AgentDashboard() {
           <CommissionOfferCards />
         </div>
 
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight">My Dashboard</h1>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">My Dashboard</h1>
             <Button
               variant="ghost"
               size="sm"
@@ -136,12 +136,14 @@ export default function AgentDashboard() {
               Tour
             </Button>
           </div>
-          <div data-onboarding="step-new-student">
+          <div data-onboarding="step-new-student" className="w-full sm:w-auto">
             <Button
-              className="bg-accent text-accent-foreground hover:bg-accent/90 active:scale-[0.98] transition-all"
+              className="w-full sm:w-auto bg-accent text-accent-foreground hover:bg-accent/90 active:scale-[0.98] transition-all"
               onClick={() => navigate("/agent/enroll")}
             >
-              + New Student Enrollment
+              <Plus className="w-4 h-4 mr-1" />
+              <span className="sm:hidden">Add Student</span>
+              <span className="hidden sm:inline">New Student Enrollment</span>
             </Button>
           </div>
         </div>
