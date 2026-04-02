@@ -120,5 +120,6 @@ export function DashboardLayout({ children, allowedRoles }: DashboardLayoutProps
         )}
       </div>
     </SidebarProvider>
+    </PresenceProvider>
   );
 }
