@@ -250,6 +250,31 @@ export default function EnrollStudent() {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
+      // Duplicate check by email
+      if (email.trim()) {
+        const { data: existingByEmail } = await supabase
+          .from("students")
+          .select("id")
+          .ilike("email", email.trim())
+          .limit(1);
+        if (existingByEmail?.length) {
+          throw new Error("A student with this email already exists in the system. Please contact your admin or owner.");
+        }
+      }
+      // Duplicate check by name + DOB
+      if (firstName.trim() && lastName.trim() && dob) {
+        const { data: existingByName } = await supabase
+          .from("students")
+          .select("id")
+          .ilike("first_name", firstName.trim())
+          .ilike("last_name", lastName.trim())
+          .eq("date_of_birth", dob)
+          .limit(1);
+        if (existingByName?.length) {
+          throw new Error("A student with this name and date of birth already exists in the system. Please contact your admin or owner.");
+        }
+      }
+
       const { data: student, error: studentError } = await supabase
         .from("students")
         .insert({
