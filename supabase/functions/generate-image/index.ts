@@ -75,7 +75,12 @@ serve(async (req) => {
     const presetText = presetInstructions[preset] || presetInstructions.social_post;
 
     // Build prompt
-    let fullPrompt = `${presetText}\n\nContent/Theme: ${prompt}\n\nIMPORTANT: Do NOT include any specific university names in the image text. Only use general course names or fields of study.`;
+    let fullPrompt = `${presetText}\n\nCreative Brief: ${prompt}\n\nCRITICAL TEXT RULES:
+- The user's input above is a CREATIVE BRIEF describing the theme/topic. It is NOT text to display on the image.
+- Do NOT copy, echo, or reproduce the user's prompt text on the image.
+- Instead, create your OWN short, professional, eye-catching marketing text that fits the theme.
+- If the brief is in Romanian or another language, create text in that same language but make it professional and concise (e.g. a catchy headline, not the raw brief).
+- Do NOT include any specific university names in the image text. Only use general course names or fields of study.`;
 
     if (brand?.brand_prompt) {
       fullPrompt += `\n\nBrand Guidelines: ${brand.brand_prompt}`;
