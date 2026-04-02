@@ -385,10 +385,24 @@ export default function MessagesPage() {
                 const other = convo ? getOtherParticipant(convo) : null;
                 return (
                   <div className="p-3 border-b flex items-center gap-3">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="text-xs bg-accent/20 text-accent">{getInitials(other?.full_name)}</AvatarFallback>
-                    </Avatar>
-                    <p className="font-medium text-sm">{other?.full_name || "Unknown"}</p>
+                    <div className="relative">
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="text-xs bg-accent/20 text-accent">{getInitials(other?.full_name)}</AvatarFallback>
+                      </Avatar>
+                      {presenceMap[other?.id]?.is_online && (
+                        <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-card" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">{other?.full_name || "Unknown"}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {presenceMap[other?.id]?.is_online
+                          ? "Online"
+                          : presenceMap[other?.id]?.last_seen_at
+                            ? `Active ${formatDistanceToNow(new Date(presenceMap[other?.id].last_seen_at), { addSuffix: true })}`
+                            : "Offline"}
+                      </p>
+                    </div>
                   </div>
                 );
               })()}
