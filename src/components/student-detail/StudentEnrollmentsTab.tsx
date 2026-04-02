@@ -191,9 +191,9 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
         <CardContent className="p-0">
           {!hasSignedConsent && canChangeStatus && (
             <div className="px-4 pt-3">
-              <Alert className="border-yellow-500/50 bg-yellow-500/10">
-                <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                <AlertDescription className="text-sm text-yellow-700">
+              <Alert className="border-destructive/50 bg-destructive/10">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                <AlertDescription className="text-sm text-destructive">
                   Consent form must be signed before the status can progress beyond <strong>Applied</strong>.
                 </AlertDescription>
               </Alert>
