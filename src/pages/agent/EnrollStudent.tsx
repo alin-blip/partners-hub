@@ -450,19 +450,19 @@ export default function EnrollStudent() {
         </div>
 
         {/* Step indicator */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto">
           {[1, 2, 3, 4, 5, 6].map((s) => (
-            <div key={s} className="flex items-center gap-2">
+            <div key={s} className="flex items-center gap-1 sm:gap-2">
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
+                className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium transition-colors ${
                   s === step ? "bg-accent text-accent-foreground"
                     : s < step ? "bg-accent/20 text-accent"
                     : "bg-muted text-muted-foreground"
                 }`}
               >
-                {s < step ? <Check className="w-4 h-4" /> : s}
+                {s < step ? <Check className="w-3 h-3 sm:w-4 sm:h-4" /> : s}
               </div>
-              {s < totalSteps && <div className={`w-8 h-0.5 ${s < step ? "bg-accent" : "bg-muted"}`} />}
+              {s < totalSteps && <div className={`w-4 sm:w-8 h-0.5 ${s < step ? "bg-accent" : "bg-muted"}`} />}
             </div>
           ))}
         </div>
