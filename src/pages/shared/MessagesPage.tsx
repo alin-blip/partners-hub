@@ -40,6 +40,28 @@ export default function MessagesPage() {
     },
   });
 
+  // Fetch unread counts per conversation
+  const { data: unreadMap = {} } = useQuery({
+    queryKey: ["unread-per-convo", user?.id],
+    queryFn: async () => {
+      if (!user || conversations.length === 0) return {};
+      const convoIds = conversations.map((c: any) => c.id);
+      const { data, error } = await supabase
+        .from("direct_messages")
+        .select("id, conversation_id")
+        .in("conversation_id", convoIds)
+        .neq("sender_id", user.id)
+        .is("read_at", null);
+      if (error) return {};
+      const counts: Record<string, number> = {};
+      for (const msg of data || []) {
+        counts[msg.conversation_id] = (counts[msg.conversation_id] || 0) + 1;
+      }
+      return counts;
+    },
+    enabled: !!user && conversations.length > 0,
+  });
+
   // Fetch messages for active conversation
   const { data: messages = [] } = useQuery({
     queryKey: ["direct-messages", activeConvo],
@@ -114,6 +136,7 @@ export default function MessagesPage() {
       .then(() => {
         qc.invalidateQueries({ queryKey: ["direct-conversations"] });
         qc.invalidateQueries({ queryKey: ["unread-messages-count"] });
+        qc.invalidateQueries({ queryKey: ["unread-per-convo"] });
         qc.invalidateQueries({ queryKey: ["notifications-bell"] });
       });
   }, [activeConvo, messages, user]);
@@ -184,10 +207,8 @@ export default function MessagesPage() {
     return convo.p1;
   };
 
-  const getUnreadCount = (convo: any) => {
-    // We'd need a separate query for unread counts, but for simplicity
-    // we'll just check the messages array when it's the active convo
-    return 0;
+  const getUnreadForConvo = (convoId: string) => {
+    return (unreadMap as Record<string, number>)[convoId] || 0;
   };
 
   // Render @mentions as highlighted spans
@@ -306,6 +327,7 @@ export default function MessagesPage() {
                 {conversations.map((convo: any) => {
                   const other = getOtherParticipant(convo);
                   const isActive = activeConvo === convo.id;
+                  const unread = getUnreadForConvo(convo.id);
                   return (
                     <button
                       key={convo.id}
@@ -314,11 +336,18 @@ export default function MessagesPage() {
                         isActive ? "bg-accent/10" : "hover:bg-muted/50"
                       }`}
                     >
-                      <Avatar className="h-9 w-9 shrink-0">
-                        <AvatarFallback className="text-xs bg-accent/20 text-accent">{getInitials(other?.full_name)}</AvatarFallback>
-                      </Avatar>
+                      <div className="relative shrink-0">
+                        <Avatar className="h-9 w-9">
+                          <AvatarFallback className="text-xs bg-accent/20 text-accent">{getInitials(other?.full_name)}</AvatarFallback>
+                        </Avatar>
+                        {unread > 0 && (
+                          <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1">
+                            {unread > 99 ? "99+" : unread}
+                          </span>
+                        )}
+                      </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{other?.full_name || "Unknown"}</p>
+                        <p className={`text-sm truncate ${unread > 0 ? "font-semibold" : "font-medium"}`}>{other?.full_name || "Unknown"}</p>
                         <p className="text-xs text-muted-foreground">
                           {format(new Date(convo.updated_at), "dd MMM, HH:mm")}
                         </p>
