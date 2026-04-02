@@ -187,6 +187,7 @@ export default function EnrollmentsPage() {
                   onClick={() => navigate(`${prefix}/students/${e.student_id}`)}
                 >
                   <TableCell className="font-medium">{e.students?.first_name} {e.students?.last_name}</TableCell>
+                  <TableCell className="hidden lg:table-cell text-muted-foreground">{(enrollmentAgentProfiles as any)[e.students?.agent_id] || "—"}</TableCell>
                   <TableCell>{e.universities?.name}</TableCell>
                   <TableCell>{e.courses?.name}</TableCell>
                   <TableCell onClick={(ev) => ev.stopPropagation()}>
