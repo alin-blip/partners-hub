@@ -221,7 +221,7 @@ export default function AgentsPage() {
                       </Select>
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden md:table-cell">
                     <div className="flex items-center gap-2">
                       <span className={`inline-block w-2.5 h-2.5 rounded-full ${presenceMap[p.id]?.is_online ? "bg-green-500" : "bg-muted-foreground/30"}`} />
                       <span className="text-xs text-muted-foreground">
