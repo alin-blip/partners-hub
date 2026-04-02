@@ -3,16 +3,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Users, UserCheck, ClipboardList, PoundSterling, TrendingUp, Target } from "lucide-react";
+import { Users, UserCheck, ClipboardList, PoundSterling, TrendingUp, Target, Trophy } from "lucide-react";
 import { calcCommission } from "@/lib/commissions";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { format } from "date-fns";
+import { Progress } from "@/components/ui/progress";
+import { format, subMonths, startOfMonth } from "date-fns";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer,
 } from "recharts";
 import {
   ChartContainer, ChartTooltipContent, ChartConfig,
@@ -21,15 +23,49 @@ import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { PromoBanner } from "@/components/PromoBanner";
 import { EmailLogSection } from "@/components/EmailLogSection";
 import { DashboardSearchCard } from "@/components/DashboardSearchCard";
 
-const chartConfig: ChartConfig = {
+const teamChartConfig: ChartConfig = {
   students: { label: "Students", color: "hsl(var(--primary))" },
   enrollments: { label: "Enrollments", color: "hsl(var(--accent))" },
-  commission: { label: "Commission (£)", color: "hsl(142 71% 45%)" },
+};
+
+const pipelineChartConfig: ChartConfig = {
+  count: { label: "Enrollments", color: "hsl(var(--primary))" },
+};
+
+const trendChartConfig: ChartConfig = {
+  count: { label: "New Enrollments", color: "hsl(var(--primary))" },
+};
+
+const DONUT_COLORS = [
+  "hsl(var(--primary))",
+  "hsl(var(--accent))",
+  "hsl(142 71% 45%)",
+  "hsl(38 92% 50%)",
+  "hsl(280 65% 60%)",
+  "hsl(200 80% 50%)",
+  "hsl(350 80% 55%)",
+  "hsl(170 60% 45%)",
+];
+
+const PIPELINE_STATUSES = [
+  "applied", "documents_pending", "processing", "offer_received",
+  "accepted", "funding", "enrolled", "active",
+];
+
+const STATUS_LABELS: Record<string, string> = {
+  applied: "Applied",
+  documents_pending: "Docs Pending",
+  processing: "Processing",
+  offer_received: "Offer Received",
+  accepted: "Accepted",
+  funding: "Funding",
+  enrolled: "Enrolled",
+  active: "Active",
 };
 
 export default function OwnerDashboard() {
@@ -43,13 +79,12 @@ export default function OwnerDashboard() {
     },
   });
 
-  // Revenue from commission snapshots
   const { data: snapshots = [] } = useQuery({
     queryKey: ["owner-revenue-snapshots"],
     queryFn: async () => {
       const { data } = await supabase
         .from("commission_snapshots")
-        .select("id, agent_rate, admin_rate, override_amount, snapshot_status");
+        .select("id, agent_rate, admin_rate, override_amount, snapshot_status, enrollment_id, university_id");
       return (data || []) as any[];
     },
   });
@@ -97,7 +132,15 @@ export default function OwnerDashboard() {
     queryFn: async () => {
       const { data } = await supabase
         .from("enrollments")
-        .select("id, status, student_id");
+        .select("id, status, student_id, created_at, university_id");
+      return data || [];
+    },
+  });
+
+  const { data: universities = [] } = useQuery({
+    queryKey: ["owner-universities"],
+    queryFn: async () => {
+      const { data } = await supabase.from("universities").select("id, name");
       return data || [];
     },
   });
@@ -133,10 +176,8 @@ export default function OwnerDashboard() {
   const agents = profiles.filter((p: any) => roleMap.get(p.id) === "agent");
   const activeAgents = agents.filter((a: any) => a.is_active);
 
-  // Build student-to-agent map
   const studentAgentMap = new Map(students.map((s: any) => [s.id, s.agent_id]));
 
-  // Count active enrollments per agent
   const agentActiveEnrollments = new Map<string, number>();
   const agentTotalEnrollments = new Map<string, number>();
   for (const e of allEnrollments) {
@@ -149,21 +190,17 @@ export default function OwnerDashboard() {
     }
   }
 
-  // Count students per agent
   const agentStudentCounts = new Map<string, number>();
   for (const s of students) {
     agentStudentCounts.set(s.agent_id, (agentStudentCounts.get(s.agent_id) || 0) + 1);
   }
 
-  // Pipeline
   const pipelineCount = allEnrollments.filter((e: any) => !["active", "rejected"].includes(e.status)).length;
 
-  // Lead-to-enrollment conversion
   const totalLeads = leads.length;
   const convertedLeads = leads.filter((l: any) => l.status === "converted").length;
   const conversionRate = totalLeads > 0 ? Math.round((convertedLeads / totalLeads) * 100) : 0;
 
-  // Leads per agent
   const agentLeadCounts = new Map<string, number>();
   for (const l of leads) {
     agentLeadCounts.set((l as any).agent_id, (agentLeadCounts.get((l as any).agent_id) || 0) + 1);
@@ -173,21 +210,79 @@ export default function OwnerDashboard() {
     agentConvertedLeads.set((l as any).agent_id, (agentConvertedLeads.get((l as any).agent_id) || 0) + 1);
   }
 
-  // Total revenue from snapshots (actual locked-in commissions)
   const totalSnapshotRevenue = snapshots.reduce((sum: number, s: any) => {
     const effectiveRate = s.override_amount != null ? Number(s.override_amount) : Number(s.agent_rate);
     return sum + effectiveRate + Number(s.admin_rate);
   }, 0);
   const totalPaidOut = snapshotPayments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
 
-  // Estimated revenue (old method as fallback for agents without snapshots)
   const totalRevenue = activeAgents.reduce((sum: number, agent: any) => {
     const count = agentActiveEnrollments.get(agent.id) || 0;
     const { amount } = calcCommission(count, tiers);
     return sum + amount;
   }, 0);
 
-  // Build hierarchical data: admins → agents
+  // === NEW: Pipeline data ===
+  const pipelineData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const status of PIPELINE_STATUSES) counts[status] = 0;
+    for (const e of allEnrollments) {
+      if (PIPELINE_STATUSES.includes(e.status)) {
+        counts[e.status] = (counts[e.status] || 0) + 1;
+      }
+    }
+    return PIPELINE_STATUSES.map((s) => ({
+      status: STATUS_LABELS[s] || s,
+      count: counts[s],
+    }));
+  }, [allEnrollments]);
+
+  // === NEW: Monthly trend (last 6 months) ===
+  const monthlyTrendData = useMemo(() => {
+    const now = new Date();
+    const months: { key: string; label: string; count: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = subMonths(now, i);
+      const key = format(startOfMonth(d), "yyyy-MM");
+      months.push({ key, label: format(d, "MMM yyyy"), count: 0 });
+    }
+    for (const e of allEnrollments) {
+      const key = (e as any).created_at?.substring(0, 7);
+      const m = months.find((m) => m.key === key);
+      if (m) m.count++;
+    }
+    return months;
+  }, [allEnrollments]);
+
+  // === NEW: Revenue per university ===
+  const uniMap = useMemo(() => new Map(universities.map((u: any) => [u.id, u.name])), [universities]);
+  const revenueByUni = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const s of snapshots) {
+      const uniName = uniMap.get(s.university_id) || "Unknown";
+      const effectiveRate = s.override_amount != null ? Number(s.override_amount) : Number(s.agent_rate);
+      const total = effectiveRate + Number(s.admin_rate);
+      map.set(uniName, (map.get(uniName) || 0) + total);
+    }
+    return Array.from(map.entries())
+      .map(([name, value]) => ({ name, value: Math.round(value) }))
+      .sort((a, b) => b.value - a.value);
+  }, [snapshots, uniMap]);
+
+  // === NEW: Top 5 agents leaderboard ===
+  const topAgents = useMemo(() => {
+    const agentList = agents.map((a: any) => ({
+      name: a.full_name || a.email,
+      enrollments: agentTotalEnrollments.get(a.id) || 0,
+      active: agentActiveEnrollments.get(a.id) || 0,
+    }));
+    agentList.sort((a, b) => b.enrollments - a.enrollments);
+    return agentList.slice(0, 5);
+  }, [agents, agentTotalEnrollments, agentActiveEnrollments]);
+
+  const maxTopEnrollments = topAgents.length > 0 ? Math.max(topAgents[0]?.enrollments, 1) : 1;
+
+  // Build hierarchical data
   const unassignedAgents = agents.filter((a: any) => !a.admin_id);
 
   const buildAgentData = (agentList: any[]) =>
@@ -234,12 +329,11 @@ export default function OwnerDashboard() {
     });
   };
 
-  // Summary chart data for all admins
+  // Summary chart — NO commission, only students vs enrollments
   const summaryChartData = adminChartData.map((a) => ({
     name: a.admin.full_name || a.admin.email,
     students: a.totalStudents,
     enrollments: a.totalEnrollments,
-    commission: a.totalCommission,
   }));
 
   if (unassignedAgents.length > 0) {
@@ -248,7 +342,6 @@ export default function OwnerDashboard() {
       name: "Unassigned",
       students: unassignedData.reduce((s, a) => s + a.students, 0),
       enrollments: unassignedData.reduce((s, a) => s + a.enrollments, 0),
-      commission: unassignedData.reduce((s, a) => s + a.commission, 0),
     });
   }
 
@@ -259,6 +352,7 @@ export default function OwnerDashboard() {
         <DashboardSearchCard />
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
 
+        {/* Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
           <MetricCard title="Total Students" value={students.length} icon={Users} />
           <MetricCard title="Active Agents" value={activeAgents.length} icon={UserCheck} />
@@ -290,28 +384,143 @@ export default function OwnerDashboard() {
           />
         </div>
 
-        {/* Admin Performance Overview Chart */}
-        {summaryChartData.length > 0 && (
+        {/* Row 1: Pipeline Funnel + Monthly Trend */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Team Performance Overview</CardTitle>
+              <CardTitle className="text-lg">Enrollment Pipeline</CardTitle>
             </CardHeader>
             <CardContent>
-              <ChartContainer config={chartConfig} className="h-[300px] w-full">
-                <BarChart data={summaryChartData} barGap={4}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
-                  <YAxis tick={{ fontSize: 12 }} className="fill-muted-foreground" />
+              <ChartContainer config={pipelineChartConfig} className="h-[280px] w-full">
+                <BarChart data={pipelineData} layout="vertical" barSize={20}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                  <YAxis dataKey="status" type="category" tick={{ fontSize: 11 }} className="fill-muted-foreground" width={100} />
                   <Tooltip content={<ChartTooltipContent />} />
-                  <Legend />
-                  <Bar dataKey="students" fill="var(--color-students)" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="enrollments" fill="var(--color-enrollments)" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="commission" fill="var(--color-commission)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="count" fill="var(--color-count)" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ChartContainer>
             </CardContent>
           </Card>
-        )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Monthly Enrollments (6 months)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer config={trendChartConfig} className="h-[280px] w-full">
+                <LineChart data={monthlyTrendData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                  <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" allowDecimals={false} />
+                  <Tooltip content={<ChartTooltipContent />} />
+                  <Line
+                    type="monotone"
+                    dataKey="count"
+                    stroke="var(--color-count)"
+                    strokeWidth={2}
+                    dot={{ fill: "var(--color-count)", r: 4 }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Row 2: Team Performance (fixed) + Revenue per University */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {summaryChartData.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Team Performance (Students vs Enrollments)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer config={teamChartConfig} className="h-[280px] w-full">
+                  <BarChart data={summaryChartData} barGap={4}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
+                    <XAxis dataKey="name" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
+                    <YAxis tick={{ fontSize: 12 }} className="fill-muted-foreground" allowDecimals={false} />
+                    <Tooltip content={<ChartTooltipContent />} />
+                    <Legend />
+                    <Bar dataKey="students" fill="var(--color-students)" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="enrollments" fill="var(--color-enrollments)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Revenue by University</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {revenueByUni.length > 0 ? (
+                <div className="h-[280px] w-full flex items-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={revenueByUni}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={3}
+                        dataKey="value"
+                        label={({ name, value }) => `${name}: £${value.toLocaleString()}`}
+                      >
+                        {revenueByUni.map((_, i) => (
+                          <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value: number) => `£${value.toLocaleString()}`} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-12">No revenue data yet</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Row 3: Top 5 Agents Leaderboard */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-amber-500" />
+              <CardTitle className="text-lg">Top 5 Agents</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {topAgents.length > 0 ? (
+              <div className="space-y-4">
+                {topAgents.map((agent, i) => (
+                  <div key={agent.name} className="flex items-center gap-4">
+                    <span className="text-lg font-bold text-muted-foreground w-6 text-right">
+                      {i + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium truncate">{agent.name}</span>
+                        <span className="text-sm text-muted-foreground ml-2 shrink-0">
+                          {agent.enrollments} enrollments ({agent.active} active)
+                        </span>
+                      </div>
+                      <Progress
+                        value={(agent.enrollments / maxTopEnrollments) * 100}
+                        className="h-2"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">No agent data</p>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Hierarchical Admin → Agents breakdown */}
         <div className="space-y-4">
@@ -362,15 +571,14 @@ export default function OwnerDashboard() {
                   <CardContent className="pt-0 space-y-4">
                     {agentData.length > 0 ? (
                       <>
-                        <ChartContainer config={chartConfig} className="h-[200px] w-full">
+                        <ChartContainer config={teamChartConfig} className="h-[200px] w-full">
                           <BarChart data={agentData} barGap={4}>
                             <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
                             <XAxis dataKey="name" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                            <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                            <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" allowDecimals={false} />
                             <Tooltip content={<ChartTooltipContent />} />
                             <Bar dataKey="students" fill="var(--color-students)" radius={[4, 4, 0, 0]} />
                             <Bar dataKey="enrollments" fill="var(--color-enrollments)" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="commission" fill="var(--color-commission)" radius={[4, 4, 0, 0]} />
                           </BarChart>
                         </ChartContainer>
                         <Table>
