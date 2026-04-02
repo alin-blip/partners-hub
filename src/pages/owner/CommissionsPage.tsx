@@ -782,7 +782,12 @@ function AgentRow({
                                 {snap.enrollments?.students?.first_name} {snap.enrollments?.students?.last_name}
                               </TableCell>
                               <TableCell className="text-sm">{snap.enrollments?.universities?.name || "—"}</TableCell>
-                              <TableCell className="text-sm text-right tabular-nums font-medium">£{rate.toLocaleString()}</TableCell>
+                              <TableCell className="text-sm text-right tabular-nums font-medium">
+                                £{rate.toLocaleString()}
+                                {snap.override_amount != null && (
+                                  <Badge variant="outline" className="ml-1 text-[10px] px-1">override</Badge>
+                                )}
+                              </TableCell>
                               <TableCell className="text-sm text-right tabular-nums">
                                 <span className={ib.qualifies ? "text-green-700 dark:text-green-400 font-medium" : "text-muted-foreground"}>
                                   £{amount25.toLocaleString()}
