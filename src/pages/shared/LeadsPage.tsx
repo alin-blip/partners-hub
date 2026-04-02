@@ -247,7 +247,7 @@ export default function LeadsPage() {
                         <TableCell className="font-medium">
                           {lead.first_name} {lead.last_name}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden sm:table-cell">
                           <div className="flex flex-col gap-0.5 text-xs">
                             {lead.email && (
                               <a href={`mailto:${lead.email}`} className="flex items-center gap-1 text-muted-foreground hover:text-accent">
@@ -261,10 +261,10 @@ export default function LeadsPage() {
                             )}
                           </div>
                         </TableCell>
-                        <TableCell className="text-sm">{lead.nationality || "—"}</TableCell>
-                        <TableCell className="text-sm max-w-[140px] truncate">{lead.course_interest || "—"}</TableCell>
-                        <TableCell className="text-sm">{agentMap[lead.agent_id] || "—"}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
+                        <TableCell className="hidden md:table-cell text-sm">{lead.nationality || "—"}</TableCell>
+                        <TableCell className="hidden lg:table-cell text-sm max-w-[140px] truncate">{lead.course_interest || "—"}</TableCell>
+                        <TableCell className="hidden md:table-cell text-sm">{agentMap[lead.agent_id] || "—"}</TableCell>
+                        <TableCell className="hidden sm:table-cell text-xs text-muted-foreground">
                           {format(new Date(lead.created_at), "dd MMM yyyy")}
                         </TableCell>
                         <TableCell>
