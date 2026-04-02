@@ -51,10 +51,19 @@ export default function StudentDetailPage() {
   const { data: agentProfile } = useQuery({
     queryKey: ["agent-profile", student?.agent_id],
     queryFn: async () => {
-      const { data } = await supabase.from("profiles").select("full_name").eq("id", student!.agent_id).single();
+      const { data } = await supabase.from("profiles").select("full_name, admin_id").eq("id", student!.agent_id).single();
       return data;
     },
     enabled: !!student?.agent_id,
+  });
+
+  const { data: adminProfile } = useQuery({
+    queryKey: ["admin-profile-for-student", agentProfile?.admin_id],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("full_name").eq("id", agentProfile!.admin_id!).single();
+      return data;
+    },
+    enabled: !!agentProfile?.admin_id,
   });
 
   const { data: hasConsent } = useQuery({
