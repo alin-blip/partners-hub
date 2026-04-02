@@ -888,3 +888,49 @@ function AgentRow({
     </>
   );
 }
+
+/* ──── Inline Course Fee % Input ──── */
+
+function CourseFeeInput({ courseId, currentValue, onSave }: {
+  courseId: string;
+  currentValue: number | null;
+  onSave: (courseId: string, value: number | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(currentValue != null ? String(currentValue) : "");
+
+  if (!editing) {
+    return (
+      <button
+        className="inline-flex items-center gap-1 text-sm tabular-nums hover:text-primary transition-colors"
+        onClick={() => { setValue(currentValue != null ? String(currentValue) : ""); setEditing(true); }}
+      >
+        {currentValue != null ? `${currentValue}%` : <span className="text-muted-foreground">Set %</span>}
+        <Edit2 className="w-3 h-3 text-muted-foreground" />
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      <Input
+        type="number"
+        step="0.1"
+        className="h-7 w-20 text-sm"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            onSave(courseId, value ? Number(value) : null);
+            setEditing(false);
+          }
+          if (e.key === "Escape") setEditing(false);
+        }}
+        autoFocus
+      />
+      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { onSave(courseId, value ? Number(value) : null); setEditing(false); }}>
+        ✓
+      </Button>
+    </div>
+  );
+}
