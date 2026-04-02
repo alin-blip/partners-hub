@@ -259,7 +259,7 @@ export default function OwnerDashboard() {
         <DashboardSearchCard />
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
           <MetricCard title="Total Students" value={students.length} icon={Users} />
           <MetricCard title="Active Agents" value={activeAgents.length} icon={UserCheck} />
           <MetricCard title="In Pipeline" value={pipelineCount} icon={ClipboardList} />
@@ -271,10 +271,22 @@ export default function OwnerDashboard() {
             description={`${convertedLeads} of ${totalLeads} leads converted`}
           />
           <MetricCard
-            title="Est. Revenue"
-            value={`£${totalRevenue.toLocaleString()}`}
+            title="Revenue (Locked)"
+            value={`£${totalSnapshotRevenue.toLocaleString()}`}
             icon={PoundSterling}
-            description="Based on commission tiers"
+            description={`${snapshots.length} snapshots`}
+          />
+          <MetricCard
+            title="Paid Out"
+            value={`£${totalPaidOut.toLocaleString()}`}
+            icon={PoundSterling}
+            description="Total payments made"
+          />
+          <MetricCard
+            title="Outstanding"
+            value={`£${(totalSnapshotRevenue - totalPaidOut).toLocaleString()}`}
+            icon={PoundSterling}
+            description="Remaining to pay"
           />
         </div>
 
