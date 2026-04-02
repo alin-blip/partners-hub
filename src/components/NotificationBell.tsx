@@ -218,6 +218,7 @@ export function NotificationBell() {
     message: "💬",
     task: "📋",
     enrollment: "🎓",
+    lead: "📥",
   };
 
   return (

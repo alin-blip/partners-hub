@@ -130,10 +130,30 @@ export function AppSidebar() {
     refetchInterval: 60000,
   });
 
+  // New leads count
+  const { data: newLeadsCount = 0 } = useQuery({
+    queryKey: ["new-leads-count", user?.id, role],
+    queryFn: async () => {
+      if (!user) return 0;
+      let query = supabase
+        .from("leads")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "new");
+      if (role === "agent") {
+        query = query.eq("agent_id", user.id);
+      }
+      const { count, error } = await query;
+      if (error) return 0;
+      return count || 0;
+    },
+    enabled: !!user,
+    refetchInterval: 30000,
+  });
+
   const mainItems: NavItem[] = [
     { title: "Dashboard", url: `${prefix}/dashboard`, icon: LayoutDashboard },
     { title: "Students", url: `${prefix}/students`, icon: Users },
-    { title: "Leads", url: `${prefix}/leads`, icon: ContactRound },
+    { title: "Leads", url: `${prefix}/leads`, icon: ContactRound, badge: newLeadsCount },
     { title: "Enrollments", url: `${prefix}/enrollments`, icon: ClipboardList },
     { title: "Messages", url: `${prefix}/messages`, icon: Mail, badge: unreadCount },
     { title: "Tasks", url: `${prefix}/tasks`, icon: ListTodo, badge: pendingTasksCount },
