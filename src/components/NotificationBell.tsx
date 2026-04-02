@@ -11,9 +11,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
 
+type NotificationType = "message" | "task" | "enrollment" | "lead";
+
 type NotificationItem = {
   id: string;
-  type: "message" | "task" | "enrollment";
+  type: NotificationType;
   title: string;
   description: string;
   time: string;
@@ -135,7 +137,33 @@ export function NotificationBell() {
         });
       }
 
-      // 4. Pending tier upgrade requests (owner only)
+      // 4. New leads
+      {
+        let leadsQuery = supabase
+          .from("leads")
+          .select("id, first_name, last_name, email, phone, created_at")
+          .eq("status", "new")
+          .order("created_at", { ascending: false })
+          .limit(5);
+        if (role === "agent") {
+          leadsQuery = leadsQuery.eq("agent_id", user.id);
+        }
+        const { data: newLeads } = await leadsQuery;
+        if (newLeads) {
+          newLeads.forEach((lead: any) => {
+            items.push({
+              id: `lead-${lead.id}`,
+              type: "lead",
+              title: `New lead: ${lead.first_name} ${lead.last_name}`,
+              description: [lead.email, lead.phone].filter(Boolean).join(" · "),
+              time: lead.created_at,
+              link: `${prefix}/leads`,
+            });
+          });
+        }
+      }
+
+      // 5. Pending tier upgrade requests (owner only)
       if (role === "owner") {
         const { data: upgrades } = await (supabase as any)
           .from("tier_upgrade_requests")
@@ -190,6 +218,7 @@ export function NotificationBell() {
     message: "💬",
     task: "📋",
     enrollment: "🎓",
+    lead: "📥",
   };
 
   return (
