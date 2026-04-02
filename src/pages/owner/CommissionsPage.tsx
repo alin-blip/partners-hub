@@ -22,7 +22,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   PoundSterling, Users, TrendingUp, ChevronDown, ChevronRight,
-  CreditCard, Clock, CheckCircle2, AlertCircle, ArrowUpCircle, X,
+  CreditCard, Clock, CheckCircle2, AlertCircle, ArrowUpCircle, X, Percent, Edit2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -44,6 +44,9 @@ export default function CommissionsPage() {
   const [payType, setPayType] = useState("25_percent_monthly");
   const [payPeriod, setPayPeriod] = useState("");
   const [payNotes, setPayNotes] = useState("");
+  const [overrideDialog, setOverrideDialog] = useState<{ snapshotId: string; currentRate: number; studentName: string } | null>(null);
+  const [overrideAmount, setOverrideAmount] = useState("");
+  const [overridePercentage, setOverridePercentage] = useState("");
 
   // Fetch snapshots with intake info
   const { data: snapshots = [] } = useQuery({
