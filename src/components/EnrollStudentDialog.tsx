@@ -1,5 +1,4 @@
 import { useState, useRef } from "react";
-import { extractSignatureRgb } from "@/lib/signature-utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,10 +10,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, Check, Calendar, Upload, FileText, X, ShieldCheck, Eye, MessageSquare, AlertTriangle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Calendar, Upload, FileText, X, Eye, MessageSquare, AlertTriangle } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { CourseDetailsInfoCard } from "@/components/CourseDetailsInfoCard";
-import { SignatureCanvas } from "@/components/SignatureCanvas";
 import { syncToDrive } from "@/lib/drive-sync";
 import { AddressLookupInput } from "@/components/AddressLookupInput";
 
@@ -24,8 +22,6 @@ const GENDER_OPTIONS = ["Male", "Female", "Other", "Prefer not to say"];
 const STUDY_PATTERNS_FALLBACK = ["Weekdays", "Weekend", "Evenings"];
 const RELATIONSHIP_OPTIONS = ["Parent", "Spouse", "Sibling", "Friend", "Other"];
 const DOC_TYPES_ENROLL = ["Passport", "Proof of Address", "Other"];
-
-import { CONSENT_CLAUSES, MARKETING_OPTIONS, DEFAULT_MARKETING_CHECKS } from "@/lib/consent-clauses";
 
 function sanitizeName(name: string) {
   return name.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 30);
@@ -78,19 +74,8 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedDocType, setSelectedDocType] = useState("Passport");
 
-  // Step 5 — Consent
-  const [consentChecks, setConsentChecks] = useState<Record<string, boolean>>({});
-  const [marketingChecks, setMarketingChecks] = useState<Record<string, boolean>>(DEFAULT_MARKETING_CHECKS);
-  const [consentSignature, setConsentSignature] = useState("");
-  const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
-  const [consentPreviewUrl, setConsentPreviewUrl] = useState<string | null>(null);
-  const [previewingConsent, setPreviewingConsent] = useState(false);
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
   const [contactingAdmin, setContactingAdmin] = useState(false);
-
-  const nonMarketingClauses = CONSENT_CLAUSES.filter((c) => !c.isMarketing);
-  const allConsentsChecked = nonMarketingClauses.every((c) => consentChecks[c.id]);
-  const canProceedConsent = allConsentsChecked && consentSignature.trim().length > 0 && !!signatureDataUrl;
 
   const resetForm = () => {
     setStep(1);
@@ -101,7 +86,6 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
     setPreviousFundingYears(""); setCrn(""); setQualifications(""); setNotes("");
     setNokName(""); setNokPhone(""); setNokRelationship("");
     setDocFiles([]); setSelectedDocType("Passport");
-    setConsentChecks({}); setMarketingChecks({...DEFAULT_MARKETING_CHECKS}); setConsentSignature(""); setSignatureDataUrl(null); setConsentPreviewUrl(null);
     setDuplicateError(null);
   };
 
@@ -196,68 +180,6 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
 
   const removeFile = (index: number) => setDocFiles((prev) => prev.filter((_, i) => i !== index));
 
-  const generateAndUploadConsentPdf = async (studentId: string) => {
-    const selectedUni = universities.find((u: any) => u.id === universityId);
-    const selectedCrs = courses.find((c: any) => c.id === courseId);
-
-    const { data: agentProfile } = await supabase
-      .from("profiles")
-      .select("full_name")
-      .eq("id", user!.id)
-      .single();
-
-    let sigBody: Record<string, any> = {};
-    if (signatureDataUrl) {
-      const sigData = await extractSignatureRgb(signatureDataUrl, 340, 150);
-      if (sigData) {
-        sigBody = { signatureRgb: sigData.rgb, signatureWidth: sigData.width, signatureHeight: sigData.height };
-      }
-    }
-
-    const { data: pdfData, error: pdfError } = await supabase.functions.invoke("generate-consent-pdf", {
-      body: {
-        studentName: `${title ? title + " " : ""}${firstName} ${lastName}`,
-        dateOfBirth: dob || null,
-        nationality: nationality || null,
-        address: fullAddress || null,
-        universityName: selectedUni?.name || "",
-        courseName: selectedCrs?.name || "",
-        agentName: agentProfile?.full_name || "EduForYou UK",
-        signature: consentSignature,
-        consentDate: new Date().toLocaleDateString("en-GB"),
-        marketingConsent: marketingChecks,
-        ...sigBody,
-      },
-    });
-
-    if (pdfError) throw pdfError;
-
-    const base64 = pdfData.pdf_base64;
-    const binaryString = atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    const pdfBlob = new Blob([bytes], { type: "application/pdf" });
-
-    const storagePath = `${studentId}/Consent_Form_${Date.now()}.pdf`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("student-documents")
-      .upload(storagePath, pdfBlob, { contentType: "application/pdf" });
-    if (uploadError) throw uploadError;
-
-    await supabase.from("student_documents").insert({
-      student_id: studentId,
-      agent_id: user!.id,
-      doc_type: "Consent Form",
-      file_name: `EduForYou_Consent_Form_${firstName}_${lastName}.pdf`,
-      file_path: storagePath,
-      file_size: pdfBlob.size,
-      uploaded_by: user!.id,
-    });
-  };
-
   const submitMutation = useMutation({
     mutationFn: async () => {
       // Duplicate check by email
@@ -336,19 +258,50 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
         }
       }
 
-      // Generate and upload consent PDF
-      await generateAndUploadConsentPdf(student.id);
-
       // Sync to Google Drive (non-blocking)
       syncToDrive("student_created", student.id);
+
+      return student.id;
     },
-    onSuccess: () => {
+    onSuccess: async (studentId) => {
       queryClient.invalidateQueries({ queryKey: ["all-students"] });
       queryClient.invalidateQueries({ queryKey: ["agent-students"] });
       queryClient.invalidateQueries({ queryKey: ["enrollments"] });
       toast.success("Student enrolled successfully!");
       resetForm();
       onOpenChange(false);
+
+      // Auto-send consent signing link to student if they have an email
+      if (email.trim() && studentId) {
+        try {
+          const { data: tokenData, error: tokenError } = await supabase.functions.invoke("create-consent-token", {
+            body: { student_id: studentId },
+          });
+          if (!tokenError && tokenData?.signing_url) {
+            const studentFullName = `${title ? title + " " : ""}${firstName} ${lastName}`;
+            const { data: agentProfileData } = await supabase
+              .from("profiles")
+              .select("full_name")
+              .eq("id", user!.id)
+              .single();
+
+            await supabase.functions.invoke("send-transactional-email", {
+              body: {
+                templateName: "consent-signing-link",
+                recipientEmail: email.trim(),
+                idempotencyKey: `consent-link-${studentId}-${Date.now()}`,
+                templateData: {
+                  studentName: studentFullName,
+                  agentName: agentProfileData?.full_name || "EduForYou UK",
+                  signingUrl: tokenData.signing_url,
+                },
+              },
+            });
+          }
+        } catch (consentErr) {
+          console.error("Failed to auto-send consent link:", consentErr);
+        }
+      }
     },
     onError: (error: Error) => {
       console.error("Enrollment error:", error);
@@ -427,12 +380,13 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
   };
 
   const canProceedStep1 = universityId && courseId;
-  const canProceedStep2 = firstName && lastName;
+  const canProceedStep2 = firstName && lastName && nationality && gender && dob && email && phone && fullAddress && immigrationStatus;
+  const canProceedStep3 = nokName && nokPhone && nokRelationship;
   const selectedUniversity = universities.find((u: any) => u.id === universityId);
   const selectedCampus = campuses.find((c: any) => c.id === campusId);
   const selectedCourse = courses.find((c: any) => c.id === courseId);
   const selectedIntake = intakes.find((i: any) => i.id === intakeId);
-  const totalSteps = 6;
+  const totalSteps = 5;
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) resetForm(); onOpenChange(o); }}>
@@ -465,7 +419,7 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
 
         {/* Step indicator */}
         <div className="flex items-center gap-1 sm:gap-2 pb-2 overflow-x-auto">
-          {[1, 2, 3, 4, 5, 6].map((s) => (
+          {[1, 2, 3, 4, 5].map((s) => (
             <div key={s} className="flex items-center gap-1 sm:gap-2">
               <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium transition-colors ${s === step ? "bg-accent text-accent-foreground" : s < step ? "bg-accent/20 text-accent" : "bg-muted text-muted-foreground"}`}>
                 {s < step ? <Check className="w-3 h-3 sm:w-4 sm:h-4" /> : s}
@@ -547,20 +501,20 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
               <div className="space-y-2"><Label>Last Name *</Label><Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Smith" /></div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Nationality</Label><Input value={nationality} onChange={(e) => setNationality(e.target.value)} placeholder="e.g. British" /></div>
-              <div className="space-y-2"><Label>Gender</Label><Select value={gender} onValueChange={setGender}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{GENDER_OPTIONS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select></div>
+              <div className="space-y-2"><Label>Nationality *</Label><Input value={nationality} onChange={(e) => setNationality(e.target.value)} placeholder="e.g. British" /></div>
+              <div className="space-y-2"><Label>Gender *</Label><Select value={gender} onValueChange={setGender}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{GENDER_OPTIONS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select></div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Date of Birth</Label><Input type="date" value={dob} onChange={(e) => setDob(e.target.value)} /></div>
-              <div className="space-y-2"><Label>Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="john@example.com" /></div>
+              <div className="space-y-2"><Label>Date of Birth *</Label><Input type="date" value={dob} onChange={(e) => setDob(e.target.value)} /></div>
+              <div className="space-y-2"><Label>Email *</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="john@example.com" /></div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Mobile No</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+44..." /></div>
+              <div className="space-y-2"><Label>Mobile No *</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+44..." /></div>
               <div className="space-y-2"><Label>UK Entry Date</Label><Input type="date" value={ukEntryDate} onChange={(e) => setUkEntryDate(e.target.value)} /></div>
             </div>
             <AddressLookupInput postcode={postcode} address={fullAddress} onPostcodeChange={setPostcode} onAddressChange={setFullAddress} />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Immigration Status</Label><Select value={immigrationStatus} onValueChange={setImmigrationStatus}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{IMMIGRATION_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select></div>
+              <div className="space-y-2"><Label>Immigration Status *</Label><Select value={immigrationStatus} onValueChange={setImmigrationStatus}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{IMMIGRATION_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select></div>
               <div className="space-y-2"><Label>Sharecode</Label><Input value={shareCode} onChange={(e) => setShareCode(e.target.value)} placeholder="Share code" /></div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -583,18 +537,18 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
           </div>
         )}
 
-        {/* Step 3 */}
+        {/* Step 3 — Next of Kin */}
         {step === 3 && (
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Next of Kin Details</h3>
-            <div className="space-y-2"><Label>Full Name</Label><Input value={nokName} onChange={(e) => setNokName(e.target.value)} placeholder="Full name" /></div>
+            <div className="space-y-2"><Label>Full Name *</Label><Input value={nokName} onChange={(e) => setNokName(e.target.value)} placeholder="Full name" /></div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Telephone</Label><Input value={nokPhone} onChange={(e) => setNokPhone(e.target.value)} placeholder="+44..." /></div>
-              <div className="space-y-2"><Label>Relationship</Label><Select value={nokRelationship} onValueChange={setNokRelationship}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{RELATIONSHIP_OPTIONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent></Select></div>
+              <div className="space-y-2"><Label>Telephone *</Label><Input value={nokPhone} onChange={(e) => setNokPhone(e.target.value)} placeholder="+44..." /></div>
+              <div className="space-y-2"><Label>Relationship *</Label><Select value={nokRelationship} onValueChange={setNokRelationship}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{RELATIONSHIP_OPTIONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent></Select></div>
             </div>
             <div className="flex justify-between pt-2">
               <Button variant="outline" onClick={() => setStep(2)}><ArrowLeft className="w-4 h-4 mr-1" /> Back</Button>
-              <Button onClick={() => setStep(4)} className="bg-accent text-accent-foreground hover:bg-accent/90">Next <ArrowRight className="w-4 h-4 ml-1" /></Button>
+              <Button onClick={() => setStep(4)} disabled={!canProceedStep3} className="bg-accent text-accent-foreground hover:bg-accent/90">Next <ArrowRight className="w-4 h-4 ml-1" /></Button>
             </div>
           </div>
         )}
@@ -635,147 +589,8 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
           </div>
         )}
 
-        {/* Step 5 — Consent Form */}
+        {/* Step 5 — Review */}
         {step === 5 && (
-          <div className="space-y-5">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-accent" />
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">EduForYou Consent Form</h3>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Please read each declaration carefully and tick to confirm your agreement. All consents are required to proceed.
-            </p>
-
-            <div className="space-y-3">
-              {CONSENT_CLAUSES.map((clause) => (
-                <div key={clause.id} className="space-y-2 p-3 rounded-lg border bg-muted/20">
-                  {clause.isMarketing ? (
-                    <div>
-                      <p className="text-sm font-semibold">{clause.title}</p>
-                      <p className="text-xs text-muted-foreground leading-relaxed mt-1 mb-2">{clause.text}</p>
-                      <div className="space-y-2 ml-1">
-                        {MARKETING_OPTIONS.map((opt) => (
-                          <label key={opt.id} className="flex items-center gap-3 cursor-pointer">
-                            <Checkbox
-                              checked={!!marketingChecks[opt.id]}
-                              disabled={!!opt.required}
-                              onCheckedChange={(checked) => {
-                                if (opt.required) return;
-                                setMarketingChecks((prev) => {
-                                  const next = { ...prev, [opt.id]: !!checked };
-                                  if (checked && opt.exclusive) next[opt.exclusive] = false;
-                                  return next;
-                                });
-                              }}
-                            />
-                            <span className="text-xs text-foreground">{opt.label}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <Checkbox
-                        checked={!!consentChecks[clause.id]}
-                        onCheckedChange={(checked) =>
-                          setConsentChecks((prev) => ({ ...prev, [clause.id]: !!checked }))
-                        }
-                        className="mt-0.5"
-                      />
-                      <div>
-                        <p className="text-sm font-semibold">{clause.title}</p>
-                        <p className="text-xs text-muted-foreground leading-relaxed mt-1">{clause.text}</p>
-                        {clause.bullets && (
-                          <ul className="list-disc list-inside text-xs text-muted-foreground mt-1 space-y-0.5">
-                            {clause.bullets.map((b, i) => <li key={i}>{b}</li>)}
-                          </ul>
-                        )}
-                      </div>
-                    </label>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div className="space-y-2 pt-2">
-              <Label>Full Name (typed confirmation) *</Label>
-              <Input
-                value={consentSignature}
-                onChange={(e) => setConsentSignature(e.target.value)}
-                placeholder={`e.g. ${firstName} ${lastName}`}
-              />
-              <p className="text-xs text-muted-foreground">
-                Type your full name to confirm your identity.
-              </p>
-            </div>
-
-            <div className="space-y-2 pt-2">
-              <Label>Signature (draw below) *</Label>
-              <SignatureCanvas onSignatureChange={setSignatureDataUrl} width={400} height={120} />
-              <p className="text-xs text-muted-foreground">
-                Draw your signature above. Date: {new Date().toLocaleDateString("en-GB")}
-              </p>
-            </div>
-
-            <div className="flex justify-between pt-2">
-              <Button variant="outline" onClick={() => setStep(4)}><ArrowLeft className="w-4 h-4 mr-1" /> Back</Button>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  disabled={!canProceedConsent || previewingConsent}
-                  onClick={async () => {
-                    setPreviewingConsent(true);
-                    try {
-                      const selectedUni = universities.find((u: any) => u.id === universityId);
-                      const selectedCrs = courses.find((c: any) => c.id === courseId);
-                      const { data: pdfData, error: pdfError } = await supabase.functions.invoke("generate-consent-pdf", {
-                        body: {
-                          studentName: `${title ? title + " " : ""}${firstName} ${lastName}`,
-                          dateOfBirth: dob || null,
-                          nationality: nationality || null,
-                          address: fullAddress || null,
-                          universityName: selectedUni?.name || "",
-                          courseName: selectedCrs?.name || "",
-                          agentName: "EduForYou UK",
-                          signature: consentSignature,
-                          signatureImage: signatureDataUrl || null,
-                          consentDate: new Date().toLocaleDateString("en-GB"),
-                          marketingConsent: marketingChecks,
-                        },
-                      });
-                      if (pdfError) throw pdfError;
-                      const binaryString = atob(pdfData.pdf_base64);
-                      const bytes = new Uint8Array(binaryString.length);
-                      for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
-                      const blob = new Blob([bytes], { type: "application/pdf" });
-                      setConsentPreviewUrl(URL.createObjectURL(blob));
-                    } catch (err: any) {
-                      console.error("Preview error:", err);
-                    } finally {
-                      setPreviewingConsent(false);
-                    }
-                  }}
-                >
-                  <Eye className="w-4 h-4 mr-1" /> {previewingConsent ? "Loading…" : "Preview PDF"}
-                </Button>
-                <Button onClick={() => setStep(6)} disabled={!canProceedConsent} className="bg-accent text-accent-foreground hover:bg-accent/90">
-                  Review <ArrowRight className="w-4 h-4 ml-1" />
-                </Button>
-              </div>
-            </div>
-
-            {consentPreviewUrl && (
-              <div className="space-y-2 pt-3">
-                <Label className="text-sm font-semibold">PDF Preview</Label>
-                <iframe src={consentPreviewUrl} className="w-full h-[400px] rounded-lg border" title="Consent PDF Preview" />
-                <Button variant="outline" size="sm" onClick={() => setConsentPreviewUrl(null)}>Close Preview</Button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Step 6 — Review */}
-        {step === 6 && (
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Institution & Course</h3>
             <div className="grid grid-cols-2 gap-y-2 text-sm">
@@ -789,9 +604,20 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide pt-2">Applicant</h3>
             <div className="grid grid-cols-2 gap-y-2 text-sm">
               <span className="text-muted-foreground">Name</span><span className="font-medium">{title ? `${title} ` : ""}{firstName} {lastName}</span>
-              {email && (<><span className="text-muted-foreground">Email</span><span className="font-medium">{email}</span></>)}
-              {phone && (<><span className="text-muted-foreground">Mobile</span><span className="font-medium">{phone}</span></>)}
-              {fullAddress && (<><span className="text-muted-foreground">Address</span><span className="font-medium">{fullAddress}</span></>)}
+              <span className="text-muted-foreground">Email</span><span className="font-medium">{email}</span>
+              <span className="text-muted-foreground">Mobile</span><span className="font-medium">{phone}</span>
+              <span className="text-muted-foreground">Address</span><span className="font-medium">{fullAddress}</span>
+              <span className="text-muted-foreground">Nationality</span><span className="font-medium">{nationality}</span>
+              <span className="text-muted-foreground">Gender</span><span className="font-medium">{gender}</span>
+              <span className="text-muted-foreground">Date of Birth</span><span className="font-medium">{dob}</span>
+              <span className="text-muted-foreground">Immigration</span><span className="font-medium">{immigrationStatus}</span>
+            </div>
+
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide pt-2">Next of Kin</h3>
+            <div className="grid grid-cols-2 gap-y-2 text-sm">
+              <span className="text-muted-foreground">Name</span><span className="font-medium">{nokName}</span>
+              <span className="text-muted-foreground">Phone</span><span className="font-medium">{nokPhone}</span>
+              <span className="text-muted-foreground">Relationship</span><span className="font-medium">{nokRelationship}</span>
             </div>
 
             {docFiles.length > 0 && (
@@ -806,12 +632,11 @@ export function EnrollStudentDialog({ open, onOpenChange }: Props) {
             )}
 
             <div className="flex items-center gap-2 p-3 rounded-lg border bg-accent/10 text-sm">
-              <ShieldCheck className="w-4 h-4 text-accent flex-shrink-0" />
-              <span>Consent form signed by: <strong className="font-serif italic">{consentSignature}</strong></span>
+              <span className="text-muted-foreground">📧 A consent form signing link will be automatically sent to the student's email after enrollment.</span>
             </div>
 
             <div className="flex justify-between pt-4">
-              <Button variant="outline" onClick={() => setStep(5)}><ArrowLeft className="w-4 h-4 mr-1" /> Back</Button>
+              <Button variant="outline" onClick={() => setStep(4)}><ArrowLeft className="w-4 h-4 mr-1" /> Back</Button>
               <Button onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending} className="bg-accent text-accent-foreground hover:bg-accent/90">
                 {submitMutation.isPending ? "Submitting…" : "Submit Enrollment"}
               </Button>
