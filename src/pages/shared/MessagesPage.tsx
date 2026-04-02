@@ -9,7 +9,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Plus, MessageCircle, Search, Users, Shield, UserCheck } from "lucide-react";
+import { Send, Plus, MessageCircle, Search, Users, Shield, UserCheck, ArrowLeft } from "lucide-react";
+import { MentionTextarea } from "@/components/MentionTextarea";
+import { Badge } from "@/components/ui/badge";
+import { format, formatDistanceToNow } from "date-fns";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+} from "@/components/ui/dialog";
+import { usePresenceMap } from "@/contexts/PresenceContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { MentionTextarea } from "@/components/MentionTextarea";
 import { Badge } from "@/components/ui/badge";
 import { format, formatDistanceToNow } from "date-fns";
