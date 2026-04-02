@@ -28,4 +28,5 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'regent-application-link': regentApplicationLink,
   'admin-delete-code': adminDeleteCode,
   'welcome-agent': welcomeAgent,
+  'transfer-approval-code': transferApprovalCode,
 }
