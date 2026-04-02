@@ -1,50 +1,37 @@
 
 
-# Plan: Îmbunătățire Dashboard Owner — Grafice și Metrici
+# Plan: Adăugare căutare/filtru după campus și locație + afișare locație pe card
 
-## Problema actuală
-Graficul "Team Performance Overview" combină Students, Enrollments și Commission pe aceleași axe — commission-ul (în £) domină scala Y, făcând barele de students/enrollments invizibile (apar ca 0). Plus, lipsesc vizualizări cheie pentru un owner.
+## Ce se schimbă
 
-## Ce adăugăm
+### 1. Fetch campuses și legăturile campus-curs
+- Adăugăm un query pentru `campuses` (deja există în DB cu `name` și `city`)
+- Adăugăm un query pentru `course_timetable_groups` (legătura `course_id` → `campus_id`)
+- Construim un map: `courseId → [campus names/cities]`
 
-### 1. Enrollment Pipeline Funnel (nou)
-Un grafic BarChart orizontal care arată câte enrollment-uri sunt în fiecare status (applied → documents_pending → processing → offer_received → accepted → funding → enrolled → active). Oferă vizibilitate asupra blocajelor din pipeline.
+### 2. Extindere filtru de căutare
+- Termenul de search va căuta și în numele campus-urilor și în orașul (`city`) asociat fiecărui curs
+- Dacă scrii "London" sau "Birmingham", vor apărea cursurile de la campusurile din acel oraș
 
-### 2. Monthly Trend Line Chart (nou)
-Un LineChart care arată evoluția lunară a enrollment-urilor noi (ultimele 6 luni), grupate pe lună din `created_at`. Permite identificarea tendințelor de creștere/scădere.
+### 3. Afișare locație pe cardul cursului
+- Sub badges-urile existente (level, study_mode), adăugăm o linie cu icon `MapPin` care arată campusurile/orașele asociate cursului
+- Format: "Campus Name (City)" sau doar "City" dacă sunt multiple, trunchiate la primele 2-3
 
-### 3. Revenue Breakdown Pie/Donut Chart (nou)
-Un PieChart care arată distribuția revenue-ului pe universități — fetch din `commission_snapshots` join `enrollments` → `universities`. Arată de unde vin banii.
+## Fișiere modificate
+1. **`src/pages/shared/UniversitiesCoursesPage.tsx`**
+   - Query nou: `campuses` + `course_timetable_groups`
+   - Build `courseCampusMap: Map<courseId, {name, city}[]>`
+   - Filtru extins cu campus name + city matching
+   - Pe fiecare card: afișare locație cu `MapPin` icon
 
-### 4. Fix graficul existent "Team Performance"
-- Separă commission pe un ax Y secundar (dreapta) sau îl mută într-un grafic separat
-- Alternativ: scoate commission din bar chart-ul principal și lasă doar Students vs Enrollments (comparație vizuală corectă)
-
-### 5. Top Agents Leaderboard Card (nou)
-Un card mic cu top 5 agenți sortați după enrollment-uri active, cu progress bar vizual.
+2. **`src/components/DashboardSearchCard.tsx`**
+   - Aceleași query-uri noi (campuses + course_timetable_groups)
+   - Filtru extins cu campus/locație
+   - Afișare locație sub universitate pe fiecare rezultat
 
 ## Detalii tehnice
-
-### Queries noi necesare
-- **Pipeline**: reutilizăm `allEnrollments`, grupăm client-side pe `status`
-- **Monthly trend**: query nou pe `enrollments` cu `created_at`, grupare client-side pe lună
-- **Revenue per uni**: query nou pe `commission_snapshots` join `enrollments` join `universities`
-
-### Fișiere modificate
-1. **`src/pages/owner/OwnerDashboard.tsx`** — toate modificările sunt aici:
-   - Adăugare 3 query-uri noi (monthly enrollments, snapshots cu uni info)
-   - Procesare date client-side pentru pipeline, trend, revenue breakdown
-   - Import `LineChart, Line, PieChart, Pie, Cell` din recharts
-   - 4 carduri grafice noi sub metric cards
-   - Fix bar chart existent (scoate commission, lasă students vs enrollments)
-   - Commission mutat în grafic separat sau combinat cu revenue pie
-
-### Layout nou (de sus în jos)
-1. Metric Cards (8 — existente)
-2. **Row 1**: Pipeline Funnel (50%) + Monthly Trend (50%)
-3. **Row 2**: Team Performance — doar Students vs Enrollments (50%) + Revenue per University donut (50%)
-4. **Row 3**: Top 5 Agents card
-5. Admin → Agent Hierarchy (existent)
-6. Recent Enrollments (existent)
-7. Email Log (existent)
+- `campuses` are `name` și `city` — folosim ambele
+- `course_timetable_groups` face legătura `course_id` ↔ `campus_id` — grupăm pe `course_id`
+- Fallback: dacă un curs nu are campus-uri asociate prin `course_timetable_groups`, nu afișăm nimic la locație
+- Nu necesită migrații DB — datele există deja
 
