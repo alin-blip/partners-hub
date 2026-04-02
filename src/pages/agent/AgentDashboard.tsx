@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Users, ClipboardList, Trophy, PoundSterling, HelpCircle, CheckCircle2, Clock } from "lucide-react";
+import { Users, ClipboardList, Trophy, PoundSterling, HelpCircle, CheckCircle2, Clock, Plus } from "lucide-react";
 import { PromoBanner } from "@/components/PromoBanner";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
