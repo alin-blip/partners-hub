@@ -1,37 +1,26 @@
 
 
-# Plan: Adăugare căutare/filtru după campus și locație + afișare locație pe card
+# Plan: Fix location display + campus search fallback
 
-## Ce se schimbă
+## Problem 1: Location display is inline (comma-separated)
+Currently locations show as one truncated line. User wants bullet points, one per line.
 
-### 1. Fetch campuses și legăturile campus-curs
-- Adăugăm un query pentru `campuses` (deja există în DB cu `name` și `city`)
-- Adăugăm un query pentru `course_timetable_groups` (legătura `course_id` → `campus_id`)
-- Construim un map: `courseId → [campus names/cities]`
+## Problem 2: UWTSD campus search doesn't work
+UWTSD has 4 campuses in `campuses` table but **zero entries** in `course_timetable_groups` linking courses to campuses. The current logic only builds `courseCampusMap` from `course_timetable_groups`, so UWTSD courses have no campus data.
 
-### 2. Extindere filtru de căutare
-- Termenul de search va căuta și în numele campus-urilor și în orașul (`city`) asociat fiecărui curs
-- Dacă scrii "London" sau "Birmingham", vor apărea cursurile de la campusurile din acel oraș
+## Solution
 
-### 3. Afișare locație pe cardul cursului
-- Sub badges-urile existente (level, study_mode), adăugăm o linie cu icon `MapPin` care arată campusurile/orașele asociate cursului
-- Format: "Campus Name (City)" sau doar "City" dacă sunt multiple, trunchiate la primele 2-3
+### File: `src/pages/shared/UniversitiesCoursesPage.tsx`
 
-## Fișiere modificate
-1. **`src/pages/shared/UniversitiesCoursesPage.tsx`**
-   - Query nou: `campuses` + `course_timetable_groups`
-   - Build `courseCampusMap: Map<courseId, {name, city}[]>`
-   - Filtru extins cu campus name + city matching
-   - Pe fiecare card: afișare locație cu `MapPin` icon
+**1. Fallback logic for campus mapping (lines 141-152)**
+After building `courseCampusMap` from `course_timetable_groups`, add a fallback: for any course that has NO entries in the map, inherit all campuses from its university. This way UWTSD courses (and any others without timetable groups) will show their university's campuses.
 
-2. **`src/components/DashboardSearchCard.tsx`**
-   - Aceleași query-uri noi (campuses + course_timetable_groups)
-   - Filtru extins cu campus/locație
-   - Afișare locație sub universitate pe fiecare rezultat
+**2. Location display as bullet list (lines 382-394)**
+Replace the single-line `<span className="truncate">` with a vertical list:
+- Icon `MapPin` aligned to top
+- Each location on its own line as a bullet point
+- No truncation, show all locations
 
-## Detalii tehnice
-- `campuses` are `name` și `city` — folosim ambele
-- `course_timetable_groups` face legătura `course_id` ↔ `campus_id` — grupăm pe `course_id`
-- Fallback: dacă un curs nu are campus-uri asociate prin `course_timetable_groups`, nu afișăm nimic la locație
-- Nu necesită migrații DB — datele există deja
+### File: `src/components/DashboardSearchCard.tsx`
+Apply the same fallback logic for campus mapping so search works there too.
 
