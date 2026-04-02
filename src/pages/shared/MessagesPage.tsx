@@ -23,6 +23,7 @@ import {
 
 export default function MessagesPage() {
   const { user, role } = useAuth();
+  const presenceMap = usePresenceMap();
   const { toast } = useToast();
   const qc = useQueryClient();
   const [activeConvo, setActiveConvo] = useState<string | null>(null);
