@@ -378,7 +378,7 @@ export default function MessagesPage() {
         </div>
 
         {/* Message area */}
-        <div className="flex-1 flex flex-col">
+        <div className={`${isMobile && !activeConvo ? "hidden" : "flex"} flex-1 flex-col`}>
           {!activeConvo ? (
             <div className="flex-1 flex items-center justify-center text-muted-foreground">
               <div className="text-center">
