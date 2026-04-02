@@ -59,7 +59,25 @@ export default function AdminAgentsPage() {
       if (data?.error) throw new Error(data.error);
       return data;
     },
-    onSuccess: () => {
+    onSuccess: async (data: any) => {
+      // Auto-create welcome conversation
+      if (data?.user_id) {
+        try {
+          const { data: convo } = await supabase.from("direct_conversations").insert({
+            participant_1: user!.id,
+            participant_2: data.user_id,
+          } as any).select().single();
+          if (convo) {
+            await supabase.from("direct_messages").insert({
+              conversation_id: convo.id,
+              sender_id: user!.id,
+              content: "Welcome to the team! 🎉 If you have any questions, please ask here.",
+            } as any);
+          }
+        } catch (e) {
+          console.error("Failed to create welcome conversation:", e);
+        }
+      }
       queryClient.invalidateQueries({ queryKey: ["admin-agents"] });
       toast({ title: "Agent created successfully" });
       setOpen(false);
