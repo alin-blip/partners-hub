@@ -1,51 +1,60 @@
 
 
-# Plan: Online/Last-Seen Status (Messenger-style)
+# Plan: Mobile Optimization for All Pages and Forms
 
-## What it does
-Owner and Admin can see which users are currently online (green dot) or when they were last active ("Active 5 min ago"), displayed in the Messages page conversation list, chat header, and Agents management page.
+## Problem
+Most users access the platform from their phone. Currently, many pages use fixed-width layouts, multi-column grids, and desktop-oriented components that don't adapt well on small screens.
 
 ## Changes
 
-### 1. Database: new `user_presence` table + migration
-```sql
-CREATE TABLE public.user_presence (
-  user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  last_seen_at timestamptz NOT NULL DEFAULT now(),
-  is_online boolean NOT NULL DEFAULT false
-);
-ALTER TABLE public.user_presence ENABLE ROW LEVEL SECURITY;
-```
-RLS policies:
-- Owner/Admin can SELECT all rows
-- Agents can SELECT rows of users they have conversations with
-- Users can UPDATE/INSERT their own row (upsert on heartbeat)
+### 1. DashboardLayout — Mobile padding + header
+- Reduce main padding from `p-6` to `p-4 sm:p-6`
+- Make header more compact on mobile
 
-Enable realtime: `ALTER PUBLICATION supabase_realtime ADD TABLE public.user_presence;`
+### 2. MessagesPage — Mobile chat view
+- Currently: fixed `w-80` sidebar + message area side-by-side — breaks on mobile
+- Fix: On mobile, show conversation list full-width. When a conversation is selected, show only the message area with a back button. Toggle between the two views
+- Chat input area: make it sticky at the bottom, properly sized for touch
 
-### 2. Presence hook: `src/hooks/usePresence.ts`
-- On mount: upsert `user_presence` row with `is_online = true, last_seen_at = now()`
-- Heartbeat every 60 seconds: update `last_seen_at`
-- On `beforeunload` / unmount: set `is_online = false`
-- Subscribe to realtime changes on `user_presence` for live updates
-- Export a map of `userId -> { is_online, last_seen_at }`
+### 3. EnrollStudentDialog — Responsive form grids
+- Change `grid-cols-3` to `grid-cols-1 sm:grid-cols-3` (Title/First/Last name)
+- Change all `grid-cols-2` to `grid-cols-1 sm:grid-cols-2`
+- Step indicator: make circles smaller on mobile (`w-6 h-6` vs `w-8 h-8`)
 
-### 3. DashboardLayout integration
-- Call `usePresence()` in `DashboardLayout` so heartbeat runs on every authenticated page
-- Pass presence data via context or direct hook usage in child pages
+### 4. EnrollStudent page — Same grid fixes
+- Same grid responsive changes as the dialog
+- All `grid-cols-2` → `grid-cols-1 sm:grid-cols-2`
+- All `grid-cols-3` → `grid-cols-1 sm:grid-cols-3`
 
-### 4. MessagesPage UI updates
-- Conversation list: green dot on avatar when online, "Active X ago" subtitle when offline
-- Chat header: show online/last-seen next to the user's name
-- Use `formatDistanceToNow` for relative time display
+### 5. StudentsPage — Responsive table
+- On mobile: hide Phone and Immigration columns, keep Name/Email/Created
+- Make action buttons stack or wrap
+- Search + filter: stack vertically on mobile (already uses `flex-col sm:flex-row`)
 
-### 5. AgentsPage UI updates
-- Add an "Status" column showing green dot + "Online" or gray dot + "Last seen X ago"
+### 6. LeadsPage — Responsive table
+- Hide less important columns on mobile
+- Wrap header actions
+
+### 7. AgentsPage — Responsive table
+- Hide Online/Joined columns on mobile, keep Name/Role/Status/Actions
+
+### 8. OwnerDashboard — Metric cards + charts
+- Metric cards grid: ensure `grid-cols-2` on mobile (already likely works)
+- Charts: ensure `ResponsiveContainer` fills properly
+
+### 9. Global CSS touch improvements
+- Add touch-friendly tap targets (min 44px height for buttons/rows)
+- Ensure select triggers and inputs have adequate height on mobile
 
 ## Files modified
-1. **Database migration** — create `user_presence` table, RLS, realtime
-2. **`src/hooks/usePresence.ts`** — new hook for heartbeat + realtime subscription
-3. **`src/components/DashboardLayout.tsx`** — mount the presence hook
-4. **`src/pages/shared/MessagesPage.tsx`** — green dots + last-seen text
-5. **`src/pages/owner/AgentsPage.tsx`** — online status column
+1. `src/components/DashboardLayout.tsx` — mobile padding
+2. `src/pages/shared/MessagesPage.tsx` — mobile chat toggle view
+3. `src/components/EnrollStudentDialog.tsx` — responsive grids
+4. `src/pages/agent/EnrollStudent.tsx` — responsive grids
+5. `src/pages/shared/StudentsPage.tsx` — hide columns on mobile
+6. `src/pages/shared/LeadsPage.tsx` — hide columns on mobile
+7. `src/pages/owner/AgentsPage.tsx` — hide columns on mobile
+8. `src/index.css` — touch target improvements
+
+The most impactful change is the MessagesPage mobile view, since chat is impossible to use on phone with the current side-by-side layout.
 
