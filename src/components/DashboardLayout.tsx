@@ -6,6 +6,7 @@ import { AIChatPanel } from "@/components/AIChatPanel";
 import { NotificationBell } from "@/components/NotificationBell";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
+import { PresenceProvider } from "@/contexts/PresenceContext";
 
 interface DashboardLayoutProps {
   children: ReactNode;
