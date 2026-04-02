@@ -43,6 +43,27 @@ export default function OwnerDashboard() {
     },
   });
 
+  // Revenue from commission snapshots
+  const { data: snapshots = [] } = useQuery({
+    queryKey: ["owner-revenue-snapshots"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("commission_snapshots")
+        .select("id, agent_rate, admin_rate, override_amount, snapshot_status");
+      return (data || []) as any[];
+    },
+  });
+
+  const { data: snapshotPayments = [] } = useQuery({
+    queryKey: ["owner-revenue-payments"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("commission_payments")
+        .select("id, amount");
+      return (data || []) as any[];
+    },
+  });
+
   const { data: profiles = [] } = useQuery({
     queryKey: ["owner-profiles"],
     queryFn: async () => {
