@@ -11,6 +11,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
 
+type NotificationType = "message" | "task" | "enrollment" | "lead";
+
 type NotificationItem = {
   id: string;
   type: "message" | "task" | "enrollment";
