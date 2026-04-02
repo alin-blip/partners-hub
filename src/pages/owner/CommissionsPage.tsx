@@ -387,6 +387,7 @@ export default function CommissionsPage() {
           <TabsList>
             <TabsTrigger value="agents">Agent Breakdown</TabsTrigger>
             <TabsTrigger value="payments">Payment History</TabsTrigger>
+            <TabsTrigger value="course-fees">Course Fee %</TabsTrigger>
           </TabsList>
 
           <TabsContent value="agents" className="space-y-4 mt-4">
