@@ -1,41 +1,51 @@
 
 
-# Plan: Fix 3 Platform Issues
+# Plan: Online/Last-Seen Status (Messenger-style)
 
-## Issue 1: Consent form not auto-sent after enrollment (UWTSD)
-**Root cause**: After enrollment submission, the consent PDF is generated and saved, but no consent signing link is automatically emailed to the student. The agent must manually click "Email Link" in the Documents tab.
+## What it does
+Owner and Admin can see which users are currently online (green dot) or when they were last active ("Active 5 min ago"), displayed in the Messages page conversation list, chat header, and Agents management page.
 
-**Fix**: After successful enrollment in `EnrollStudent.tsx`, automatically create a consent token and email the signing link to the student (if they have an email). This happens in the `onSuccess` callback, after `generateAndUploadConsentPdf`.
+## Changes
 
-**File**: `src/pages/agent/EnrollStudent.tsx` — add auto-send logic in `onSuccess` after enrollment.
+### 1. Database: new `user_presence` table + migration
+```sql
+CREATE TABLE public.user_presence (
+  user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  last_seen_at timestamptz NOT NULL DEFAULT now(),
+  is_online boolean NOT NULL DEFAULT false
+);
+ALTER TABLE public.user_presence ENABLE ROW LEVEL SECURITY;
+```
+RLS policies:
+- Owner/Admin can SELECT all rows
+- Agents can SELECT rows of users they have conversations with
+- Users can UPDATE/INSERT their own row (upsert on heartbeat)
 
----
+Enable realtime: `ALTER PUBLICATION supabase_realtime ADD TABLE public.user_presence;`
 
-## Issue 2: Documents disappear after application submitted
-**Root cause**: The `student_documents` table has NO `cancelled_at` column, but the frontend queries filter with `.is("cancelled_at" as any, null)`. Because this column doesn't exist, the Supabase API returns an error (silently), resulting in an empty document list.
+### 2. Presence hook: `src/hooks/usePresence.ts`
+- On mount: upsert `user_presence` row with `is_online = true, last_seen_at = now()`
+- Heartbeat every 60 seconds: update `last_seen_at`
+- On `beforeunload` / unmount: set `is_online = false`
+- Subscribe to realtime changes on `user_presence` for live updates
+- Export a map of `userId -> { is_online, last_seen_at }`
 
-**Fix**:
-1. **Database migration**: Add `cancelled_at` and `cancelled_by` columns to `student_documents`.
-2. No frontend changes needed — the existing code already uses these columns correctly.
+### 3. DashboardLayout integration
+- Call `usePresence()` in `DashboardLayout` so heartbeat runs on every authenticated page
+- Pass presence data via context or direct hook usage in child pages
 
-**File**: New database migration.
+### 4. MessagesPage UI updates
+- Conversation list: green dot on avatar when online, "Active X ago" subtitle when offline
+- Chat header: show online/last-seen next to the user's name
+- Use `formatDistanceToNow` for relative time display
 
----
-
-## Issue 3: Poster generation puts the raw prompt text on the image
-**Root cause**: The `generate-image` edge function passes the user's prompt as `Content/Theme: ${prompt}`. The AI model interprets this literally and puts the exact text on the poster (e.g., "Fa-mi un poster pentru certhe în business").
-
-**Fix**: Update the prompt in `generate-image/index.ts` to:
-1. Instruct the AI that the prompt is a **creative brief/description**, NOT literal text to display
-2. Tell it to generate appropriate, professional text based on the theme
-3. Add explicit instruction: "Do NOT copy the user's prompt text onto the image. Create your own professional, relevant text."
-
-**File**: `supabase/functions/generate-image/index.ts` — modify `fullPrompt` construction around line 78.
-
----
+### 5. AgentsPage UI updates
+- Add an "Status" column showing green dot + "Online" or gray dot + "Last seen X ago"
 
 ## Files modified
-1. `src/pages/agent/EnrollStudent.tsx` — auto-send consent link after enrollment
-2. `supabase/functions/generate-image/index.ts` — fix prompt to not echo user text
-3. Database migration — add `cancelled_at`/`cancelled_by` columns to `student_documents`
+1. **Database migration** — create `user_presence` table, RLS, realtime
+2. **`src/hooks/usePresence.ts`** — new hook for heartbeat + realtime subscription
+3. **`src/components/DashboardLayout.tsx`** — mount the presence hook
+4. **`src/pages/shared/MessagesPage.tsx`** — green dots + last-seen text
+5. **`src/pages/owner/AgentsPage.tsx`** — online status column
 
