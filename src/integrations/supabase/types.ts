@@ -2067,6 +2067,87 @@ export type Database = {
           },
         ]
       }
+      transfer_requests: {
+        Row: {
+          approved_at: string | null
+          approver_id: string | null
+          code: string
+          created_at: string
+          enrollment_id: string
+          id: string
+          new_campus_id: string | null
+          new_course_id: string
+          new_intake_id: string | null
+          new_university_id: string
+          requested_by: string
+          status: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approver_id?: string | null
+          code?: string
+          created_at?: string
+          enrollment_id: string
+          id?: string
+          new_campus_id?: string | null
+          new_course_id: string
+          new_intake_id?: string | null
+          new_university_id: string
+          requested_by: string
+          status?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approver_id?: string | null
+          code?: string
+          created_at?: string
+          enrollment_id?: string
+          id?: string
+          new_campus_id?: string | null
+          new_course_id?: string
+          new_intake_id?: string | null
+          new_university_id?: string
+          requested_by?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transfer_requests_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfer_requests_new_campus_id_fkey"
+            columns: ["new_campus_id"]
+            isOneToOne: false
+            referencedRelation: "campuses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfer_requests_new_course_id_fkey"
+            columns: ["new_course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfer_requests_new_intake_id_fkey"
+            columns: ["new_intake_id"]
+            isOneToOne: false
+            referencedRelation: "intakes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfer_requests_new_university_id_fkey"
+            columns: ["new_university_id"]
+            isOneToOne: false
+            referencedRelation: "universities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       universities: {
         Row: {
           created_at: string
