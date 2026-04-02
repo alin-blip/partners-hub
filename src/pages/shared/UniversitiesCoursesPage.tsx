@@ -139,6 +139,14 @@ export default function UniversitiesCoursesPage() {
   });
 
   const campusMap = new Map(campuses.map((c: any) => [c.id, c]));
+  const uniCampusMap = new Map<string, { name: string; city: string | null }[]>();
+  for (const c of campuses) {
+    const existing = uniCampusMap.get(c.university_id) || [];
+    if (!existing.some((e: any) => e.name === c.name)) {
+      existing.push({ name: c.name, city: c.city });
+    }
+    uniCampusMap.set(c.university_id, existing);
+  }
   const courseCampusMap = new Map<string, { name: string; city: string | null }[]>();
   for (const ctg of courseTimetableGroups) {
     if (!ctg.campus_id) continue;
@@ -149,6 +157,12 @@ export default function UniversitiesCoursesPage() {
       existing.push({ name: campus.name, city: campus.city });
     }
     courseCampusMap.set(ctg.course_id, existing);
+  }
+  // Fallback: courses without timetable group entries inherit university campuses
+  for (const course of courses) {
+    if (!courseCampusMap.has(course.id) && uniCampusMap.has(course.university_id)) {
+      courseCampusMap.set(course.id, uniCampusMap.get(course.university_id)!);
+    }
   }
 
   const activeUniversities = universities.filter((u: any) => u.is_active);
@@ -382,13 +396,16 @@ export default function UniversitiesCoursesPage() {
                         {(() => {
                           const locs = courseCampusMap.get(course.id) || [];
                           if (locs.length === 0) return null;
-                          const display = locs.slice(0, 3).map((l) => l.city ? `${l.name} (${l.city})` : l.name).join(", ");
                           return (
-                            <div className="flex items-center gap-2">
-                              <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
-                              <span className="truncate">
-                                {display}{locs.length > 3 && ` +${locs.length - 3}`}
-                              </span>
+                            <div className="flex gap-2">
+                              <MapPin className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                              <ul className="space-y-0.5">
+                                {locs.map((l, i) => (
+                                  <li key={i} className="text-sm text-muted-foreground">
+                                    • {l.city ? `${l.name} (${l.city})` : l.name}
+                                  </li>
+                                ))}
+                              </ul>
                             </div>
                           );
                         })()}
