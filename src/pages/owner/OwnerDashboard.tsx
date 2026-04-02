@@ -173,7 +173,14 @@ export default function OwnerDashboard() {
     agentConvertedLeads.set((l as any).agent_id, (agentConvertedLeads.get((l as any).agent_id) || 0) + 1);
   }
 
-  // Total revenue
+  // Total revenue from snapshots (actual locked-in commissions)
+  const totalSnapshotRevenue = snapshots.reduce((sum: number, s: any) => {
+    const effectiveRate = s.override_amount != null ? Number(s.override_amount) : Number(s.agent_rate);
+    return sum + effectiveRate + Number(s.admin_rate);
+  }, 0);
+  const totalPaidOut = snapshotPayments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+
+  // Estimated revenue (old method as fallback for agents without snapshots)
   const totalRevenue = activeAgents.reduce((sum: number, agent: any) => {
     const count = agentActiveEnrollments.get(agent.id) || 0;
     const { amount } = calcCommission(count, tiers);
