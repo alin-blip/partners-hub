@@ -1,51 +1,39 @@
 
 
-# Fix "Add to Home Screen" Icon
+# Fix Facebook/Social Link Preview for Digital Card URLs
 
 ## Problem
-The app has no **Web App Manifest** (`manifest.json`) and no properly sized PNG icons. When a user taps "Add to Home Screen" on mobile, the browser needs:
-1. A `manifest.json` file declaring app name, icons, theme color, etc.
-2. PNG icons in multiple sizes (at minimum 192×192 and 512×512)
-3. An `<link rel="manifest">` tag in `index.html`
-4. An `<link rel="apple-touch-icon">` for iOS
+When an agent shares their card link (`https://agents-eduforyou.co.uk/card/slug`) on Facebook or LinkedIn, the crawler gets an empty SPA shell — no title, no image, no description. The preview appears blank.
 
-Currently there is only a `favicon.ico` (122KB, standard ICO format) — no manifest, no apple-touch-icon, no large PNGs.
+## Root Cause
+The app is a Single Page Application (React). When Facebook's crawler fetches `/card/slug`, it receives the generic `index.html` with no agent-specific OG meta tags — just the default "EduForYou UK – Agent Management Platform" title and a generic image.
 
-## What needs to happen
+## Existing Infrastructure
+The `og-share` edge function already exists and works perfectly — it fetches the agent's profile, avatar, bio, and job title from the database and serves a full HTML page with proper OG meta tags, then redirects the browser to the real card page. It's currently used by the social sharing buttons.
 
-### 1. Generate PWA icons from existing favicon
-- Convert `favicon.ico` to PNG icons: `icon-192.png`, `icon-512.png`, `apple-touch-icon.png` (180×180)
-- Place them in `public/`
+## Solution
+Make the **card link that agents copy and share** point to the `og-share` edge function instead of the direct SPA URL. The edge function already handles the redirect to the real card page, so the user experience is seamless:
 
-### 2. Create `public/manifest.json`
-```json
-{
-  "name": "EduForYou UK – Agent Management Platform",
-  "short_name": "EduForYou",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#f97316",
-  "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
-  ]
-}
-```
+1. Facebook crawler hits `og-share?slug=john` → gets rich OG meta (name, photo, bio)
+2. Real user hits same URL → sees OG page for a split second, then auto-redirects to `/card/john`
 
-### 3. Update `index.html` `<head>`
-Add three lines:
-```html
-<link rel="manifest" href="/manifest.json">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<meta name="theme-color" content="#f97316">
-```
+## Changes
 
-### Files to modify
-- `public/manifest.json` — new
-- `public/icon-192.png`, `public/icon-512.png`, `public/apple-touch-icon.png` — generated from favicon
-- `index.html` — add manifest + apple-touch-icon + theme-color meta
+### 1. `src/components/CardSettingsSection.tsx`
+- Add an `ogCardUrl` that points to the edge function: `{SUPABASE_URL}/functions/v1/og-share?slug={slug}`
+- Change the "Copy Card Link" button to copy the `ogCardUrl` instead of the direct SPA URL
+- Keep the direct `cardUrl` for the QR code (QR scanners open a browser directly, no crawler involved)
 
-### Live platform impact
-Zero risk. These are purely additive static files — no database, no RLS, no auth changes. Existing users and agents are unaffected.
+### 2. `src/pages/public/AgentCardPage.tsx`
+- Add dynamic OG meta tags using `document.title` and a `<meta>` injection in `useEffect` after fetching profile data
+- This helps if someone shares the direct URL (from QR scan or address bar), though it won't fully work for Facebook's crawler (which doesn't execute JS), it improves Twitter/Telegram/iMessage which do partial JS execution
+
+### 3. No edge function changes needed
+The `og-share` function already works correctly with `?slug=` parameter.
+
+## Live Impact
+- Zero risk — only changes which URL gets copied to clipboard
+- QR codes remain unchanged (direct URL)
+- Agents' existing shared links still work (just show blank preview as before)
+- New shared links will show rich previews with agent photo, name, and bio
 
