@@ -1,60 +1,82 @@
 
-Obiectiv: să nu mai apară preview gol când linkul cardului este pus pe Facebook/LinkedIn.
 
-Plan recomandat
+# Imagine dinamica OG pentru social preview — Card header cu avatar + "Agent certificat EduForYou"
 
-1. Schimbăm strategia pentru `og:image`
-- Nu ne bazăm pe “screenshot live” al paginii React.
-- Pentru social preview, folosim o imagine garantată și publică, servită direct din asset-uri publice.
-- Varianta rapidă și stabilă: imagine generală branded pentru toate slug-urile.
-- Varianta mai bună, ca pas 2: imagine dinamică branded per agent (avatar + nume + titlu), nu screenshot real al paginii.
+## Problema
+Imaginea de social preview apare taiata sau e doar bannerul generic. Utilizatorul vrea ca preview-ul sa arate ca header-ul cardului digital: gradient, poza de profil a agentului si textul "Agent certificat EduForYou".
 
-2. Actualizăm `supabase/functions/og-share/index.ts`
-- Setăm mereu un `og:image` valid, absolut, pe domeniul de producție.
-- Folosim fallback către `https://agents-eduforyou.co.uk/images/eduforyou-facebook-banner.jpg`.
-- Dacă există avatar agent și vrem să-l păstrăm, îl folosim doar dacă este valid; altfel fallback la bannerul general.
-- Adăugăm și tag-uri suplimentare pentru compatibilitate:
-  - `og:image:secure_url`
-  - `og:image:type`
-  - `og:image:width`
-  - `og:image:height`
-  - `og:image:alt`
-  - `twitter:image`
-- Fixăm și `og:url` / redirect-ul să folosească consistent domeniul public al cardului.
+## Solutie
+Cream un **nou Edge Function** (`generate-og-card`) care genereaza dinamic o imagine PNG 1200x630 folosind Canvas API (disponibil in Deno via `jsr:@nicolo-ribaudo/2d-canvas@0.4.4`) cu:
+- Background gradient (primary -> accent, ca pe card)
+- Avatar-ul agentului (cerculet centrat)
+- Numele agentului
+- Textul "Agent certificat EduForYou"
 
-3. Păstrăm URL-ul de share prin `og-share`
-- Linkul din card settings rămâne cel care trece prin `og-share?slug=...`.
-- Asta este corect pentru crawlers și nu necesită schimbări de produs majore.
+Apoi actualizam `og-share` sa pointeze `og:image` catre acest nou endpoint in loc de bannerul static.
 
-4. Opțional, după fixul rapid, facem varianta premium
-- Adăugăm un endpoint de imagine OG dedicat per slug, care generează o imagine branded cu:
-  - avatar agent
-  - nume
-  - job title
-  - branding EduForYou
-- `og-share` va ponta către acea imagine generată.
-- Asta oferă “card digital în preview” fără să depindem de screenshot-uri reale ale UI-ului.
+## Fisiere modificate
 
-De ce nu recomand screenshot real al cardului
-- Facebook nu “face screenshot” la SPA.
-- Screenshot server-side per slug ar cere un mecanism de randare/headless browser și este mai fragil și mai greu de întreținut.
-- O imagine OG statică sau generată este soluția standard și robustă pentru social preview.
+### 1. `supabase/functions/generate-og-card/index.ts` (NOU)
+- Primeste `?slug=xxx` ca parametru
+- Fetch-uieste din DB: `profiles.full_name`, `profiles.avatar_url`, `agent_card_settings.job_title`
+- Genereaza pe Canvas o imagine 1200x630:
+  - Gradient background (negru -> portocaliu, ca pe card)
+  - Avatar circular centrat (fetch-uit si desenat pe canvas)
+  - Sub avatar: numele agentului (bold, alb/negru)
+  - Sub nume: "Agent certificat EduForYou" (portocaliu)
+- Returneaza `image/png` cu cache headers
+- Fallback: daca avatar-ul nu se poate incarca, deseneaza initialele
 
-Fișiere vizate
-- `supabase/functions/og-share/index.ts`
-- reutilizare asset existent: `public/images/eduforyou-facebook-banner.jpg`
+### 2. `supabase/functions/og-share/index.ts` (ACTUALIZAT)
+- Schimba `ogImage` de la bannerul static la URL-ul dinamic:
+  ```
+  ogImage = `${SUPABASE_URL}/functions/v1/generate-og-card?slug=${slug}`
+  ```
+- Pastreaza fallback la bannerul static daca ceva nu merge
 
-Impact
-- Fără modificări de bază de date.
-- Fără impact pe auth sau flow-ul cardului.
-- Preview-ul nu va mai depinde de avatar sau de execuția JS.
+## Design imagine OG (1200x630)
 
-Detalii tehnice
-- Fixul minim: banner general pentru toate cardurile.
-- Fixul ideal în 2 faze:
-  1. fallback general imediat
-  2. imagine OG dinamică per agent
+```text
++--------------------------------------------------+
+|  ████████████████████████████████████████████████  |
+|  ██  gradient negru -> portocaliu               ██  |
+|  ██                                             ██  |
+|  ██              ┌──────────┐                   ██  |
+|  ██              │  AVATAR  │                   ██  |
+|  ██              │ (cercle) │                   ██  |
+|  ██              └──────────┘                   ██  |
+|  ██                                             ██  |
+|  ██           Numele Agentului                  ██  |
+|  ██      Agent certificat EduForYou             ██  |
+|  ██                                             ██  |
+|  ████████████████████████████████████████████████  |
++--------------------------------------------------+
+```
 
-Rezultatul așteptat
-- Când agentul pune linkul cardului pe Facebook/LinkedIn, preview-ul va afișa sigur o imagine branded, plus titlul și descrierea cardului.
-- Dacă vrem, în pasul următor preview-ul poate arăta și numele/poza agentului într-un layout de tip card.
+## Detalii tehnice
+- Canvas in Deno: folosim `jsr:@nicolo-ribaudo/2d-canvas` care suporta `createCanvas`, `loadImage` — compatibil cu Deno Deploy
+- Alternativ, daca canvas nu e disponibil in Deno edge, generam un SVG inline convertit la PNG, sau folosim Lovable AI image generation (`google/gemini-3.1-flash-image-preview`) ca fallback
+- Abordare pragmatica: **generam un SVG care returneaza direct** (Facebook accepta SVG ca og:image? Nu.) — deci cel mai sigur e sa generam PNG via canvas sau sa folosim AI image gen
+- **Cea mai robusta abordare**: Folosim API-ul Lovable AI (`google/gemini-3.1-flash-image-preview`) din edge function pentru a genera imaginea branded, apoi o cache-uim in storage bucket `generated-images`. La request-uri ulterioare, servim din cache.
+
+## Plan final (cel mai robust)
+
+### Pas 1: `generate-og-card` Edge Function
+- Check daca exista deja in `generated-images/og-cards/{slug}.png`
+- Daca da, redirect 302 catre URL-ul public din storage
+- Daca nu, genereaza imaginea:
+  - Construieste un SVG 1200x630 cu gradient, avatar (embedded base64), nume, text "Agent certificat EduForYou"
+  - Converteste SVG -> PNG folosind `resvg-wasm` (disponibil pe Deno) sau serveste SVG direct cu content-type image/svg+xml (mai simplu, dar Facebook nu accepta SVG)
+  - **Varianta cea mai simpla si garantata**: construim HTML/inline-CSS si il convertim la imagine cu `resvg-wasm`, SAU generam imaginea cu Lovable AI
+- Salveaza in storage bucket si returneaza imaginea
+
+### Pas 2: `og-share/index.ts` — pointeaza og:image la noul endpoint
+
+### Pas 3: Invalidare cache — cand agentul isi schimba avatarul sau setarile cardului, stergem `og-cards/{slug}.png` din storage (in `CardSettingsSection` save mutation si in `BrandedProfilePicture` upload)
+
+## Impact
+- Fara modificari de baza de date
+- Fara impact pe auth
+- Noul endpoint e public (fara JWT)
+- Imaginile sunt cache-uite in storage pentru performanta
+
