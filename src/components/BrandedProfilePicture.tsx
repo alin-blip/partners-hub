@@ -117,6 +117,16 @@ export function BrandedProfilePicture() {
                 .update({ avatar_url: brandedUrl } as any)
                 .eq("id", user.id);
               if (updateErr) throw updateErr;
+
+              // Invalidate cached OG card image so it regenerates with new avatar
+              const { data: slugData } = await supabase
+                .from("profiles")
+                .select("slug")
+                .eq("id", user.id)
+                .single();
+              if (slugData?.slug) {
+                await supabase.storage.from("generated-images").remove([`og-cards/${slugData.slug}.png`]);
+              }
             } catch (err: any) {
               console.error("Branded avatar upload error:", err);
             }
