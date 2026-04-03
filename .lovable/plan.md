@@ -1,37 +1,25 @@
 
 
-# Fix: Social media preview nu funcționează cu URL-ul direct
+# Fix: Imagine statică pentru preview-ul social pe /card/:slug
 
 ## Problema
-Când postezi `https://agents-eduforyou.co.uk/card/dalina` pe Facebook, crawler-ul Facebook primește `index.html` cu metadata generică ("EduForYou UK – Agent Management Platform") pentru că aplicația este un SPA (Single Page Application) — nu poate servi OG tags dinamice fără server-side rendering.
-
-Funcția `og-share` generează metadata corectă, dar doar dacă este accesată direct (prin URL-ul Supabase). Copy button-ul deja copiază acest URL, dar utilizatorii postează URL-ul direct.
+Facebook crawlează `/card/:slug` și primește `index.html` cu o imagine OG care pointează la un URL Google Storage expirat. Rezultatul: preview gol sau generic.
 
 ## Soluția
-Adăugăm un **`public/_redirects`** file care redirecționează crawler-ele sociale (Facebook, LinkedIn, Twitter, Telegram) de la `/card/:slug` către funcția `og-share`, iar utilizatorii normali primesc SPA-ul.
+Actualizăm `index.html` să folosească imaginea statică `eduforyou-facebook-banner.jpg` (care deja există în `public/images/`) cu URL-ul de producție. Astfel, ORICE pagină partajată pe Facebook (inclusiv `/card/:slug`) va afișa bannerul EduForYou.
 
-Dacă hosting-ul Lovable nu suportă `_redirects` (posibil), implementăm un **plan B**: afișăm clar în UI că link-ul de social media este cel copiat, și schimbăm QR-ul + link-ul vizibil la proxy URL.
+Link-ul special de social media (og-share) rămâne funcțional pentru preview-uri personalizate cu avatar.
 
 ## Modificări
 
-### 1. `public/_redirects` (NOU) — încercare de redirect pentru crawlere
-```
-/card/:slug  https://wyvbfjyuhpnmceudgmrh.supabase.co/functions/v1/og-share?slug=:slug  200  conditions[User-Agent]=facebookexternalhit,Twitterbot,LinkedInBot,TelegramBot
-/card/:slug  /index.html  200
-```
+### 1. `index.html` — OG image corect
+- Înlocuim URL-ul Google Storage expirat cu: `https://agents-eduforyou.co.uk/images/eduforyou-facebook-banner.jpg`
+- Actualizăm atât `og:image` cât și `twitter:image`
+- Dimensiuni corecte: 1200x630
 
-### 2. `src/components/CardSettingsSection.tsx` — UI mai clar
-- Afișăm **două link-uri separate**: 
-  - "Link pentru social media" — afișează og-share URL cu label clar "Folosește acest link pe Facebook/LinkedIn"
-  - "Link direct" — URL-ul normal pentru browser
-- QR code-ul Digital Card pointează la `ogCardUrl` (nu `cardUrl`)
-- Mesaj explicit: "Pentru Facebook/LinkedIn, copiază link-ul de social media"
-
-### 3. `src/pages/shared/AgentSocialFeedPage.tsx` — sharing flow
-- Verificăm că `handleShareForPlatform` folosește `ogCardUrl` nu `cardUrl`
-
-## Detalii tehnice
-- `_redirects` cu condiții User-Agent funcționează pe Netlify; pe Lovable hosting s-ar putea să nu fie suportat
-- Dacă nu funcționează, Plan B (UI clar) este soluția garantată — utilizatorii vor ști exact ce link să copieze
-- Nu sunt necesare modificări de bază de date
+### Detalii tehnice
+- Imaginea `eduforyou-facebook-banner.jpg` (44KB) există deja în `public/images/`
+- Schimbarea este doar în `index.html`, o singură linie per tag
+- Nu sunt necesare modificări de bază de date sau edge functions
+- Link-ul de social media personalizat (cu avatar) continuă să funcționeze separat
 
