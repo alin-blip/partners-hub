@@ -70,7 +70,28 @@ export default function AgentsPage() {
       if (data?.error) throw new Error(data.error);
       return data;
     },
-    onSuccess: () => {
+    onSuccess: async (data: any) => {
+      // Auto-create welcome conversation for new agents
+      if (data?.user_id && newRole === "agent") {
+        try {
+          const conversationPartnerId = newAdminId || user?.id;
+          if (conversationPartnerId) {
+            const { data: convo } = await supabase.from("direct_conversations").insert({
+              participant_1: conversationPartnerId,
+              participant_2: data.user_id,
+            } as any).select().single();
+            if (convo) {
+              await supabase.from("direct_messages").insert({
+                conversation_id: convo.id,
+                sender_id: conversationPartnerId,
+                content: "Welcome to the team! 🎉 If you have any questions, please ask here.",
+              } as any);
+            }
+          }
+        } catch (e) {
+          console.error("Failed to create welcome conversation:", e);
+        }
+      }
       queryClient.invalidateQueries({ queryKey: ["all-profiles"] });
       queryClient.invalidateQueries({ queryKey: ["all-roles"] });
       toast({ title: "User created successfully" });
