@@ -16,6 +16,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { Plus } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { AddressLookupInput } from "@/components/AddressLookupInput";
