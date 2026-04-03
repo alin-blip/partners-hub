@@ -23,6 +23,7 @@ import { AddressLookupInput } from "@/components/AddressLookupInput";
 import { usePresenceMap } from "@/contexts/PresenceContext";
 
 export default function AgentsPage() {
+  const { user } = useAuth();
   const { toast } = useToast();
   const presenceMap = usePresenceMap();
   const queryClient = useQueryClient();
