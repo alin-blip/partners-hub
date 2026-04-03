@@ -88,7 +88,8 @@ export default function AgentCardPage() {
       };
       setMeta("og:title", document.title);
       setMeta("og:description", (card as any)?.bio || "Education consultant helping you reach your goals in the UK.");
-      if (prof.avatar_url) setMeta("og:image", prof.avatar_url);
+      // Always use the static branded preview image for consistent social sharing
+      setMeta("og:image", "https://agents-eduforyou.co.uk/images/eduforyou-card-preview-v2.png");
       setMeta("og:url", window.location.href);
     })();
   }, [slug]);
