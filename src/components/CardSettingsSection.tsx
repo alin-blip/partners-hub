@@ -170,6 +170,8 @@ export default function CardSettingsSection() {
 
   const BASE_URL = import.meta.env.PROD ? "https://agents-eduforyou.co.uk" : window.location.origin;
   const cardUrl = slug ? `${BASE_URL}/card/${slug}` : "";
+  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+  const ogCardUrl = slug && SUPABASE_URL ? `${SUPABASE_URL}/functions/v1/og-share?slug=${slug}` : cardUrl;
   const applyFormUrl = slug ? `${BASE_URL}/apply/${slug}` : "";
 
   const copyLink = (url: string, label = "Link") => {
@@ -245,7 +247,7 @@ export default function CardSettingsSection() {
               <div className="space-y-4">
                 <div className="flex items-center gap-2 p-2 rounded-md bg-muted text-xs">
                   <span className="truncate flex-1">{cardUrl}</span>
-                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyLink(cardUrl, "Card link")}>
+                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyLink(ogCardUrl, "Card link")}>
                     <Copy className="w-3 h-3" />
                   </Button>
                   <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => window.open(cardUrl, "_blank")}>

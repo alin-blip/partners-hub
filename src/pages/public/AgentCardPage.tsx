@@ -78,6 +78,18 @@ export default function AgentCardPage() {
       setProfile(prof as AgentProfile);
       setSettings(card as unknown as CardSettings);
       setLoading(false);
+
+      // Inject dynamic OG meta for platforms with partial JS execution (Telegram, iMessage)
+      document.title = `${prof.full_name}${(card as any)?.job_title ? ` – ${(card as any).job_title}` : ""} | EduForYou UK`;
+      const setMeta = (property: string, content: string) => {
+        let el = document.querySelector(`meta[property="${property}"]`);
+        if (!el) { el = document.createElement("meta"); el.setAttribute("property", property); document.head.appendChild(el); }
+        el.setAttribute("content", content);
+      };
+      setMeta("og:title", document.title);
+      setMeta("og:description", (card as any)?.bio || "Education consultant helping you reach your goals in the UK.");
+      if (prof.avatar_url) setMeta("og:image", prof.avatar_url);
+      setMeta("og:url", window.location.href);
     })();
   }, [slug]);
 
