@@ -160,10 +160,16 @@ export default function CardSettingsSection() {
         .upsert(payload as any, { onConflict: "user_id" });
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({ title: "Digital card saved!" });
       qc.invalidateQueries({ queryKey: ["card-settings"] });
       qc.invalidateQueries({ queryKey: ["profile-slug"] });
+      // Invalidate cached OG card image so it regenerates with new data
+      if (slug) {
+        try {
+          await supabase.storage.from("generated-images").remove([`og-cards/${slug}.png`]);
+        } catch {}
+      }
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
