@@ -1,23 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { Resvg, initWasm } from "https://esm.sh/@aspect-dev/resvg-wasm@1.0.4";
+import { render } from "jsr:@nick/resvg@0.1.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
-
-let wasmInitialized = false;
-
-async function ensureWasm() {
-  if (wasmInitialized) return;
-  const wasmUrl =
-    "https://esm.sh/@aspect-dev/resvg-wasm@1.0.4/resvg_wasm_bg.wasm";
-  const wasmResponse = await fetch(wasmUrl);
-  const wasmBytes = await wasmResponse.arrayBuffer();
-  await initWasm(wasmBytes);
-  wasmInitialized = true;
-}
 
 function escapeXml(s: string): string {
   return s
@@ -34,7 +22,12 @@ async function fetchAvatarBase64(url: string): Promise<string | null> {
     if (!resp.ok) return null;
     const buf = await resp.arrayBuffer();
     const ct = resp.headers.get("content-type") || "image/png";
-    const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+    const bytes = new Uint8Array(buf);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    const b64 = btoa(binary);
     return `data:${ct};base64,${b64}`;
   } catch {
     return null;
@@ -52,7 +45,7 @@ function buildSvg(params: {
   const H = 630;
   const avatarR = 90;
   const avatarCx = W / 2;
-  const avatarCy = 220;
+  const avatarCy = 200;
 
   const avatarSection = avatarDataUri
     ? `<defs>
@@ -120,18 +113,17 @@ Deno.serve(async (req) => {
   // Check cache first (unless refresh requested)
   const storagePath = `og-cards/${slug}.png`;
   if (!refresh) {
-    const { data: existing } = await supabase.storage
+    const { data: listing } = await supabase.storage
       .from("generated-images")
-      .createSignedUrl(storagePath, 60);
-    if (existing?.signedUrl) {
-      // File exists in cache — redirect to public URL
+      .list("og-cards", { search: `${slug}.png`, limit: 1 });
+    if (listing && listing.length > 0) {
       const { data: pub } = supabase.storage
         .from("generated-images")
         .getPublicUrl(storagePath);
       return new Response(null, {
         status: 302,
         headers: {
-          Location: `${pub.publicUrl}?t=${Date.now()}`,
+          Location: `${pub.publicUrl}?t=${listing[0].updated_at || Date.now()}`,
           "Cache-Control": "public, max-age=3600",
           ...corsHeaders,
         },
@@ -154,13 +146,6 @@ Deno.serve(async (req) => {
     });
   }
 
-  const { data: card } = await supabase
-    .from("agent_card_settings")
-    .select("job_title")
-    .eq("user_id", profile.id)
-    .eq("is_public", true)
-    .single();
-
   const name = profile.full_name || "Agent";
   const label = "Agent certificat EduForYou";
   const initials = name
@@ -178,14 +163,11 @@ Deno.serve(async (req) => {
   // Build SVG
   const svg = buildSvg({ name, label, avatarDataUri, initials });
 
-  // Convert SVG to PNG via resvg-wasm
+  // Convert SVG to PNG via resvg
   try {
-    await ensureWasm();
-    const resvg = new Resvg(svg, {
+    const pngData = render(svg, {
       fitTo: { mode: "width", value: 1200 },
     });
-    const rendered = resvg.render();
-    const pngData = rendered.asPng();
 
     // Upload to storage cache
     await supabase.storage.from("generated-images").upload(
@@ -206,7 +188,7 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("resvg render error:", err);
-    // Fallback: return SVG (won't work perfectly on Facebook but better than nothing)
+    // Fallback: return SVG directly
     return new Response(svg, {
       headers: {
         "Content-Type": "image/svg+xml",
