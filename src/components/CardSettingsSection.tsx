@@ -251,19 +251,34 @@ export default function CardSettingsSection() {
 
             {cardUrl && isPublic && (
               <div className="space-y-4">
+                {/* Social Media Link - primary, highlighted */}
                 <div>
+                  <p className="text-xs font-medium mb-1 text-accent">📱 Link pentru Social Media (Facebook, LinkedIn, WhatsApp)</p>
+                  <div className="flex items-center gap-2 p-2 rounded-md bg-accent/10 border border-accent/30 text-xs">
+                    <span className="truncate flex-1 font-mono">{ogCardUrl}</span>
+                    <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyLink(ogCardUrl, "Social media link")}>
+                      <Copy className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1">✅ Folosește acest link când postezi pe Facebook/LinkedIn — va afișa poza ta și numele tău în preview.</p>
+                </div>
+
+                {/* Direct Link */}
+                <div>
+                  <p className="text-xs font-medium mb-1">🔗 Link direct (browser)</p>
                   <div className="flex items-center gap-2 p-2 rounded-md bg-muted text-xs">
                     <span className="truncate flex-1">{cardUrl}</span>
-                    <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyLink(ogCardUrl, "Card link")}>
+                    <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyLink(cardUrl, "Direct link")}>
                       <Copy className="w-3 h-3" />
                     </Button>
                     <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => window.open(cardUrl, "_blank")}>
                       <ExternalLink className="w-3 h-3" />
                     </Button>
                   </div>
-                  <p className="text-[10px] text-muted-foreground mt-1">Link optimizat pentru social media (Facebook, LinkedIn)</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">Link-ul direct către cardul tău — pentru trimis prin email sau mesaj.</p>
                 </div>
 
+                {/* Apply Form Link */}
                 <div className="flex items-center gap-2 p-2 rounded-md bg-muted text-xs">
                   <span className="truncate flex-1">{applyFormUrl}</span>
                   <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyLink(applyFormUrl, "Application form link")}>
@@ -274,11 +289,11 @@ export default function CardSettingsSection() {
                   </Button>
                 </div>
 
-                {/* QR Codes */}
+                {/* QR Codes - use ogCardUrl so scanned QR on social gets proper preview */}
                 <div className="grid grid-cols-2 gap-4 pt-2">
                   <div className="flex flex-col items-center gap-2">
                     <p className="text-xs font-medium text-muted-foreground flex items-center gap-1"><QrCode className="w-3 h-3" /> Digital Card QR</p>
-                    <QRCodeCanvas ref={cardQrRef} value={cardUrl} size={120} className="rounded border p-1" />
+                    <QRCodeCanvas ref={cardQrRef} value={ogCardUrl} size={120} className="rounded border p-1" />
                     <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => downloadQr(cardQrRef, `card-qr-${slug}.png`)}>
                       <Download className="w-3 h-3 mr-1" /> Download
                     </Button>
