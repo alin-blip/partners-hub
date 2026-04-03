@@ -176,8 +176,6 @@ export default function CardSettingsSection() {
 
   const BASE_URL = import.meta.env.PROD ? "https://agents-eduforyou.co.uk" : window.location.origin;
   const cardUrl = slug ? `${BASE_URL}/card/${slug}` : "";
-  const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-  const ogCardUrl = slug && SUPABASE_PROJECT_ID ? `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/og-share?slug=${slug}` : cardUrl;
   const applyFormUrl = slug ? `${BASE_URL}/apply/${slug}` : "";
 
   const copyLink = (url: string, label = "Link") => {
