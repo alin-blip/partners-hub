@@ -6,6 +6,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+const APP_DOMAIN = "https://agents-eduforyou.co.uk";
+const FALLBACK_OG_IMAGE = `${APP_DOMAIN}/images/eduforyou-facebook-banner.jpg`;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -24,7 +27,6 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
-  // Fetch agent profile (use profiles table directly — view may not work with service role)
   const { data: profile } = await supabase
     .from("profiles")
     .select("id, full_name, avatar_url, slug")
@@ -36,7 +38,6 @@ Deno.serve(async (req) => {
     return new Response("Agent not found", { status: 404 });
   }
 
-  // Fetch card settings for job_title / bio
   const { data: card } = await supabase
     .from("agent_card_settings")
     .select("job_title, bio, company_name")
@@ -44,7 +45,12 @@ Deno.serve(async (req) => {
     .eq("is_public", true)
     .single();
 
-  let ogImage = profile.avatar_url || "";
+  // Always use the branded fallback banner as og:image.
+  // Avatar URLs from Supabase storage often fail Facebook's crawler.
+  let ogImage = FALLBACK_OG_IMAGE;
+  let ogImageWidth = "1200";
+  let ogImageHeight = "630";
+
   let ogDescription = card?.bio || "Education consultant helping you reach your goals in the UK.";
   let ogTitle = `${profile.full_name || "Agent"}${card?.job_title ? ` – ${card.job_title}` : ""} | EduForYou UK`;
 
@@ -57,16 +63,17 @@ Deno.serve(async (req) => {
       .single();
 
     if (post) {
-      ogImage = post.image_url || ogImage;
+      if (post.image_url) {
+        ogImage = post.image_url;
+        ogImageWidth = "1080";
+        ogImageHeight = "1080";
+      }
       ogDescription = post.caption || ogDescription;
     }
   }
 
-  // Determine the public app URL from the request origin or fallback
-  const appOrigin = Deno.env.get("APP_URL") || "https://agentseduforyou.lovable.app";
-  const cardPageUrl = `${appOrigin}/card/${slug}`;
+  const cardPageUrl = `${APP_DOMAIN}/card/${slug}`;
 
-  // Escape HTML entities for safe embedding
   const esc = (s: string) =>
     s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -79,8 +86,11 @@ Deno.serve(async (req) => {
   <meta property="og:title" content="${esc(ogTitle)}" />
   <meta property="og:description" content="${esc(ogDescription.slice(0, 300))}" />
   <meta property="og:image" content="${esc(ogImage)}" />
-  <meta property="og:image:width" content="1080" />
-  <meta property="og:image:height" content="1080" />
+  <meta property="og:image:secure_url" content="${esc(ogImage)}" />
+  <meta property="og:image:type" content="image/jpeg" />
+  <meta property="og:image:width" content="${ogImageWidth}" />
+  <meta property="og:image:height" content="${ogImageHeight}" />
+  <meta property="og:image:alt" content="${esc(ogTitle)}" />
   <meta property="og:url" content="${esc(cardPageUrl)}" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${esc(ogTitle)}" />
