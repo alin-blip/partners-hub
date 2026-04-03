@@ -247,7 +247,7 @@ export default function CardSettingsSection() {
               <div className="space-y-4">
                 <div>
                   <div className="flex items-center gap-2 p-2 rounded-md bg-muted text-xs">
-                    <span className="truncate flex-1">{ogCardUrl}</span>
+                    <span className="truncate flex-1">{cardUrl}</span>
                     <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyLink(ogCardUrl, "Card link")}>
                       <Copy className="w-3 h-3" />
                     </Button>
