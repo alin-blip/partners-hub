@@ -260,7 +260,7 @@ export default function CardSettingsSection() {
                       <Copy className="w-3 h-3" />
                     </Button>
                   </div>
-                  <p className="text-[10px] text-muted-foreground mt-1">✅ Folosește acest link când postezi pe Facebook/LinkedIn — va afișa poza ta și numele tău în preview.</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">✅ Folosește acest link când postezi pe Facebook/LinkedIn — va afișa bannerul oficial EduForYou în preview.</p>
                 </div>
 
                 {/* Direct Link */}
