@@ -100,9 +100,9 @@
 
     "@bufbuild/protobuf": ["@bufbuild/protobuf@1.10.1", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@bufbuild/protobuf/-/protobuf-1.10.1.tgz", {}, "sha512-wJ8ReQbHxsAfXhrf9ixl0aYbZorRuOWpBNzm8pL8ftmSxQx/wnJD5Eg861NwJU/czy2VXFIebCeZnZrI9rktIQ=="],
 
-    "@elevenlabs/client": ["@elevenlabs/client@1.1.0", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@elevenlabs/client/-/client-1.1.0.tgz", { "dependencies": { "@elevenlabs/types": "0.9.0", "livekit-client": "^2.11.4" } }, "sha512-09txdIekGAyH5iMadtk/GdO0wzkgZ2SxMMVczchYFoU+RWLXGkgwM121ZaK0vAn+L9kKEB3Pv0Adj35wsSBtTw=="],
+    "@elevenlabs/client": ["@elevenlabs/client@1.1.1", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@elevenlabs/client/-/client-1.1.1.tgz", { "dependencies": { "@elevenlabs/types": "0.9.0", "livekit-client": "^2.11.4" } }, "sha512-CFCIDERaU2i6ucRzY7ZZP9Z6eF8xpj1mSAUVcAPg17KNryS0Ia/yQAAfY+KNYsBaUL7P0akLaM8XT2zXS+EnsA=="],
 
-    "@elevenlabs/react": ["@elevenlabs/react@1.0.1", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@elevenlabs/react/-/react-1.0.1.tgz", { "dependencies": { "@elevenlabs/client": "1.1.0" }, "peerDependencies": { "react": ">=16.8.0" } }, "sha512-pRlerWBdr8cv8ed8RQ3i7kY+YcePqQFIdg4bx/2txFfJHGS10mmPl+OcNh1d6dk5Ihscp+z1Q8qMRCOd/ru+Hw=="],
+    "@elevenlabs/react": ["@elevenlabs/react@1.0.2", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@elevenlabs/react/-/react-1.0.2.tgz", { "dependencies": { "@elevenlabs/client": "1.1.1" }, "peerDependencies": { "react": ">=16.8.0" } }, "sha512-hw0yKkaxb8RQf1fkibn2HhTORczYXFLw1j03VFN1UWSTgdEb4yArH5ZfNcFWmcfRXjygYZBNnl4s/D+7zzHl9Q=="],
 
     "@elevenlabs/types": ["@elevenlabs/types@0.9.0", "https://europe-west1-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/@elevenlabs/types/-/types-0.9.0.tgz", {}, "sha512-LaTO48+R2dY6CdgGQbKUcpSPs+5BA9hbvwHg+27P6Rg4pDZA/rIBHyBVzEVmySZ7i7dGNXRcFlZp5vMAxqUHqw=="],
 
