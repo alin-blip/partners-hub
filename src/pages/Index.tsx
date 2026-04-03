@@ -135,7 +135,7 @@ const Index = () => {
       {/* ═══ HERO ═══ */}
       <header className="relative pt-16 bg-primary overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary to-[hsl(220,50%,16%)]" />
-        <div className="absolute top-0 right-0 w-1/2 h-full opacity-10 bg-[radial-gradient(circle_at_70%_30%,hsl(24,95%,53%)_0%,transparent_60%)]" />
+        <div className="absolute top-0 right-0 w-1/2 h-full opacity-10 bg-[radial-gradient(circle_at_70%_30%,hsl(46,71%,52%)_0%,transparent_60%)]" />
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-20 lg:py-28">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
