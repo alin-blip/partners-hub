@@ -1,25 +1,55 @@
 
+Obiectiv: când se distribuie orice link de tip `/card/:slug`, preview-ul să arate mereu imaginea încărcată de tine, nu avatarul agentului și nu bannerul vechi.
 
-# Fix: Imagine statică pentru preview-ul social pe /card/:slug
+De ce încă nu e stabil:
+- `/card/:slug` este o rută SPA, deci crawler-ele sociale văd în primul rând metadatele statice din `index.html`.
+- `og-share` încă poate servi altă imagine pentru linkurile “social”.
+- `AgentCardPage` injectează client-side `og:image` din avatar, ceea ce poate produce preview-uri inconsistente în unele aplicații.
 
-## Problema
-Facebook crawlează `/card/:slug` și primește `index.html` cu o imagine OG care pointează la un URL Google Storage expirat. Rezultatul: preview gol sau generic.
+Implementare propusă:
+1. Adaug imaginea ta ca asset public nou, cu nume unic
+- Copiez upload-ul în `public/images/` cu un nume nou, versionat, ca să evit cache-ul vechi al Facebook/LinkedIn.
+- Nu suprascriu bannerul vechi.
 
-## Soluția
-Actualizăm `index.html` să folosească imaginea statică `eduforyou-facebook-banner.jpg` (care deja există în `public/images/`) cu URL-ul de producție. Astfel, ORICE pagină partajată pe Facebook (inclusiv `/card/:slug`) va afișa bannerul EduForYou.
+2. Fac această imagine sursa unică de preview pentru toate cardurile
+- Actualizez `index.html`:
+  - `og:image`
+  - `twitter:image`
+  - `og:image:secure_url`
+  - `og:image:type`
+  - `og:image:width`
+  - `og:image:height`
+- Asta garantează că linkul direct `/card/:slug` va afișa aceeași imagine statică pentru oricine.
 
-Link-ul special de social media (og-share) rămâne funcțional pentru preview-uri personalizate cu avatar.
+3. Aliniez și linkul “social media” la aceeași imagine
+- Actualizez `supabase/functions/og-share/index.ts` ca, pentru share de card (fără `post`), să folosească exact aceeași imagine statică.
+- Păstrez logica pentru `postId` doar la share-urile de postări sociale, dacă vrei ca postările să rămână cu preview-ul lor propriu.
 
-## Modificări
+4. Elimin conflictul din pagina publică a cardului
+- Actualizez `src/pages/public/AgentCardPage.tsx` ca injectarea meta client-side să nu mai seteze `og:image` la avatar.
+- O setez la aceeași imagine statică, ca preview-ul să fie consistent inclusiv în aplicațiile care execută parțial JS.
 
-### 1. `index.html` — OG image corect
-- Înlocuim URL-ul Google Storage expirat cu: `https://agents-eduforyou.co.uk/images/eduforyou-facebook-banner.jpg`
-- Actualizăm atât `og:image` cât și `twitter:image`
-- Dimensiuni corecte: 1200x630
+5. Corectez mesajele din UI
+- În `src/components/CardSettingsSection.tsx` schimb textele care spun că preview-ul va afișa “poza ta și numele tău”.
+- Mesajul nou va explica clar că toate cardurile folosesc preview-ul oficial EduForYou.
 
-### Detalii tehnice
-- Imaginea `eduforyou-facebook-banner.jpg` (44KB) există deja în `public/images/`
-- Schimbarea este doar în `index.html`, o singură linie per tag
-- Nu sunt necesare modificări de bază de date sau edge functions
-- Link-ul de social media personalizat (cu avatar) continuă să funcționeze separat
+Fișiere vizate:
+- `public/images/<nume-nou-versionat>.png`
+- `index.html`
+- `supabase/functions/og-share/index.ts`
+- `src/pages/public/AgentCardPage.tsx`
+- `src/components/CardSettingsSection.tsx`
 
+Detalii tehnice importante:
+- Nu folosesc `_redirects`; pe hostingul Lovable nu au efect.
+- Pentru linkul direct `/card/:slug`, aceasta este soluția cea mai sigură: o imagine statică unică în head.
+- Dacă imaginea ta nu are raportul ideal Open Graph, o pot publica exact așa cum este sau o pot centra într-o variantă OG-safe fără să schimb designul.
+
+Verificare după implementare:
+- Testez link direct `/card/:slug`
+- Testez linkul “social media”
+- Verific recrawl în Facebook Sharing Debugger și LinkedIn Post Inspector
+- Confirm că apare exact imaginea nouă, nu avatarul, nu bannerul vechi și nu preview gol
+
+Rezultat așteptat:
+- Orice share pentru card va afișa aceeași imagine statică oficială EduForYou, indiferent dacă linkul e distribuit de agent, admin sau owner.
