@@ -212,7 +212,7 @@ export function NotificationBell() {
               title: "New social post ready",
               description: caption.length > 60 ? caption.slice(0, 60) + "…" : caption,
               time: sp.social_posts?.created_at || new Date().toISOString(),
-              link: `${prefix}/social-feed`,
+              link: `${prefix}/social-posts`,
             });
           });
         }
