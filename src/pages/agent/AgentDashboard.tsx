@@ -134,7 +134,7 @@ export default function AgentDashboard() {
         {latestPost?.social_posts && (
           <Card
             className={`cursor-pointer transition-all hover:shadow-md ${!latestPost.seen_at ? "ring-1 ring-accent" : ""}`}
-            onClick={() => navigate("/agent/social-feed")}
+            onClick={() => navigate("/agent/social-posts")}
           >
             <CardContent className="p-3 flex items-center gap-3">
               <img
