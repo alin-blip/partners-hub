@@ -84,6 +84,21 @@ export default function AgentDashboard() {
     enabled: !!user,
   });
 
+  const { data: latestPost } = useQuery({
+    queryKey: ["latest-social-post", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("social_post_recipients")
+        .select("id, seen_at, social_posts(id, caption, image_url, created_at)")
+        .eq("agent_id", user!.id)
+        .order("id", { ascending: false })
+        .limit(1)
+        .single();
+      return data as any;
+    },
+    enabled: !!user,
+  });
+
   const activeEnrollments = enrollments.filter((e: any) => e.status === "active").length;
   const totalCommission = snapshots.reduce((s: number, snap: any) => s + Number(snap.agent_rate), 0);
   const totalPaid = myPayments.reduce((s: number, p: any) => s + Number(p.amount), 0);
