@@ -131,6 +131,32 @@ export default function AgentDashboard() {
         </div>
         <DashboardSearchCard />
 
+        {latestPost?.social_posts && (
+          <Card
+            className={`cursor-pointer transition-all hover:shadow-md ${!latestPost.seen_at ? "ring-1 ring-accent" : ""}`}
+            onClick={() => navigate("/agent/social-feed")}
+          >
+            <CardContent className="p-3 flex items-center gap-3">
+              <img
+                src={latestPost.social_posts.image_url}
+                alt="Latest post"
+                className="w-12 h-12 rounded-md object-cover shrink-0"
+              />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <Megaphone className="w-3.5 h-3.5 text-accent shrink-0" />
+                  <span className="text-xs font-semibold text-accent">New Post</span>
+                  {!latestPost.seen_at && <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />}
+                </div>
+                <p className="text-sm truncate text-foreground">{latestPost.social_posts.caption}</p>
+              </div>
+              <Button variant="ghost" size="sm" className="shrink-0 text-xs hidden sm:inline-flex">
+                View all →
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         <div data-onboarding="step-commissions">
           <CommissionOfferCards />
         </div>
