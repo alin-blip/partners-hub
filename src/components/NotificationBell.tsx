@@ -193,6 +193,31 @@ export function NotificationBell() {
         }
       }
 
+      // 6. Unseen social posts for agents/admins
+      {
+        const { data: unseenPosts } = await supabase
+          .from("social_post_recipients")
+          .select("id, post_id, social_posts(caption, created_at)")
+          .eq("agent_id", user.id)
+          .is("seen_at", null)
+          .order("id", { ascending: false })
+          .limit(5);
+
+        if (unseenPosts) {
+          unseenPosts.forEach((sp: any) => {
+            const caption = sp.social_posts?.caption || "New post";
+            items.push({
+              id: `social-${sp.id}`,
+              type: "social",
+              title: "New social post ready",
+              description: caption.length > 60 ? caption.slice(0, 60) + "…" : caption,
+              time: sp.social_posts?.created_at || new Date().toISOString(),
+              link: `${prefix}/social-feed`,
+            });
+          });
+        }
+      }
+
       items.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
       return items.slice(0, 15);
     },
@@ -219,6 +244,7 @@ export function NotificationBell() {
     task: "📋",
     enrollment: "🎓",
     lead: "📥",
+    social: "📢",
   };
 
   return (
