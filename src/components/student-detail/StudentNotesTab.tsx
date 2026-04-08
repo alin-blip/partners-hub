@@ -14,6 +14,7 @@ import { Send, AlertTriangle, MessageSquare, FileWarning, DollarSign, Info, Aler
 import { format } from "date-fns";
 import { StatusBadge } from "@/components/StatusBadge";
 import { notifyAgentOfStatusChange } from "@/lib/enrollment-emails";
+import { getVisibleStatuses, getAdminEditableStatuses } from "@/lib/status-utils";
 
 const NOTE_TYPE_CONFIG: Record<string, { label: string; icon: any; color: string }> = {
   note: { label: "Note", icon: MessageSquare, color: "bg-blue-500/10 text-blue-700" },
@@ -25,10 +26,7 @@ const NOTE_TYPE_CONFIG: Record<string, { label: string; icon: any; color: string
   status_update: { label: "Status Update", icon: RefreshCw, color: "bg-teal-500/10 text-teal-700" },
 };
 
-const ENROLLMENT_STATUSES = [
-  "applied", "conditional_offer", "unconditional_offer",
-  "enrolled", "deferred", "rejected", "withdrawn",
-];
+// Status list is now imported from status-utils.ts (role-aware)
 
 interface Props {
   studentId: string;
@@ -222,7 +220,7 @@ export function StudentNotesTab({ studentId, studentName, canSendRequests }: Pro
                 <Select value={newStatus} onValueChange={setNewStatus}>
                   <SelectTrigger className="w-[180px] h-9"><SelectValue placeholder="New status…" /></SelectTrigger>
                   <SelectContent>
-                    {ENROLLMENT_STATUSES.map((s) => (
+                    {(role === "owner" ? getVisibleStatuses("owner") : getAdminEditableStatuses()).map((s) => (
                       <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>
                     ))}
                   </SelectContent>
