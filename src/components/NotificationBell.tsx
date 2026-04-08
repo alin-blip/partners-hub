@@ -148,7 +148,7 @@ export function NotificationBell() {
           .eq("status", "new")
           .order("created_at", { ascending: false })
           .limit(5);
-        if (role === "agent") {
+        if (role !== "owner") {
           leadsQuery = leadsQuery.eq("agent_id", user.id);
         }
         const { data: newLeads } = await leadsQuery;
@@ -256,16 +256,16 @@ export function NotificationBell() {
   const unreadCount = notifications.filter((n) => !readIds.has(n.id)).length;
 
   const handleClick = useCallback((notification: NotificationItem) => {
-    markAsRead(notification.id);
-    setReadIds(getReadIds());
+    if (user) markAsRead(notification.id, user.id);
+    setReadIds(getReadIds(user?.id));
     setOpen(false);
     navigate(notification.link);
-  }, [navigate]);
+  }, [navigate, user]);
 
   const handleMarkAllRead = useCallback(() => {
-    notifications.forEach((n) => markAsRead(n.id));
-    setReadIds(getReadIds());
-  }, [notifications]);
+    if (user) notifications.forEach((n) => markAsRead(n.id, user.id));
+    setReadIds(getReadIds(user?.id));
+  }, [notifications, user]);
 
   const typeIcon: Record<string, string> = {
     message: "💬",
