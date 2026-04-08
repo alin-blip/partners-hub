@@ -1,26 +1,50 @@
 
 
-# Fix: ELEVENLABS_API_KEY conține Agent ID în loc de API Key
+# Fix: Agentul vocal se conectează dar nu pornește
 
 ## Problema
 
-Ai introdus **Agent ID-ul** în câmpul `ELEVENLABS_API_KEY` în loc de cheia API reală. Edge function-ul `elevenlabs-agent-token` folosește `ELEVENLABS_API_KEY` pentru autentificare la ElevenLabs API — dacă acolo e un Agent ID, cererea eșuează.
+Eroarea din consolă: **"Initial connection failed: v1 RTC path not found"** + conversația se oprește la "Se conectează..."
 
-## Ce trebuie făcut
+Cauza: parametrul `overrides` pasat în `startSession()` **abortează sesiunea** — este un [bug confirmat în SDK-ul ElevenLabs](https://github.com/elevenlabs/packages/issues/92). De asemenea, `connectionType: "webrtc"` este redundant când se folosește `conversationToken` (se detectează automat).
 
-1. **Actualizează secretul `ELEVENLABS_API_KEY`** cu cheia API reală de la ElevenLabs
-   - Mergi la [ElevenLabs Dashboard → API Keys](https://elevenlabs.io/app/settings/api-keys)
-   - Copiază cheia (începe de obicei cu `sk_...`)
-   - O setăm ca valoare nouă pentru `ELEVENLABS_API_KEY`
+## Soluția
 
-2. **Verifică `ELEVENLABS_AGENT_ID`** — acesta trebuie să conțină Agent ID-ul (nu cheia API)
+Eliminăm `overrides` și `connectionType` din `startSession()`. Agentul va folosi promptul configurat direct în ElevenLabs Dashboard.
 
-## Fișiere modificate
+### Fișier: `src/components/AIChatPanel.tsx`
 
-Niciun fișier nu trebuie modificat — doar secretele trebuie corectate.
+**Modificare** — simplificăm apelul `startSession`:
+
+```typescript
+// ÎNAINTE (nu funcționează):
+await conversation.startSession({
+  conversationToken: token,
+  connectionType: "webrtc",
+  overrides: {
+    agent: {
+      prompt: { prompt: systemPrompt },
+      firstMessage: firstMessage,
+      language: "ro",
+    },
+  },
+});
+
+// DUPĂ (fix):
+await conversation.startSession({
+  conversationToken: token,
+});
+```
+
+## Ce înseamnă asta
+
+- Agentul vocal va folosi **promptul și vocea configurate direct în ElevenLabs Dashboard**
+- Contextul dinamic (studenți, enrollment-uri) nu va mai fi injectat per sesiune — trebuie configurat manual în agentul ElevenLabs
+- Edge function-ul `elevenlabs-agent-token` rămâne funcțional (returnează token-ul), dar `systemPrompt` și `firstMessage` nu mai sunt folosite pe client
 
 ## Detalii tehnice
 
-- `ELEVENLABS_API_KEY` → se trimite în header-ul `xi-api-key` pentru autentificare
-- `ELEVENLABS_AGENT_ID` → se trimite ca query parameter `agent_id` pentru a identifica agentul
+- `overrides` în `startSession` este un bug cunoscut în `@elevenlabs/react` ≥ 1.0 (GitHub issue #92)
+- Documentația oficială arată `overrides` doar în constructorul `useConversation`, nu în `startSession`
+- `connectionType: "webrtc"` este auto-detectat când se folosește `conversationToken`
 
