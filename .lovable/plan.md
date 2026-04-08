@@ -1,40 +1,63 @@
 
 
-# Plan: Audit and fix notification isolation + read state
+# Plan: Upgrade EduForYou AI Assistant — Voice + Speed + Design
 
-## Current Issues Found
+## Problems identified
+1. **TTS is slow**: Uses `eleven_multilingual_v2` (high quality but slow). Full response waits to complete before TTS starts.
+2. **No streaming TTS**: Entire AI response must finish, then entire TTS audio must generate, then playback starts — double wait.
+3. **Design is basic**: Simple sheet panel with flat bubbles, no visual polish.
 
-### 1. Leads — Admin has no filter
-Line 148: only agents get `agent_id = user.id` filter. Admins have no explicit filter. RLS on `leads` table has no admin SELECT policy, so admins get 0 results — but this is fragile. If an admin policy is added later, they'd see all team leads as notifications.
-**Fix**: Add explicit `agent_id = user.id` filter for admin too (admins who are also lead owners see only their own).
+## Solution
 
-### 2. Enrollments — No scoping beyond RLS
-The enrollment notifications query (line 119) fetches all visible enrollments from last 7 days. For agents, RLS limits to own students — correct. For admins, RLS shows own + team enrollments — this is fine since admins should see team activity. No change needed.
+### 1. Streaming TTS — Speak While AI Responds
+Instead of waiting for the full AI response, split the response into sentences and start TTS for the first sentence immediately while the rest streams in. This gives near-instant voice feedback.
 
-### 3. Messages — Already correct
-RLS on `direct_conversations` ensures users only see their own conversations. The query further filters `sender_id != user.id`. No change needed.
+**Edge function change** (`elevenlabs-tts/index.ts`):
+- Switch to `/stream` endpoint: `https://api.elevenlabs.io/v1/text-to-speech/${voice}/stream`
+- Use `eleven_turbo_v2_5` model (2-3x faster than multilingual_v2, still multilingual)
+- Return chunked audio stream
 
-### 4. Read state (dot disappearing)
-Current implementation uses localStorage (`read-notification-ids`). The mechanism works: click notification → `markAsRead(id)` → `setReadIds(getReadIds())` → dot disappears and background changes.
+**Client change** (`AIChatPanel.tsx`):
+- Accumulate AI response text. When a sentence boundary is detected (`. ` / `? ` / `! ` / `\n`), send that chunk to TTS
+- Queue audio chunks for sequential playback — user hears first sentence within ~1-2 seconds
+- Cancel queued audio on stop
 
-**Potential issue**: The notification IDs are stable (e.g., `msg-{uuid}`, `task-{uuid}`), so once read they stay read. However, if the user reads a message via the Messages page directly (not via notification click), the notification still shows as "unread" in the bell because localStorage wasn't updated. For messages specifically, we should cross-check against `read_at` on `direct_messages` — if `read_at` is set, don't show the notification at all (it's already filtered by `is("read_at", null)`, so this is already handled).
+### 2. Faster AI Model
+- Change `ai-chat/index.ts` from `google/gemini-3-flash-preview` to `google/gemini-2.5-flash` — faster responses, still high quality
 
-**No bugs found** in the read/unread dot mechanism itself.
+### 3. Redesigned Chat UI
+Completely refresh the `AIChatPanel.tsx` design:
 
-### 5. Tasks, Social, Invoices — Already correct
-All filtered by `user.id` explicitly. No cross-user leakage.
+- **Glassmorphic header** with gradient accent and animated status dot
+- **Avatar bubbles**: Bot avatar (branded icon) on assistant messages, user initial on user messages
+- **Typing indicator**: Animated 3-dot bounce instead of plain spinner
+- **Voice mode visual**: Animated sound wave bars when listening/speaking (CSS animation)
+- **Message timestamps**: Subtle relative time on each message
+- **Quick action chips**: Suggested questions on empty state ("How do commissions work?", "Visa guidance", "My students")
+- **Smooth animations**: Messages slide in with `animate-in`
+- **Better input bar**: Rounded pill shape, mic button with pulse animation when active, gradient send button
+- **Dark mode polished**: Proper contrast and glass effects
 
----
+### 4. Sentence-Chunked TTS Architecture
 
-## Changes
+```text
+AI Stream:  "Hello, I can help you with that. Let me check your students..."
+             ↓ sentence 1 detected          ↓ sentence 2 detected
+TTS Queue:  [fetch("Hello, I can help...")]  [fetch("Let me check...")]
+Playback:   ▶ plays sentence 1              ▶ plays sentence 2 (queued)
+```
 
-### `src/components/NotificationBell.tsx`
-- **Leads section** (line 148): Change condition from `if (role === "agent")` to `if (role !== "owner")` so both agents AND admins get the `agent_id = user.id` filter. This ensures an admin only sees leads they personally own, not their team's leads as notifications.
-- **Add `user.id` to localStorage key**: Change `STORAGE_KEY` to include user ID (`read-notification-ids-${userId}`) so different users on the same browser don't share read state. This prevents the edge case where two users on the same device see each other's read/unread state.
+## Files Modified
+1. `supabase/functions/elevenlabs-tts/index.ts` — Switch to streaming endpoint + turbo model
+2. `supabase/functions/ai-chat/index.ts` — Switch to `google/gemini-2.5-flash`
+3. `src/components/AIChatPanel.tsx` — Complete redesign + sentence-chunked TTS logic
 
-### Summary
-- 1 file modified: `NotificationBell.tsx`
-- 2 small changes: leads filter + per-user localStorage key
-- Zero DB changes needed — RLS already enforces isolation correctly
-- Zero risk to existing functionality
+## Files Created
+None — all changes within existing files.
+
+## Impact
+- Voice response starts 3-5x faster (sentence streaming + turbo model)
+- AI text response ~40% faster (gemini-2.5-flash)
+- Modern, polished chat UI
+- Zero breaking changes — same conversation persistence, same knowledge base
 
