@@ -18,12 +18,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Search, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { notifyAgentOfStatusChange } from "@/lib/enrollment-emails";
+import { getVisibleStatuses, getDisplayStatus, getAdminEditableStatuses } from "@/lib/status-utils";
 
-const STATUSES = [
-  "new_application", "processing", "assessment_booked", "pass", "fail",
-  "additional_requirements", "final_offer", "enrolled",
-  "commission_25_ready", "commission_paid", "withdrawn", "cancelled",
-];
 const PAGE_SIZE = 20;
 
 export default function EnrollmentsPage() {
