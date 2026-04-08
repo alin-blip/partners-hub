@@ -339,10 +339,26 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
                       <TableCell className="font-medium">{e.universities?.name}</TableCell>
                       <TableCell>{e.courses?.name}</TableCell>
                       <TableCell>
-                        {canChangeStatus && !isTransferred ? (
+                        {isTransferred ? (
+                          <StatusBadge status="transferred" />
+                        ) : role === "agent" ? (
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <StatusBadge status={getDisplayStatus(e.status, role)} />
+                            {canAgentBookAssessment(e.status) && hasSignedConsent && (
+                              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setAssessmentEnrollmentId(e.id)}>
+                                <CalendarDays className="w-3 h-3 mr-1" /> Book Assessment
+                              </Button>
+                            )}
+                            {canAgentRequestCancel(e.status) && (
+                              <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30" onClick={() => setCancelEnrollmentId(e.id)}>
+                                <XCircle className="w-3 h-3 mr-1" /> Request Cancel
+                              </Button>
+                            )}
+                          </div>
+                        ) : canChangeStatus ? (
                           <Select value={e.status} onValueChange={(v) => updateStatus.mutate({ id: e.id, status: v, oldStatus: e.status })}>
                             <SelectTrigger className="w-[180px] h-8">
-                              <StatusBadge status={e.status} />
+                              <StatusBadge status={getDisplayStatus(e.status, role)} />
                             </SelectTrigger>
                             <SelectContent>
                               {availableStatuses.map((s) => (
@@ -351,7 +367,7 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
                             </SelectContent>
                           </Select>
                         ) : (
-                          <StatusBadge status={e.status} />
+                          <StatusBadge status={getDisplayStatus(e.status, role)} />
                         )}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">{format(new Date(e.created_at), "dd MMM yyyy")}</TableCell>
