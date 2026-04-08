@@ -1,151 +1,40 @@
 
 
-# Plan: Sistem de Facturare (Invoicing System)
+# Plan: Audit and fix notification isolation + read state
 
-## Rezumat
-Sistem complet de facturare: agenții/adminii își introduc datele bancare pe profil, trimit cereri de invoice pentru comisioanele lor, iar owner-ul aprobă/plătește/respinge. Izolare strictă prin RLS — fiecare agent vede doar propriile invoice-uri, fiecare admin doar pe ale sale (nu ale altor admini).
+## Current Issues Found
 
----
+### 1. Leads — Admin has no filter
+Line 148: only agents get `agent_id = user.id` filter. Admins have no explicit filter. RLS on `leads` table has no admin SELECT policy, so admins get 0 results — but this is fragile. If an admin policy is added later, they'd see all team leads as notifications.
+**Fix**: Add explicit `agent_id = user.id` filter for admin too (admins who are also lead owners see only their own).
 
-## Faza 1 — Migrație DB
+### 2. Enrollments — No scoping beyond RLS
+The enrollment notifications query (line 119) fetches all visible enrollments from last 7 days. For agents, RLS limits to own students — correct. For admins, RLS shows own + team enrollments — this is fine since admins should see team activity. No change needed.
 
-### Tabelă `billing_details`
-- `id` uuid PK
-- `user_id` uuid UNIQUE, NOT NULL (referință la profiles.id)
-- `account_holder_name` text
-- `sort_code` text nullable
-- `account_number` text nullable
-- `iban` text nullable
-- `swift_bic` text nullable
-- `bank_name` text nullable
-- `is_company` boolean default false
-- `company_name`, `company_number`, `company_address`, `vat_number` — toate text nullable
-- `created_at`, `updated_at` timestamptz
+### 3. Messages — Already correct
+RLS on `direct_conversations` ensures users only see their own conversations. The query further filters `sender_id != user.id`. No change needed.
 
-**RLS (billing_details)**:
-- SELECT/UPDATE: `user_id = auth.uid()` — fiecare user vede/editează doar propriile date
-- INSERT: `user_id = auth.uid()`
-- Owner ALL: `has_role(auth.uid(), 'owner')` — owner-ul vede toate pentru a verifica la aprobare
-- Nu există acces cross-agent sau cross-admin
+### 4. Read state (dot disappearing)
+Current implementation uses localStorage (`read-notification-ids`). The mechanism works: click notification → `markAsRead(id)` → `setReadIds(getReadIds())` → dot disappears and background changes.
 
-### Tabelă `invoice_requests`
-- `id` uuid PK
-- `requester_id` uuid NOT NULL (referință la profiles.id)
-- `snapshot_id` uuid NOT NULL (referință la commission_snapshots.id)
-- `amount` numeric NOT NULL
-- `status` text default 'submitted' (submitted, in_review, approved, paid, rejected)
-- `invoice_number` text auto-generated (trigger: `INV-YYYYMMDD-XXXX`)
-- `notes` text nullable (agentul scrie)
-- `owner_notes` text nullable (owner-ul scrie)
-- `paid_at` timestamptz nullable
-- `created_at`, `updated_at` timestamptz
+**Potential issue**: The notification IDs are stable (e.g., `msg-{uuid}`, `task-{uuid}`), so once read they stay read. However, if the user reads a message via the Messages page directly (not via notification click), the notification still shows as "unread" in the bell because localStorage wasn't updated. For messages specifically, we should cross-check against `read_at` on `direct_messages` — if `read_at` is set, don't show the notification at all (it's already filtered by `is("read_at", null)`, so this is already handled).
 
-**RLS (invoice_requests) — REGULA CRITICĂ**:
-- Agent SELECT: `requester_id = auth.uid()` — agentul vede DOAR propriile invoice-uri
-- Admin SELECT: `requester_id = auth.uid()` — adminul vede DOAR propriile invoice-uri (NU ale echipei)
-- INSERT: `requester_id = auth.uid()` — nimeni nu poate crea invoice în numele altcuiva
-- Owner ALL: `has_role(auth.uid(), 'owner')` — doar owner-ul gestionează toate
-- UPDATE pentru owner: status changes, owner_notes, paid_at
+**No bugs found** in the read/unread dot mechanism itself.
 
-**Trigger**: auto-generate `invoice_number` la INSERT + auto-update `updated_at`
+### 5. Tasks, Social, Invoices — Already correct
+All filtered by `user.id` explicitly. No cross-user leakage.
 
 ---
 
-## Faza 2 — BillingDetailsCard
-
-### Fișier nou: `src/components/BillingDetailsCard.tsx`
-- Card cu formular pentru date bancare personale
-- Toggle "I have a company" care arată/ascunde câmpurile de firmă
-- Câmpuri personale: Account Holder Name, Sort Code, Account Number, Bank Name, IBAN, SWIFT/BIC
-- Câmpuri firmă: Company Name, Company Number, Company Address, VAT Number
-- Upsert la save (insert sau update)
-
-### Modificare: `src/pages/shared/ProfilePage.tsx`
-- Import și render `BillingDetailsCard` sub cardul Personal Information
-
----
-
-## Faza 3 — Pagina Invoices (Agent/Admin)
-
-### Fișier nou: `src/pages/shared/InvoicesPage.tsx`
-- Tabel cu invoice-urile proprii: invoice_number, amount, status, created_at
-- Status badges colorate (submitted=yellow, in_review=blue, approved=green, paid=emerald, rejected=red)
-- Buton "Request Invoice" → dialog:
-  - Dropdown cu commission_snapshots eligibile (status pending_25/ready_full, fără invoice deja)
-  - Suma pre-populată din snapshot
-  - Câmp notes opțional
-  - Verificare că billing_details există — dacă nu, toast cu link la Profile
-- MetricCards: Total Pending, Total Approved, Total Paid
-
----
-
-## Faza 4 — Pagina Owner Invoices
-
-### Fișier nou: `src/pages/owner/OwnerInvoicesPage.tsx`
-- Tabs: All / Submitted / Approved / Paid / Rejected
-- MetricCards: Pending Amount, Approved Amount, Paid This Month
-- Tabel cu toate invoice-urile: agent name, amount, status, date, invoice_number
-- Acțiuni inline pe fiecare rând:
-  - "Review" → setează in_review
-  - "Approve" → setează approved
-  - "Mark Paid" → setează paid + paid_at
-  - "Reject" → dialog cu owner_notes + setează rejected
-- Click pe rând → drawer/dialog cu detalii complete inclusiv billing info al agentului (read-only)
-
----
-
-## Faza 5 — Routing, Sidebar, Notificări
-
-### `src/App.tsx`
-- Rute noi: `/{prefix}/invoices` pentru toate rolurile
-- Owner: `/owner/invoices` → OwnerInvoicesPage
-- Agent/Admin: `/{prefix}/invoices` → InvoicesPage
-
-### `src/components/AppSidebar.tsx`
-- Adăugat "Invoices" (icon: Receipt) în mainItems, sub Enrollments
+## Changes
 
 ### `src/components/NotificationBell.tsx`
-- Tip nou `"invoice"` cu icon 🧾
-- Agent/Admin: notificare când invoice-ul primește status nou (approved/paid/rejected)
-- Query: invoice_requests unde requester_id = user.id și updated_at recent și status != submitted
+- **Leads section** (line 148): Change condition from `if (role === "agent")` to `if (role !== "owner")` so both agents AND admins get the `agent_id = user.id` filter. This ensures an admin only sees leads they personally own, not their team's leads as notifications.
+- **Add `user.id` to localStorage key**: Change `STORAGE_KEY` to include user ID (`read-notification-ids-${userId}`) so different users on the same browser don't share read state. This prevents the edge case where two users on the same device see each other's read/unread state.
 
----
-
-## Securitate — Regulile critice
-
-```text
-billing_details:
-  Agent A → vede DOAR billing_details.user_id = A
-  Admin B → vede DOAR billing_details.user_id = B
-  Owner   → vede TOATE (necesar la aprobare)
-
-invoice_requests:
-  Agent A → vede DOAR invoice_requests.requester_id = A
-  Admin B → vede DOAR invoice_requests.requester_id = B
-  Admin B NU vede invoice-urile agenților din echipa lui
-  Owner   → vede și gestionează TOATE
-```
-
-Niciun agent nu poate vedea invoice-urile altui agent.
-Niciun admin nu poate vedea invoice-urile altui admin.
-Doar owner-ul are vizibilitate globală.
-
----
-
-## Fișiere create
-1. `src/components/BillingDetailsCard.tsx`
-2. `src/pages/shared/InvoicesPage.tsx`
-3. `src/pages/owner/OwnerInvoicesPage.tsx`
-4. 1 migrație SQL (2 tabele + RLS + triggers)
-
-## Fișiere modificate
-1. `src/pages/shared/ProfilePage.tsx` — adăugat BillingDetailsCard
-2. `src/components/AppSidebar.tsx` — link Invoices
-3. `src/components/NotificationBell.tsx` — notificări invoice
-4. `src/App.tsx` — rute noi
-
-## Impact
-- Zero modificări pe tabele existente
-- Zero risc pentru funcționalitatea curentă
-- Billing details sunt PII — protejate strict prin RLS (user vede doar propriile)
+### Summary
+- 1 file modified: `NotificationBell.tsx`
+- 2 small changes: leads filter + per-user localStorage key
+- Zero DB changes needed — RLS already enforces isolation correctly
+- Zero risk to existing functionality
 
