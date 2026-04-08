@@ -16,6 +16,20 @@ serve(async (req) => {
     if (!ELEVENLABS_API_KEY) throw new Error("ELEVENLABS_API_KEY is not configured");
     if (!ELEVENLABS_AGENT_ID) throw new Error("ELEVENLABS_AGENT_ID is not configured");
 
+    // Parse optional language from request body
+    let requestedLanguage = "en";
+    try {
+      const body = await req.json();
+      if (body?.language) requestedLanguage = body.language;
+    } catch { /* no body or invalid JSON — default to English */ }
+
+    const LANGUAGE_NAMES: Record<string, string> = {
+      en: "English", ro: "Romanian", es: "Spanish", fr: "French",
+      de: "German", it: "Italian", pt: "Portuguese", ar: "Arabic",
+      hi: "Hindi", zh: "Chinese",
+    };
+    const languageName = LANGUAGE_NAMES[requestedLanguage] || "English";
+
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -185,7 +199,7 @@ ${knowledgeSection}${userDataSection}
 - Only discuss data provided above in [Your Context]. Do not invent student names, enrollment details or statistics.
 - Never reveal other agents' students or data.
 - If you don't know something specific, say so honestly and suggest the user contact their admin or the owner.
-- Always respond in English, regardless of the language the user writes in.`;
+- Always respond in ${languageName}. Every reply must be in ${languageName}.`;
 
     // Request signed URL from ElevenLabs (WebSocket — more compatible than WebRTC tokens)
     const elResponse = await fetch(
@@ -207,7 +221,9 @@ ${knowledgeSection}${userDataSection}
       JSON.stringify({
         signed_url,
         systemPrompt,
-        firstMessage: `Hi ${userName}! I'm the EduForYou AI assistant. How can I help you?`,
+        firstMessage: requestedLanguage === "en"
+          ? `Hi ${userName}! I'm the EduForYou AI assistant. How can I help you?`
+          : `Hi ${userName}! I'm the EduForYou AI assistant. I'll be speaking in ${languageName}. How can I help you?`,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
