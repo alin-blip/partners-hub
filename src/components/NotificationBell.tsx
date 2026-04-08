@@ -22,21 +22,24 @@ type NotificationItem = {
   link: string;
 };
 
-const STORAGE_KEY = "read-notification-ids";
+function getStorageKey(userId: string) {
+  return `read-notification-ids-${userId}`;
+}
 
-function getReadIds(): Set<string> {
+function getReadIds(userId?: string): Set<string> {
+  if (!userId) return new Set();
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(getStorageKey(userId));
     return raw ? new Set(JSON.parse(raw)) : new Set();
   } catch { return new Set(); }
 }
 
-function markAsRead(id: string) {
-  const ids = getReadIds();
+function markAsRead(id: string, userId: string) {
+  const ids = getReadIds(userId);
   ids.add(id);
   // Keep only last 200 to avoid bloat
   const arr = [...ids].slice(-200);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+  localStorage.setItem(getStorageKey(userId), JSON.stringify(arr));
 }
 
 export function NotificationBell() {
@@ -44,7 +47,7 @@ export function NotificationBell() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [readIds, setReadIds] = useState<Set<string>>(getReadIds);
+  const [readIds, setReadIds] = useState<Set<string>>(() => getReadIds(user?.id));
   const prefix = role === "owner" ? "/owner" : role === "admin" ? "/admin" : "/agent";
 
   const { data: notifications = [] } = useQuery({
@@ -145,7 +148,7 @@ export function NotificationBell() {
           .eq("status", "new")
           .order("created_at", { ascending: false })
           .limit(5);
-        if (role === "agent") {
+        if (role !== "owner") {
           leadsQuery = leadsQuery.eq("agent_id", user.id);
         }
         const { data: newLeads } = await leadsQuery;
@@ -253,16 +256,16 @@ export function NotificationBell() {
   const unreadCount = notifications.filter((n) => !readIds.has(n.id)).length;
 
   const handleClick = useCallback((notification: NotificationItem) => {
-    markAsRead(notification.id);
-    setReadIds(getReadIds());
+    if (user) markAsRead(notification.id, user.id);
+    setReadIds(getReadIds(user?.id));
     setOpen(false);
     navigate(notification.link);
-  }, [navigate]);
+  }, [navigate, user]);
 
   const handleMarkAllRead = useCallback(() => {
-    notifications.forEach((n) => markAsRead(n.id));
-    setReadIds(getReadIds());
-  }, [notifications]);
+    if (user) notifications.forEach((n) => markAsRead(n.id, user.id));
+    setReadIds(getReadIds(user?.id));
+  }, [notifications, user]);
 
   const typeIcon: Record<string, string> = {
     message: "💬",
