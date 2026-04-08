@@ -123,7 +123,7 @@ export default function OwnerDashboard() {
           courses!inner(name)
         `)
         .order("created_at", { ascending: false })
-        .limit(10);
+        .limit(20);
       return data || [];
     },
   });
@@ -173,6 +173,7 @@ export default function OwnerDashboard() {
   });
 
   const roleMap = new Map(roles.map((r: any) => [r.user_id, r.role]));
+  const profileMap = new Map(profiles.map((p: any) => [p.id, p]));
   const admins = profiles.filter((p: any) => roleMap.get(p.id) === "admin");
   const agents = profiles.filter((p: any) => roleMap.get(p.id) === "agent");
   const activeAgents = agents.filter((a: any) => a.is_active);
@@ -679,6 +680,7 @@ export default function OwnerDashboard() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Student</TableHead>
+                  <TableHead>Agent</TableHead>
                   <TableHead>University</TableHead>
                   <TableHead>Course</TableHead>
                   <TableHead>Status</TableHead>
@@ -686,22 +688,28 @@ export default function OwnerDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentEnrollments.map((e: any) => (
-                  <TableRow key={e.id}>
-                    <TableCell className="font-medium">
-                      {e.students?.first_name} {e.students?.last_name}
-                    </TableCell>
-                    <TableCell>{e.universities?.name}</TableCell>
-                    <TableCell>{e.courses?.name}</TableCell>
-                    <TableCell><StatusBadge status={e.status} /></TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {format(new Date(e.created_at), "dd MMM yyyy")}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {recentEnrollments.map((e: any) => {
+                  const agentProfile = profileMap.get(e.students?.agent_id);
+                  return (
+                    <TableRow key={e.id}>
+                      <TableCell className="font-medium">
+                        {e.students?.first_name} {e.students?.last_name}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {agentProfile?.full_name || "—"}
+                      </TableCell>
+                      <TableCell>{e.universities?.name}</TableCell>
+                      <TableCell>{e.courses?.name}</TableCell>
+                      <TableCell><StatusBadge status={e.status} /></TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {format(new Date(e.created_at), "dd MMM yyyy")}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 {recentEnrollments.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                       No enrollments yet
                     </TableCell>
                   </TableRow>
