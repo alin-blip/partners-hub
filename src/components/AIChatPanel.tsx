@@ -320,34 +320,35 @@ function CallModeView() {
         )}
 
         {/* Main avatar orb */}
-        <div className="relative z-10">
+         <div className="relative z-10">
           <div
-            className={`h-28 w-28 rounded-full flex items-center justify-center shadow-2xl transition-all duration-700 ${
+            className={`h-28 w-28 rounded-full flex items-center justify-center shadow-2xl transition-all duration-700 overflow-hidden ${
               isConnected
                 ? isSpeaking
-                  ? "bg-gradient-to-br from-primary via-primary/80 to-accent scale-110 shadow-primary/30"
-                  : "bg-gradient-to-br from-accent/80 via-accent to-accent/60 scale-100 shadow-accent/20"
-                : "bg-gradient-to-br from-muted to-muted/80 shadow-md"
+                  ? "ring-4 ring-primary/40 scale-110 shadow-primary/30"
+                  : "ring-4 ring-accent/30 scale-100 shadow-accent/20"
+                : "ring-2 ring-muted-foreground/20 shadow-md"
             }`}
           >
-            {isConnected ? (
-              <div className="flex items-center gap-[3px]">
-                {[0, 1, 2, 3, 4].map((i) => (
-                  <div
-                    key={i}
-                    className={`w-1 rounded-full bg-primary-foreground/90 transition-all ${
-                      isSpeaking ? "animate-bounce" : "h-3"
-                    }`}
-                    style={{
-                      height: isSpeaking ? undefined : "12px",
-                      animationDelay: isSpeaking ? `${i * 120}ms` : undefined,
-                      animationDuration: isSpeaking ? "0.6s" : undefined,
-                    }}
-                  />
-                ))}
+            <img src={aiAvatarImg} alt="EduForYou AI" className="h-full w-full object-cover" />
+            {isConnected && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[1px]">
+                <div className="flex items-center gap-[3px]">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <div
+                      key={i}
+                      className={`w-1 rounded-full bg-white/90 transition-all ${
+                        isSpeaking ? "animate-bounce" : "h-3"
+                      }`}
+                      style={{
+                        height: isSpeaking ? undefined : "12px",
+                        animationDelay: isSpeaking ? `${i * 120}ms` : undefined,
+                        animationDuration: isSpeaking ? "0.6s" : undefined,
+                      }}
+                    />
+                  ))}
+                </div>
               </div>
-            ) : (
-              <Mic className="h-10 w-10 text-muted-foreground/60" />
             )}
           </div>
           {isConnected && (
