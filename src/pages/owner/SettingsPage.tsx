@@ -17,7 +17,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Upload, Loader2, Palette, Calendar, FileUp, Pencil, Download } from "lucide-react";
+import { Plus, Trash2, Upload, Loader2, Palette, Calendar, FileUp, Pencil, Download, CheckSquare } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { DocumentProcessorDialog } from "@/components/DocumentProcessorDialog";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
