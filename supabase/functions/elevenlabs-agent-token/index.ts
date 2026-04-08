@@ -30,6 +30,23 @@ serve(async (req) => {
     };
     const languageName = LANGUAGE_NAMES[requestedLanguage] || "English";
 
+    const LOCALIZED_GREETINGS: Record<string, (name: string) => string> = {
+      en: (n) => `Hi ${n}! I'm the EduForYou AI assistant. How can I help you?`,
+      ro: (n) => `Bună ${n}! Sunt asistentul AI EduForYou. Cu ce te pot ajuta?`,
+      es: (n) => `¡Hola ${n}! Soy el asistente de IA de EduForYou. ¿En qué puedo ayudarte?`,
+      fr: (n) => `Bonjour ${n} ! Je suis l'assistant IA d'EduForYou. Comment puis-je vous aider ?`,
+      de: (n) => `Hallo ${n}! Ich bin der KI-Assistent von EduForYou. Wie kann ich Ihnen helfen?`,
+      it: (n) => `Ciao ${n}! Sono l'assistente AI di EduForYou. Come posso aiutarti?`,
+      pt: (n) => `Olá ${n}! Sou o assistente de IA da EduForYou. Como posso ajudá-lo?`,
+      ar: (n) => `مرحبًا ${n}! أنا مساعد EduForYou الذكي. كيف يمكنني مساعدتك؟`,
+      hi: (n) => `नमस्ते ${n}! मैं EduForYou का AI सहायक हूँ। मैं आपकी कैसे मदद कर सकता हूँ?`,
+      zh: (n) => `你好 ${n}！我是EduForYou的AI助手。有什么可以帮您的？`,
+    };
+
+    function getLocalizedGreeting(lang: string, name: string): string {
+      return (LOCALIZED_GREETINGS[lang] || LOCALIZED_GREETINGS["en"])(name);
+    }
+
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -199,7 +216,9 @@ ${knowledgeSection}${userDataSection}
 - Only discuss data provided above in [Your Context]. Do not invent student names, enrollment details or statistics.
 - Never reveal other agents' students or data.
 - If you don't know something specific, say so honestly and suggest the user contact their admin or the owner.
-- Always respond in ${languageName}. Every reply must be in ${languageName}.`;
+- You MUST speak and reply ONLY in ${languageName}. Every single word of every reply must be in ${languageName}.
+- Do NOT use English unless ${languageName} IS English.
+- This is non-negotiable — the user has explicitly chosen ${languageName} as their language.`;
 
     // Request signed URL from ElevenLabs (WebSocket — more compatible than WebRTC tokens)
     const elResponse = await fetch(
@@ -221,9 +240,7 @@ ${knowledgeSection}${userDataSection}
       JSON.stringify({
         signed_url,
         systemPrompt,
-        firstMessage: requestedLanguage === "en"
-          ? `Hi ${userName}! I'm the EduForYou AI assistant. How can I help you?`
-          : `Hi ${userName}! I'm the EduForYou AI assistant. I'll be speaking in ${languageName}. How can I help you?`,
+        firstMessage: getLocalizedGreeting(requestedLanguage, userName),
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
