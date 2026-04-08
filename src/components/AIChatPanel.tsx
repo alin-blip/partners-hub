@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Bot, Send, Plus, MessageSquare, ChevronLeft, Mic, MicOff, Volume2, VolumeX, Sparkles, Square } from "lucide-react";
+import { Bot, Send, Plus, MessageSquare, ChevronLeft, Mic, MicOff, Volume2, VolumeX, Sparkles, Square, Phone, PhoneOff } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -44,7 +44,6 @@ function unlockAudio() {
 // Sentence boundary detector for chunked TTS
 function extractSentences(text: string): { sentences: string[]; remainder: string } {
   const sentences: string[] = [];
-  // Match sentences ending with . ? ! followed by space or end
   const regex = /[^.!?\n]+[.!?]+(?:\s|$)/g;
   let match: RegExpExecArray | null;
   let lastIndex = 0;
@@ -203,13 +202,20 @@ export function AIChatPanel() {
   const [speaking, setSpeaking] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(true);
   const [listening, setListening] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioQueueRef = useRef<string[]>([]);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const isPlayingRef = useRef(false);
   const cancelledRef = useRef(false);
   const pendingSubmitRef = useRef(false);
+  const voiceModeRef = useRef(false);
   const queryClient = useQueryClient();
+
+  // Keep ref in sync with state for use in callbacks
+  useEffect(() => {
+    voiceModeRef.current = voiceMode;
+  }, [voiceMode]);
 
   // ElevenLabs Scribe v2 Realtime
   const scribe = useScribe({
@@ -266,11 +272,46 @@ export function AIChatPanel() {
     };
   }, []);
 
+  // Restart mic for voice conversation mode
+  const restartMicForVoiceMode = useCallback(async () => {
+    if (!voiceModeRef.current) return;
+    
+    try {
+      const { data, error } = await supabase.functions.invoke("elevenlabs-scribe-token");
+      if (error || !data?.token) {
+        console.error("Failed to get scribe token for voice mode restart");
+        setVoiceMode(false);
+        return;
+      }
+
+      await scribe.connect({
+        token: data.token,
+        microphone: {
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      });
+      setListening(true);
+    } catch (err) {
+      console.error("Voice mode mic restart error:", err);
+      setVoiceMode(false);
+      setListening(false);
+    }
+  }, [scribe]);
+
   // Audio queue player
   const playNextInQueue = useCallback(async () => {
     if (isPlayingRef.current || cancelledRef.current) return;
     if (audioQueueRef.current.length === 0) {
       setSpeaking(false);
+      // Voice mode: auto-restart mic after TTS finishes
+      if (voiceModeRef.current) {
+        setTimeout(() => {
+          if (voiceModeRef.current) {
+            restartMicForVoiceMode();
+          }
+        }, 500);
+      }
       return;
     }
 
@@ -293,12 +334,11 @@ export function AIChatPanel() {
     } finally {
       isPlayingRef.current = false;
       currentAudioRef.current = null;
-      // Play next chunk
       if (!cancelledRef.current) {
         playNextInQueue();
       }
     }
-  }, []);
+  }, [restartMicForVoiceMode]);
 
   const enqueueAudio = useCallback((url: string) => {
     audioQueueRef.current.push(url);
@@ -317,11 +357,57 @@ export function AIChatPanel() {
     }
     isPlayingRef.current = false;
     setSpeaking(false);
-    // Reset cancel flag after a tick
     setTimeout(() => { cancelledRef.current = false; }, 50);
   }, []);
 
+  // Start voice conversation mode
+  const startVoiceConversation = useCallback(async () => {
+    unlockAudio();
+    stopAllAudio();
+    setAutoSpeak(true);
+    setVoiceMode(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("elevenlabs-scribe-token");
+      if (error || !data?.token) {
+        toast.error("Nu s-a putut porni conversația vocală.");
+        setVoiceMode(false);
+        return;
+      }
+
+      await scribe.connect({
+        token: data.token,
+        microphone: {
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      });
+      setListening(true);
+      setInput("");
+    } catch (err) {
+      console.error("Voice conversation start error:", err);
+      toast.error("Eroare la pornirea conversației vocale.");
+      setVoiceMode(false);
+    }
+  }, [scribe, stopAllAudio]);
+
+  // Stop voice conversation mode
+  const stopVoiceConversation = useCallback(() => {
+    setVoiceMode(false);
+    if (scribe.isConnected) {
+      scribe.disconnect();
+    }
+    setListening(false);
+    stopAllAudio();
+  }, [scribe, stopAllAudio]);
+
   const toggleListening = useCallback(async () => {
+    // If in voice mode and user clicks mic, exit voice mode
+    if (voiceMode) {
+      stopVoiceConversation();
+      return;
+    }
+
     if (listening || scribe.isConnected) {
       scribe.disconnect();
       setListening(false);
@@ -350,7 +436,7 @@ export function AIChatPanel() {
       console.error("Scribe connect error:", err);
       toast.error("Eroare la pornirea microfonului. Verifică permisiunile.");
     }
-  }, [listening, scribe, stopAllAudio]);
+  }, [listening, scribe, stopAllAudio, voiceMode, stopVoiceConversation]);
 
   const loadConversation = useCallback(async (convId: string) => {
     const { data } = await supabase
@@ -374,6 +460,7 @@ export function AIChatPanel() {
     setActiveConversationId(null);
     setShowHistory(false);
     stopAllAudio();
+    if (voiceMode) stopVoiceConversation();
   };
 
   const send = async (overrideText?: string) => {
@@ -382,6 +469,12 @@ export function AIChatPanel() {
 
     unlockAudio();
     cancelledRef.current = false;
+
+    // If user typed manually while in voice mode, exit voice mode
+    const isFromKeyboard = !pendingSubmitRef.current && !overrideText;
+    if (isFromKeyboard && voiceMode) {
+      stopVoiceConversation();
+    }
 
     const userMsg: Msg = { role: "user", content: text, timestamp: new Date() };
     const newMessages = [...messages, userMsg];
@@ -441,6 +534,10 @@ export function AIChatPanel() {
       onError: (err) => {
         toast.error(err);
         setLoading(false);
+        // If in voice mode, restart mic even on error so user can try again
+        if (voiceModeRef.current) {
+          setTimeout(() => restartMicForVoiceMode(), 500);
+        }
       },
       onConversationId: (id) => setActiveConversationId(id),
     });
@@ -469,6 +566,13 @@ export function AIChatPanel() {
         .mic-pulse {
           animation: pulse-ring 1.5s infinite;
         }
+        @keyframes voice-glow {
+          0%, 100% { box-shadow: 0 0 0 0 hsl(var(--destructive) / 0.3); }
+          50% { box-shadow: 0 0 0 8px hsl(var(--destructive) / 0); }
+        }
+        .voice-mode-pulse {
+          animation: voice-glow 2s ease-in-out infinite;
+        }
       `}</style>
 
       <Sheet open={open} onOpenChange={setOpen}>
@@ -494,7 +598,7 @@ export function AIChatPanel() {
                     <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-md">
                       <Bot className="h-5 w-5 text-primary-foreground" />
                     </div>
-                    <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-500 border-2 border-background" />
+                    <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-background ${voiceMode ? "bg-destructive animate-pulse" : "bg-emerald-500"}`} />
                   </div>
                 )}
                 <div>
@@ -502,13 +606,26 @@ export function AIChatPanel() {
                     {showHistory ? "Istoric Conversații" : "EduForYou AI"}
                   </SheetTitle>
                   {!showHistory && (
-                    <p className="text-[11px] text-muted-foreground">Powered by AI • Disponibil 24/7</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {voiceMode ? "Conversație vocală activă" : "Powered by AI • Disponibil 24/7"}
+                    </p>
                   )}
                 </div>
               </div>
               <div className="flex items-center gap-1">
                 {!showHistory && (
                   <>
+                    {/* Voice Conversation Toggle */}
+                    <Button
+                      variant={voiceMode ? "destructive" : "ghost"}
+                      size="icon"
+                      className={`h-8 w-8 rounded-full ${voiceMode ? "voice-mode-pulse" : ""}`}
+                      onClick={voiceMode ? stopVoiceConversation : startVoiceConversation}
+                      title={voiceMode ? "Oprește conversația vocală" : "Pornește conversație vocală"}
+                      disabled={loading}
+                    >
+                      {voiceMode ? <PhoneOff className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -638,7 +755,7 @@ export function AIChatPanel() {
                   </div>
                 )}
                 {/* Listening indicator */}
-                {listening && (
+                {listening && !voiceMode && (
                   <div className="flex items-center justify-center gap-3 py-4 msg-animate">
                     <div className="flex items-center gap-3 px-4 py-2.5 rounded-full bg-destructive/10 border border-destructive/20">
                       <div className="h-2.5 w-2.5 rounded-full bg-destructive animate-pulse" />
@@ -666,40 +783,79 @@ export function AIChatPanel() {
 
               {/* Input Bar */}
               <div className="border-t border-border/50 px-4 py-3 shrink-0 bg-background/80 backdrop-blur-sm">
-                <form
-                  id="ai-chat-form"
-                  onSubmit={(e) => { e.preventDefault(); send(); }}
-                  className="flex items-center gap-2"
-                >
-                  <div className="flex-1 relative">
-                    <Input
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      placeholder={listening ? "Ascultă…" : "Scrie un mesaj…"}
-                      disabled={loading}
-                      className="rounded-full pl-4 pr-4 h-11 bg-muted/50 border-border/50 focus-visible:ring-primary/30"
-                    />
+                {voiceMode ? (
+                  /* Voice conversation mode input bar */
+                  <div className="flex items-center justify-center gap-3">
+                    <div className="flex items-center gap-3 px-5 py-3 rounded-full bg-destructive/10 border border-destructive/20 flex-1 justify-center">
+                      {listening && !loading && (
+                        <>
+                          <div className="h-3 w-3 rounded-full bg-destructive animate-pulse" />
+                          <SoundWave active={true} />
+                          <span className="text-sm font-medium text-destructive">
+                            {input ? input : "Te ascultă…"}
+                          </span>
+                        </>
+                      )}
+                      {loading && (
+                        <span className="text-sm font-medium text-muted-foreground">Se procesează…</span>
+                      )}
+                      {speaking && !loading && !listening && (
+                        <>
+                          <SoundWave active={true} />
+                          <span className="text-sm font-medium text-primary">AI vorbește…</span>
+                        </>
+                      )}
+                      {!listening && !loading && !speaking && (
+                        <span className="text-sm font-medium text-muted-foreground">Se reconectează…</span>
+                      )}
+                    </div>
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="h-11 w-11 rounded-full shrink-0 voice-mode-pulse"
+                      onClick={stopVoiceConversation}
+                      title="Oprește conversația vocală"
+                    >
+                      <PhoneOff className="h-5 w-5" />
+                    </Button>
                   </div>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant={listening ? "destructive" : "ghost"}
-                    className={`h-11 w-11 rounded-full shrink-0 ${listening ? "mic-pulse" : "hover:bg-primary/10"}`}
-                    onClick={toggleListening}
-                    title={listening ? "Oprește ascultarea" : "Pornește microfonul"}
-                    disabled={loading}
+                ) : (
+                  /* Normal text input bar */
+                  <form
+                    id="ai-chat-form"
+                    onSubmit={(e) => { e.preventDefault(); send(); }}
+                    className="flex items-center gap-2"
                   >
-                    {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                  </Button>
-                  <Button
-                    type="submit"
-                    size="icon"
-                    disabled={loading || !input.trim()}
-                    className="h-11 w-11 rounded-full shrink-0 bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-md"
-                  >
-                    <Send className="h-4 w-4" />
-                  </Button>
-                </form>
+                    <div className="flex-1 relative">
+                      <Input
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        placeholder={listening ? "Ascultă…" : "Scrie un mesaj…"}
+                        disabled={loading}
+                        className="rounded-full pl-4 pr-4 h-11 bg-muted/50 border-border/50 focus-visible:ring-primary/30"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant={listening ? "destructive" : "ghost"}
+                      className={`h-11 w-11 rounded-full shrink-0 ${listening ? "mic-pulse" : "hover:bg-primary/10"}`}
+                      onClick={toggleListening}
+                      title={listening ? "Oprește ascultarea" : "Pornește microfonul"}
+                      disabled={loading}
+                    >
+                      {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                    </Button>
+                    <Button
+                      type="submit"
+                      size="icon"
+                      disabled={loading || !input.trim()}
+                      className="h-11 w-11 rounded-full shrink-0 bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-md"
+                    >
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </form>
+                )}
               </div>
             </>
           )}
