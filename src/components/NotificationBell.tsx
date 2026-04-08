@@ -22,9 +22,12 @@ type NotificationItem = {
   link: string;
 };
 
-const STORAGE_KEY = "read-notification-ids";
+function getStorageKey(userId: string) {
+  return `read-notification-ids-${userId}`;
+}
 
-function getReadIds(): Set<string> {
+function getReadIds(userId?: string): Set<string> {
+  if (!userId) return new Set();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? new Set(JSON.parse(raw)) : new Set();
