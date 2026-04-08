@@ -362,6 +362,8 @@ export default function OwnerDashboard() {
         <DashboardSearchCard />
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
 
+        <CancellationRequestsSection />
+
         {/* Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
           <MetricCard title="Total Students" value={students.length} icon={Users} />
