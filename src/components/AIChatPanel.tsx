@@ -334,7 +334,7 @@ function CallModeView() {
             )}
           </div>
           {isConnected && (
-            <span className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-green-500 border-2 border-background shadow-sm" />
+            <span className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-accent border-2 border-background shadow-sm" />
           )}
         </div>
 
