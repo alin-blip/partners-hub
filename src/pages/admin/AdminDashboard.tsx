@@ -14,9 +14,11 @@ import {
 import { format } from "date-fns";
 import { CommissionOfferCards } from "@/components/CommissionOfferCards";
 import { DashboardSearchCard } from "@/components/DashboardSearchCard";
+import { useNavigate } from "react-router-dom";
 
 export default function AdminDashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const { data: agents = [] } = useQuery({
     queryKey: ["admin-agents", user?.id],
@@ -33,7 +35,7 @@ export default function AdminDashboard() {
   const { data: students = [] } = useQuery({
     queryKey: ["admin-students", user?.id],
     queryFn: async () => {
-      const { data } = await supabase.from("students").select("id, first_name, last_name, agent_id");
+      const { data } = await supabase.from("students").select("id, first_name, last_name, agent_id, created_at");
       return data || [];
     },
     enabled: !!user,
@@ -156,6 +158,47 @@ export default function AdminDashboard() {
                   <TableRow>
                     <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
                       No agents assigned to you yet
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+
+        {/* Team Students */}
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold">Team Students</h2>
+          <div className="rounded-lg border bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Student</TableHead>
+                  <TableHead>Agent</TableHead>
+                  <TableHead>Date Added</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {students.map((s: any) => {
+                  const agent = agents.find((a: any) => a.id === s.agent_id);
+                  return (
+                    <TableRow
+                      key={s.id}
+                      className="cursor-pointer"
+                      onClick={() => navigate(`/admin/students/${s.id}`)}
+                    >
+                      <TableCell className="font-medium">{s.first_name} {s.last_name}</TableCell>
+                      <TableCell className="text-muted-foreground">{agent?.full_name || "Unknown"}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {s.created_at ? format(new Date(s.created_at), "dd MMM yyyy") : "—"}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {students.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                      No students yet
                     </TableCell>
                   </TableRow>
                 )}
