@@ -11,7 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
 
-type NotificationType = "message" | "task" | "enrollment" | "lead" | "social";
+type NotificationType = "message" | "task" | "enrollment" | "lead" | "social" | "invoice";
 
 type NotificationItem = {
   id: string;
@@ -218,6 +218,31 @@ export function NotificationBell() {
         }
       }
 
+      // 7. Invoice status updates (for agents/admins)
+      if (role !== "owner") {
+        const { data: invoiceUpdates } = await (supabase as any)
+          .from("invoice_requests")
+          .select("id, invoice_number, status, amount, updated_at")
+          .eq("requester_id", user.id)
+          .in("status", ["approved", "paid", "rejected"])
+          .order("updated_at", { ascending: false })
+          .limit(5);
+
+        if (invoiceUpdates) {
+          invoiceUpdates.forEach((inv: any) => {
+            const statusLabel = inv.status === "approved" ? "approved ✅" : inv.status === "paid" ? "paid 💰" : "rejected ❌";
+            items.push({
+              id: `invoice-${inv.id}`,
+              type: "invoice",
+              title: `Invoice ${inv.invoice_number} ${statusLabel}`,
+              description: `£${Number(inv.amount).toFixed(2)}`,
+              time: inv.updated_at,
+              link: `${prefix}/invoices`,
+            });
+          });
+        }
+      }
+
       items.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
       return items.slice(0, 15);
     },
@@ -245,6 +270,7 @@ export function NotificationBell() {
     enrollment: "🎓",
     lead: "📥",
     social: "📢",
+    invoice: "🧾",
   };
 
   return (
