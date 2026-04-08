@@ -1974,7 +1974,7 @@ export default function SettingsPage() {
       let txt = `EduForYou Platform Settings Export\nExported: ${new Date().toLocaleString()}\n${"=".repeat(50)}\n\n`;
 
       txt += `UNIVERSITIES (${allData.universities.length})\n${"-".repeat(30)}\n`;
-      for (const u of allData.universities) txt += `• ${u.name}${u.country ? ` — ${u.country}` : ""}\n`;
+      for (const u of allData.universities) txt += `• ${u.name}\n`;
 
       txt += `\nCAMPUSES (${allData.campuses.length})\n${"-".repeat(30)}\n`;
       for (const c of allData.campuses) txt += `• ${c.name} — ${(c as any).universities?.name || "N/A"}${c.city ? ` (${c.city})` : ""}\n`;
