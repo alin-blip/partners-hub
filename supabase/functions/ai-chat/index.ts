@@ -111,6 +111,40 @@ serve(async (req) => {
       }
     }
 
+    // --- Fetch Live Course Requirements ---
+    let courseRequirementsSection = "";
+    try {
+      const { data: courseDetails } = await adminClient
+        .from("course_details")
+        .select("admission_test_info, interview_info, entry_requirements, documents_required, additional_info, courses(name, universities(name))");
+
+      if (courseDetails && courseDetails.length > 0) {
+        const byUni: Record<string, string[]> = {};
+        for (const cd of courseDetails) {
+          const courseName = (cd as any).courses?.name || "Unknown Course";
+          const uniName = (cd as any).courses?.universities?.name || "Unknown University";
+          const fields: string[] = [];
+          if (cd.entry_requirements) fields.push(`Entry Requirements: ${cd.entry_requirements}`);
+          if (cd.admission_test_info) fields.push(`Admission Test: ${cd.admission_test_info}`);
+          if (cd.interview_info) fields.push(`Interview: ${cd.interview_info}`);
+          if (cd.documents_required) fields.push(`Documents: ${cd.documents_required}`);
+          if (cd.additional_info) fields.push(`Additional: ${cd.additional_info}`);
+          if (fields.length > 0) {
+            if (!byUni[uniName]) byUni[uniName] = [];
+            byUni[uniName].push(`  • ${courseName}\n    ${fields.join("\n    ")}`);
+          }
+        }
+        if (Object.keys(byUni).length > 0) {
+          courseRequirementsSection = "\n\n[Live Course Requirements]\n";
+          for (const [uni, courses] of Object.entries(byUni)) {
+            courseRequirementsSection += `\n--- ${uni} ---\n${courses.join("\n")}\n`;
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching course details:", err);
+    }
+
     // --- Fetch User-Scoped Data ---
     let userDataSection = "";
     if (userId && userRole) {
