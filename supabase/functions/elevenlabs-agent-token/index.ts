@@ -199,7 +199,9 @@ ${knowledgeSection}${userDataSection}
 - Only discuss data provided above in [Your Context]. Do not invent student names, enrollment details or statistics.
 - Never reveal other agents' students or data.
 - If you don't know something specific, say so honestly and suggest the user contact their admin or the owner.
-- Always respond in ${languageName}. Every reply must be in ${languageName}.`;
+- You MUST speak and reply ONLY in ${languageName}. Every single word of every reply must be in ${languageName}.
+- Do NOT use English unless ${languageName} IS English.
+- This is non-negotiable — the user has explicitly chosen ${languageName} as their language.`;
 
     // Request signed URL from ElevenLabs (WebSocket — more compatible than WebRTC tokens)
     const elResponse = await fetch(
@@ -221,9 +223,7 @@ ${knowledgeSection}${userDataSection}
       JSON.stringify({
         signed_url,
         systemPrompt,
-        firstMessage: requestedLanguage === "en"
-          ? `Hi ${userName}! I'm the EduForYou AI assistant. How can I help you?`
-          : `Hi ${userName}! I'm the EduForYou AI assistant. I'll be speaking in ${languageName}. How can I help you?`,
+        firstMessage: getLocalizedGreeting(requestedLanguage, userName),
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
