@@ -5,13 +5,14 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bot, Send, Plus, MessageSquare, ChevronLeft, Sparkles, Square, Phone, PhoneOff, MessageCircle, Globe, Mic } from "lucide-react";
+import { Send, Plus, MessageSquare, ChevronLeft, Square, Phone, PhoneOff, MessageCircle, Globe, Mic } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
+import aiAvatarImg from "@/assets/ai-avatar.png";
 
 type Msg = { role: "user" | "assistant"; content: string; timestamp?: Date };
 type PanelMode = "text" | "call";
@@ -188,10 +189,21 @@ const QUICK_ACTIONS = [
 function TypingIndicator() {
   return (
     <div className="flex items-center gap-1 px-1 py-1">
-      <span className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: "0ms" }} />
-      <span className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: "150ms" }} />
-      <span className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: "300ms" }} />
+      <span className="h-1.5 w-1.5 rounded-full bg-accent/80 animate-bounce" style={{ animationDelay: "0ms" }} />
+      <span className="h-1.5 w-1.5 rounded-full bg-accent/80 animate-bounce" style={{ animationDelay: "150ms" }} />
+      <span className="h-1.5 w-1.5 rounded-full bg-accent/80 animate-bounce" style={{ animationDelay: "300ms" }} />
     </div>
+  );
+}
+
+/* ── AI Avatar helper ────────────────────────────────────── */
+
+function AIAvatar({ className = "h-7 w-7" }: { className?: string }) {
+  return (
+    <Avatar className={`${className} shrink-0`}>
+      <AvatarImage src={aiAvatarImg} alt="EduForYou AI" className="object-cover" />
+      <AvatarFallback className="bg-gradient-to-br from-accent to-accent/60 text-accent-foreground text-[10px] font-bold">AI</AvatarFallback>
+    </Avatar>
   );
 }
 
@@ -392,7 +404,7 @@ function CallModeView() {
               onClick={startCall}
               disabled={callConnecting}
               size="lg"
-              className="h-14 px-8 rounded-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-xl gap-2.5 text-sm font-semibold transition-all duration-300 hover:scale-105 hover:shadow-2xl"
+              className="h-14 px-8 rounded-full bg-gradient-to-r from-accent to-accent/80 hover:from-accent/90 hover:to-accent/70 text-accent-foreground shadow-xl gap-2.5 text-sm font-semibold transition-all duration-300 hover:scale-105 hover:shadow-2xl"
             >
               <Phone className="h-5 w-5" />
               {callConnecting ? "Connecting…" : "Start Call"}
@@ -427,7 +439,7 @@ function CallModeView() {
             {callTranscript.map((msg, i) => (
               <div key={i} className={`flex gap-2 items-start text-xs msg-animate ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 {msg.role === "assistant" && (
-                  <span className="shrink-0 h-5 w-5 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-[8px] text-primary-foreground font-bold mt-0.5">AI</span>
+                  <AIAvatar className="h-5 w-5 mt-0.5" />
                 )}
                 <span className={`inline-block max-w-[80%] px-2.5 py-1.5 rounded-xl ${
                   msg.role === "user"
@@ -631,38 +643,69 @@ export function AIChatPanel() {
           0%, 100% { transform: scale(1); opacity: 1; }
           50% { transform: scale(1.08); opacity: 0.6; }
         }
+        @keyframes wave-ring {
+          0% { transform: scale(1); opacity: 0.5; }
+          100% { transform: scale(1.8); opacity: 0; }
+        }
+        @keyframes wave-ring-slow {
+          0% { transform: scale(1); opacity: 0.35; }
+          100% { transform: scale(2.2); opacity: 0; }
+        }
       `}</style>
 
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
-          <Button
-            size="icon"
-            className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-xl z-50 bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 transition-all duration-300 hover:scale-105"
+          {/* ── FAB with avatar + wave rings ── */}
+          <button
+            className="fixed bottom-6 right-6 z-50 group"
+            style={{ width: 64, height: 64 }}
           >
-            <Sparkles className="h-6 w-6" />
-          </Button>
+            {/* Wave ring 1 */}
+            <span
+              className="absolute inset-0 rounded-full border-2 border-accent/40"
+              style={{ animation: "wave-ring 2.4s ease-out infinite" }}
+            />
+            {/* Wave ring 2 */}
+            <span
+              className="absolute inset-0 rounded-full border-2 border-accent/25"
+              style={{ animation: "wave-ring-slow 2.4s ease-out infinite 0.6s" }}
+            />
+            {/* Wave ring 3 */}
+            <span
+              className="absolute inset-0 rounded-full border border-accent/15"
+              style={{ animation: "wave-ring-slow 3s ease-out infinite 1.2s" }}
+            />
+            {/* Main circle with avatar */}
+            <span className="relative flex h-16 w-16 items-center justify-center rounded-full shadow-2xl ring-2 ring-accent/50 overflow-hidden transition-all duration-300 group-hover:scale-110 group-hover:shadow-accent/30">
+              <img
+                src={aiAvatarImg}
+                alt="EduForYou AI"
+                className="h-full w-full object-cover rounded-full"
+              />
+            </span>
+          </button>
         </SheetTrigger>
 
         <SheetContent className="w-full sm:w-[480px] p-0 flex flex-col bg-background/95 backdrop-blur-xl border-l border-border/50">
-          {/* Header */}
-          <SheetHeader className="px-5 py-4 border-b border-border/50 bg-gradient-to-r from-primary/5 via-transparent to-accent/5 shrink-0">
+          {/* Header — Orange branded */}
+          <SheetHeader className="px-5 py-4 border-b border-accent/20 bg-gradient-to-r from-accent to-accent/85 shrink-0">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {showHistory ? (
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setShowHistory(false)}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white/80 hover:text-white hover:bg-white/10" onClick={() => setShowHistory(false)}>
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                 ) : (
-                  <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-md">
-                    <Bot className="h-5 w-5 text-primary-foreground" />
+                  <div className="h-10 w-10 rounded-full ring-2 ring-white/30 shadow-lg overflow-hidden">
+                    <img src={aiAvatarImg} alt="EduForYou AI" className="h-full w-full object-cover" />
                   </div>
                 )}
                 <div>
-                  <SheetTitle className="text-sm font-semibold">
+                  <SheetTitle className="text-sm font-semibold text-white">
                     {showHistory ? "Chat History" : "EduForYou AI"}
                   </SheetTitle>
                   {!showHistory && (
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-[11px] text-white/70">
                       {mode === "text" && speaking ? "🔊 Speaking…" : mode === "call" ? "Call Mode" : "Available 24/7"}
                     </p>
                   )}
@@ -672,13 +715,13 @@ export function AIChatPanel() {
                 {!showHistory && (
                   <>
                     {/* Mode Toggle */}
-                    <div className="flex items-center bg-muted/60 rounded-full p-0.5 mr-1">
+                    <div className="flex items-center bg-white/15 rounded-full p-0.5 mr-1 backdrop-blur-sm">
                       <button
                         onClick={() => setMode("text")}
                         className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all ${
                           mode === "text"
-                            ? "bg-background text-foreground shadow-sm"
-                            : "text-muted-foreground hover:text-foreground"
+                            ? "bg-white/90 text-accent shadow-sm"
+                            : "text-white/70 hover:text-white"
                         }`}
                       >
                         <MessageCircle className="h-3 w-3" />
@@ -688,8 +731,8 @@ export function AIChatPanel() {
                         onClick={() => setMode("call")}
                         className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all ${
                           mode === "call"
-                            ? "bg-background text-foreground shadow-sm"
-                            : "text-muted-foreground hover:text-foreground"
+                            ? "bg-white/90 text-accent shadow-sm"
+                            : "text-white/70 hover:text-white"
                         }`}
                       >
                         <Phone className="h-3 w-3" />
@@ -698,10 +741,10 @@ export function AIChatPanel() {
                     </div>
                     {mode === "text" && (
                       <>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setShowHistory(true)} title="History">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white/70 hover:text-white hover:bg-white/10" onClick={() => setShowHistory(true)} title="History">
                           <MessageSquare className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={startNewChat} title="New Chat">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white/70 hover:text-white hover:bg-white/10" onClick={startNewChat} title="New Chat">
                           <Plus className="h-4 w-4" />
                         </Button>
                       </>
@@ -723,7 +766,7 @@ export function AIChatPanel() {
                     key={conv.id}
                     onClick={() => loadConversation(conv.id)}
                     className={`w-full text-left px-4 py-3 rounded-xl text-sm hover:bg-muted/80 transition-all duration-200 border border-transparent ${
-                      activeConversationId === conv.id ? "bg-primary/10 border-primary/20 font-medium" : "hover:border-border/50"
+                      activeConversationId === conv.id ? "bg-accent/10 border-accent/20 font-medium" : "hover:border-border/50"
                     }`}
                   >
                     <p className="truncate font-medium">{conv.title}</p>
@@ -749,8 +792,12 @@ export function AIChatPanel() {
               <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
                 {messages.length === 0 && (
                   <div className="flex flex-col items-center justify-center h-full text-center gap-5 py-8">
-                    <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
-                      <Sparkles className="h-8 w-8 text-primary" />
+                    {/* Welcome avatar with orange glow */}
+                    <div className="relative">
+                      <div className="absolute inset-0 rounded-full bg-accent/20 blur-xl scale-150" />
+                      <div className="relative h-20 w-20 rounded-full ring-2 ring-accent/40 shadow-2xl overflow-hidden">
+                        <img src={aiAvatarImg} alt="EduForYou AI" className="h-full w-full object-cover" />
+                      </div>
                     </div>
                     <div className="space-y-1.5">
                       <p className="text-base font-semibold">Welcome! 👋</p>
@@ -763,7 +810,7 @@ export function AIChatPanel() {
                         <button
                           key={action.prompt}
                           onClick={() => send(action.prompt)}
-                          className="px-3 py-2 text-xs rounded-xl border border-border/60 bg-background hover:bg-primary/5 hover:border-primary/30 transition-all duration-200 text-foreground/80 text-center leading-tight"
+                          className="px-3 py-2 text-xs rounded-xl border border-border/60 bg-background hover:bg-accent/10 hover:border-accent/40 transition-all duration-200 text-foreground/80 text-center leading-tight"
                         >
                           {action.label}
                         </button>
@@ -772,10 +819,10 @@ export function AIChatPanel() {
                     {/* Voice circle */}
                     <button
                       onClick={() => setMode("call")}
-                      className="mt-2 h-14 w-14 rounded-full bg-gradient-to-br from-primary to-primary/70 hover:from-primary/90 hover:to-primary/60 shadow-xl flex items-center justify-center transition-all duration-300 hover:scale-110 group"
+                      className="mt-2 h-14 w-14 rounded-full bg-gradient-to-br from-accent to-accent/70 hover:from-accent/90 hover:to-accent/60 shadow-xl flex items-center justify-center transition-all duration-300 hover:scale-110 group"
                       title="Tap to talk"
                     >
-                      <Mic className="h-6 w-6 text-primary-foreground group-hover:scale-110 transition-transform" />
+                      <Mic className="h-6 w-6 text-accent-foreground group-hover:scale-110 transition-transform" />
                     </button>
                     <p className="text-[11px] text-muted-foreground -mt-1">Tap to talk</p>
                   </div>
@@ -784,15 +831,13 @@ export function AIChatPanel() {
                 {messages.map((msg, i) => (
                   <div key={i} className={`flex gap-2.5 msg-animate ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                     {msg.role === "assistant" && (
-                      <Avatar className="h-7 w-7 shrink-0 mt-0.5">
-                        <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground text-[10px] font-bold">AI</AvatarFallback>
-                      </Avatar>
+                      <AIAvatar className="h-7 w-7 mt-0.5" />
                     )}
                     <div className="flex flex-col gap-0.5 max-w-[80%]">
                       <div
                         className={`rounded-2xl px-3.5 py-2.5 text-sm ${
                           msg.role === "user"
-                            ? "bg-primary text-primary-foreground rounded-br-md"
+                            ? "bg-accent text-accent-foreground rounded-br-md"
                             : "bg-muted/70 text-foreground border border-border/30 rounded-bl-md"
                         }`}
                       >
@@ -810,7 +855,7 @@ export function AIChatPanel() {
                     </div>
                     {msg.role === "user" && (
                       <Avatar className="h-7 w-7 shrink-0 mt-0.5">
-                        <AvatarFallback className="bg-accent text-accent-foreground text-[10px] font-bold">YOU</AvatarFallback>
+                        <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-bold">YOU</AvatarFallback>
                       </Avatar>
                     )}
                   </div>
@@ -819,9 +864,7 @@ export function AIChatPanel() {
                 {/* Typing */}
                 {loading && messages[messages.length - 1]?.role === "user" && (
                   <div className="flex gap-2.5 justify-start msg-animate">
-                    <Avatar className="h-7 w-7 shrink-0 mt-0.5">
-                      <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground text-[10px] font-bold">AI</AvatarFallback>
-                    </Avatar>
+                    <AIAvatar className="h-7 w-7 mt-0.5" />
                     <div className="bg-muted/70 border border-border/30 rounded-2xl rounded-bl-md px-4 py-3">
                       <TypingIndicator />
                     </div>
@@ -831,9 +874,9 @@ export function AIChatPanel() {
                 {/* Speaking indicator + Stop */}
                 {speaking && (
                   <div className="flex items-center justify-center gap-3 py-2 msg-animate">
-                    <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
-                      <span className="text-sm text-primary font-medium">🔊 Speaking…</span>
-                      <Button variant="outline" size="sm" className="h-7 rounded-full text-xs" onClick={stopAllAudio}>
+                    <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-accent/10 border border-accent/20">
+                      <span className="text-sm text-accent font-medium">🔊 Speaking…</span>
+                      <Button variant="outline" size="sm" className="h-7 rounded-full text-xs border-accent/30 hover:bg-accent/10" onClick={stopAllAudio}>
                         <Square className="h-3 w-3 mr-1" /> Stop
                       </Button>
                     </div>
@@ -852,13 +895,13 @@ export function AIChatPanel() {
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="Type a message…"
                     disabled={loading}
-                    className="flex-1 rounded-full pl-4 pr-4 h-11 bg-muted/50 border-border/50 focus-visible:ring-primary/30"
+                    className="flex-1 rounded-full pl-4 pr-4 h-11 bg-muted/50 border-border/50 focus-visible:ring-accent/30"
                   />
                   <Button
                     type="submit"
                     size="icon"
                     disabled={loading || !input.trim()}
-                    className="h-11 w-11 rounded-full shrink-0 bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-md"
+                    className="h-11 w-11 rounded-full shrink-0 bg-gradient-to-br from-accent to-accent/80 hover:from-accent/90 hover:to-accent/70 text-accent-foreground shadow-md"
                   >
                     <Send className="h-4 w-4" />
                   </Button>
