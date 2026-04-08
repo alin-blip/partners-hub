@@ -30,6 +30,7 @@ import { useState, useMemo } from "react";
 import { PromoBanner } from "@/components/PromoBanner";
 import { EmailLogSection } from "@/components/EmailLogSection";
 import { DashboardSearchCard } from "@/components/DashboardSearchCard";
+import { CancellationRequestsSection } from "@/components/CancellationRequestsSection";
 
 const teamChartConfig: ChartConfig = {
   students: { label: "Students", color: "hsl(var(--primary))" },
@@ -360,6 +361,8 @@ export default function OwnerDashboard() {
         <PromoBanner />
         <DashboardSearchCard />
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+
+        <CancellationRequestsSection />
 
         {/* Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">

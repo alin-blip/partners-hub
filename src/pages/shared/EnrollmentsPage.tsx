@@ -18,12 +18,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Search, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { notifyAgentOfStatusChange } from "@/lib/enrollment-emails";
+import { getVisibleStatuses, getDisplayStatus, getAdminEditableStatuses } from "@/lib/status-utils";
 
-const STATUSES = [
-  "new_application", "processing", "assessment_booked", "pass", "fail",
-  "additional_requirements", "final_offer", "enrolled",
-  "commission_25_ready", "commission_paid", "withdrawn", "cancelled",
-];
 const PAGE_SIZE = 20;
 
 export default function EnrollmentsPage() {
@@ -33,6 +29,8 @@ export default function EnrollmentsPage() {
   const navigate = useNavigate();
   const canEdit = role === "owner" || role === "admin";
   const prefix = role === "owner" ? "/owner" : role === "admin" ? "/admin" : "/agent";
+  const filterStatuses = getVisibleStatuses(role);
+  const editableStatuses = role === "owner" ? getVisibleStatuses("owner") : getAdminEditableStatuses();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [page, setPage] = useState(0);
@@ -156,7 +154,7 @@ export default function EnrollmentsPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="All">All Statuses</SelectItem>
-              {STATUSES.map((s) => <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>)}
+              {filterStatuses.map((s) => <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -198,16 +196,16 @@ export default function EnrollmentsPage() {
                         onValueChange={(v) => updateStatus.mutate({ id: e.id, status: v, oldStatus: e.status })}
                       >
                         <SelectTrigger className="w-[180px] h-8">
-                          <StatusBadge status={e.status} />
+                          <StatusBadge status={getDisplayStatus(e.status, role)} />
                         </SelectTrigger>
                         <SelectContent>
-                          {STATUSES.map((s) => (
+                          {editableStatuses.map((s) => (
                             <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     ) : (
-                      <StatusBadge status={e.status} />
+                      <StatusBadge status={getDisplayStatus(e.status, role)} />
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">

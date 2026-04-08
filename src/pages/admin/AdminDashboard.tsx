@@ -5,6 +5,7 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Users, UserCheck, ClipboardList, PoundSterling, Clock } from "lucide-react";
+import { CancellationRequestsSection } from "@/components/CancellationRequestsSection";
 import { PromoBanner } from "@/components/PromoBanner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -130,6 +131,8 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
+
+        <CancellationRequestsSection />
 
         <div className="space-y-4">
           <h2 className="text-lg font-semibold">My Agents</h2>

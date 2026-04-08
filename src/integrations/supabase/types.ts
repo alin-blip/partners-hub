@@ -502,6 +502,47 @@ export type Database = {
           },
         ]
       }
+      cancellation_requests: {
+        Row: {
+          created_at: string | null
+          enrollment_id: string
+          id: string
+          reason: string | null
+          requested_by: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string | null
+          enrollment_id: string
+          id?: string
+          reason?: string | null
+          requested_by: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string | null
+          enrollment_id?: string
+          id?: string
+          reason?: string | null
+          requested_by?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cancellation_requests_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "enrollments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commission_payments: {
         Row: {
           amount: number
@@ -1082,6 +1123,8 @@ export type Database = {
       }
       enrollments: {
         Row: {
+          assessment_date: string | null
+          assessment_time: string | null
           campus_id: string | null
           course_id: string
           created_at: string
@@ -1098,6 +1141,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          assessment_date?: string | null
+          assessment_time?: string | null
           campus_id?: string | null
           course_id: string
           created_at?: string
@@ -1114,6 +1159,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          assessment_date?: string | null
+          assessment_time?: string | null
           campus_id?: string | null
           course_id?: string
           created_at?: string

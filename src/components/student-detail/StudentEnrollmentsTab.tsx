@@ -13,15 +13,12 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { notifyAgentOfStatusChange } from "@/lib/enrollment-emails";
 import { CourseDetailsInfoCard } from "@/components/CourseDetailsInfoCard";
-import { ChevronDown, ChevronUp, ArrowRightLeft, AlertTriangle } from "lucide-react";
+import { ChevronDown, ChevronUp, ArrowRightLeft, AlertTriangle, CalendarDays, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-
-const STATUSES = [
-  "new_application", "processing", "assessment_booked", "pass", "fail",
-  "additional_requirements", "final_offer", "enrolled",
-  "commission_25_ready", "commission_paid", "withdrawn", "cancelled",
-];
+import { AssessmentBookingDialog } from "./AssessmentBookingDialog";
+import { getVisibleStatuses, getDisplayStatus, getAdminEditableStatuses, canAgentBookAssessment, canAgentRequestCancel } from "@/lib/status-utils";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Props {
   studentId: string;
@@ -248,9 +245,63 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
     }
   };
 
+  // Assessment booking dialog
+  const [assessmentEnrollmentId, setAssessmentEnrollmentId] = useState<string | null>(null);
+  const [bookingLoading, setBookingLoading] = useState(false);
+
+  // Cancellation request dialog
+  const [cancelEnrollmentId, setCancelEnrollmentId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelLoading, setCancelLoading] = useState(false);
+
   const getAvailableStatuses = (currentStatus: string) => {
-    if (hasSignedConsent) return STATUSES;
-    return ["new_application"];
+    if (!hasSignedConsent) return ["new_application"];
+    if (role === "owner") return getVisibleStatuses("owner");
+    if (role === "admin") return getAdminEditableStatuses();
+    return []; // agents don't use dropdown
+  };
+
+  const handleBookAssessment = async (date: Date, time: string) => {
+    if (!assessmentEnrollmentId) return;
+    setBookingLoading(true);
+    try {
+      const dateStr = format(date, "yyyy-MM-dd");
+      const { error } = await supabase.from("enrollments").update({
+        status: "assessment_booked",
+        assessment_date: dateStr,
+        assessment_time: time,
+      }).eq("id", assessmentEnrollmentId);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["student-enrollments", studentId] });
+      toast({ title: "Assessment booked", description: `${format(date, "dd MMM yyyy")} at ${time}` });
+      setAssessmentEnrollmentId(null);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
+  const handleRequestCancel = async () => {
+    if (!cancelEnrollmentId) return;
+    setCancelLoading(true);
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) throw new Error("Not authenticated");
+      const { error } = await supabase.from("cancellation_requests").insert({
+        enrollment_id: cancelEnrollmentId,
+        requested_by: currentUser.id,
+        reason: cancelReason || null,
+      });
+      if (error) throw error;
+      toast({ title: "Cancellation requested", description: "Your admin will review and approve or reject." });
+      setCancelEnrollmentId(null);
+      setCancelReason("");
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setCancelLoading(false);
+    }
   };
 
   return (
@@ -288,10 +339,26 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
                       <TableCell className="font-medium">{e.universities?.name}</TableCell>
                       <TableCell>{e.courses?.name}</TableCell>
                       <TableCell>
-                        {canChangeStatus && !isTransferred ? (
+                        {isTransferred ? (
+                          <StatusBadge status="transferred" />
+                        ) : role === "agent" ? (
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <StatusBadge status={getDisplayStatus(e.status, role)} />
+                            {canAgentBookAssessment(e.status) && hasSignedConsent && (
+                              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setAssessmentEnrollmentId(e.id)}>
+                                <CalendarDays className="w-3 h-3 mr-1" /> Book Assessment
+                              </Button>
+                            )}
+                            {canAgentRequestCancel(e.status) && (
+                              <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30" onClick={() => setCancelEnrollmentId(e.id)}>
+                                <XCircle className="w-3 h-3 mr-1" /> Request Cancel
+                              </Button>
+                            )}
+                          </div>
+                        ) : canChangeStatus ? (
                           <Select value={e.status} onValueChange={(v) => updateStatus.mutate({ id: e.id, status: v, oldStatus: e.status })}>
                             <SelectTrigger className="w-[180px] h-8">
-                              <StatusBadge status={e.status} />
+                              <StatusBadge status={getDisplayStatus(e.status, role)} />
                             </SelectTrigger>
                             <SelectContent>
                               {availableStatuses.map((s) => (
@@ -300,7 +367,7 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
                             </SelectContent>
                           </Select>
                         ) : (
-                          <StatusBadge status={e.status} />
+                          <StatusBadge status={getDisplayStatus(e.status, role)} />
                         )}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">{format(new Date(e.created_at), "dd MMM yyyy")}</TableCell>
@@ -459,6 +526,45 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Assessment Booking Dialog */}
+      <AssessmentBookingDialog
+        open={!!assessmentEnrollmentId}
+        onOpenChange={(o) => { if (!o) setAssessmentEnrollmentId(null); }}
+        onConfirm={handleBookAssessment}
+        loading={bookingLoading}
+      />
+
+      {/* Cancellation Request Dialog */}
+      <Dialog open={!!cancelEnrollmentId} onOpenChange={(o) => { if (!o) { setCancelEnrollmentId(null); setCancelReason(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <XCircle className="w-5 h-5 text-destructive" />
+              Request Cancellation
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This will send a cancellation request to your admin for approval. The enrollment will only be cancelled after approval.
+          </p>
+          <div>
+            <Label>Reason (optional)</Label>
+            <Textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Why should this enrollment be cancelled?"
+              className="mt-1"
+              rows={3}
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => { setCancelEnrollmentId(null); setCancelReason(""); }}>Cancel</Button>
+            <Button variant="destructive" onClick={handleRequestCancel} disabled={cancelLoading}>
+              {cancelLoading ? "Submitting…" : "Submit Request"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </>
