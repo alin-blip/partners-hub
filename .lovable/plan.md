@@ -1,54 +1,100 @@
 
 
-# Plan: Continuous Voice Conversation Mode
+# Plan: ElevenLabs Conversational AI Agent cu context dinamic din platformă
 
-## What the user wants
-A "conversation mode" button where the mic stays active continuously — user speaks, AI responds with voice, then mic auto-resumes for the next question. No need to press mic each time. Text mode stays text-only.
+## Ce se schimbă
 
-## How it works today
-1. User presses mic → Scribe listens → commits transcript → sends to AI → TTS plays → **stops**
-2. User must press mic again for next question
+Înlocuim pipeline-ul actual (Scribe STT → ai-chat → ElevenLabs TTS) cu un **ElevenLabs Conversational AI Agent nativ** care face speech-to-speech direct, dar primește promptul și contextul din platforma EduForYou la fiecare sesiune.
 
-## Solution: Auto-loop voice mode
+## Cum funcționează
 
-### New flow
-1. User clicks a **"Conversație Vocală"** (phone icon) button to enter voice mode
-2. Mic starts listening automatically
-3. User speaks → transcript committed → sent to AI
-4. AI responds with streaming TTS
-5. **When TTS finishes playing → mic automatically restarts** (loop)
-6. User clicks "Oprește conversația" to exit voice mode
-7. If user types text instead → AI responds in text only, no auto-mic restart
+```text
+┌─────────────────────────────────────────────────┐
+│  User clicks "Start Conversation"               │
+│                                                  │
+│  1. Frontend → edge function (get-agent-token)  │
+│     - Authenticates user via JWT                │
+│     - Fetches: role, profile, students,          │
+│       enrollments, knowledge base               │
+│     - Builds system prompt (same as ai-chat)    │
+│     - Requests conversation token from EL       │
+│     - Returns: { token, systemPrompt }          │
+│                                                  │
+│  2. Frontend → useConversation(token, overrides)│
+│     - overrides.agent.prompt = systemPrompt     │
+│     - Native speech-to-speech via WebRTC        │
+│     - No intermediate text pipeline             │
+│                                                  │
+│  3. User speaks ↔ Agent responds (continuous)   │
+│     - Auto-handles turn-taking                  │
+│     - User can interrupt agent mid-speech       │
+│     - Transcripts shown in chat UI              │
+└─────────────────────────────────────────────────┘
+```
 
-### UI changes
-- Add a **voice conversation toggle button** in the header (next to volume/history buttons) — a Phone or Headphones icon
-- When voice mode is active: header shows a pulsing indicator, input bar transforms to show "Conversație vocală activă..." with a large stop button
-- The existing mic button stays for one-shot voice input in text mode
+## Cerință prealabilă: Agent ID
 
-### Technical changes in `AIChatPanel.tsx`
+Trebuie creat un agent în ElevenLabs Dashboard (o singură dată):
+- Model: orice (promptul va fi suprascris de platformă via overrides)
+- Voice: selectezi vocea dorită (ex: Sarah, Laura)
+- Enable "Allow overrides" în setări
+- Copiezi **Agent ID**-ul generat
 
-**New state:**
-- `voiceMode: boolean` — continuous conversation mode active
+Agent ID-ul va fi stocat ca secret (`ELEVENLABS_AGENT_ID`).
 
-**Modified logic:**
-- `playNextInQueue()`: when queue is empty AND `voiceMode` is true → call `startListeningAgain()` after a short delay (500ms)
-- `startListeningAgain()`: fetches new scribe token and reconnects mic
-- `onCommittedTranscript`: in voice mode, auto-submits (already does this)
-- `send()`: if triggered from voice mode, keeps `voiceMode = true` so the loop continues
-- `send()`: if triggered from typing (keyboard), does NOT restart mic — pure text mode
-- Exiting voice mode: disconnects scribe, stops audio, resets state
+## Implementare
 
-**Edge case handling:**
-- If user types while in voice mode → exit voice mode, send as text
-- If AI is still generating when user speaks → stop current audio, send new message
-- Token refresh: get new scribe token each time mic restarts (tokens are single-use)
+### 1. Edge function: `elevenlabs-agent-token`
 
-## Files modified
-1. `src/components/AIChatPanel.tsx` — add `voiceMode` state, auto-restart logic, UI for voice conversation mode
+**Creează** `supabase/functions/elevenlabs-agent-token/index.ts`
 
-## Files created
-None
+- Autentifică userul din JWT (exact ca în ai-chat)
+- Fetches: user role, profile, knowledge base, students/enrollments (identic cu ai-chat)
+- Construiește system prompt-ul complet (copy from ai-chat logic)
+- Cere conversation token de la ElevenLabs API
+- Returnează `{ token, systemPrompt, firstMessage }`
 
-## No backend changes needed
-Same edge functions (ai-chat, elevenlabs-tts, elevenlabs-scribe-token) — no modifications required.
+### 2. Frontend: `AIChatPanel.tsx`
+
+**Modifică** pentru a adăuga modul Conversational Agent:
+
+- Instalează `@elevenlabs/react` (deja există în proiect)
+- Adaugă `useConversation` hook alongside existing `useScribe`
+- Butonul **Phone** pornește agentul conversațional:
+  1. Fetch token + prompt de la `elevenlabs-agent-token`
+  2. `conversation.startSession({ conversationToken, overrides: { agent: { prompt: { prompt: systemPrompt } } } })`
+- Afișează transcripturile user/agent în chat UI via `onMessage`
+- Butonul **PhoneOff** → `conversation.endSession()`
+- Modul text (scris) rămâne neschimbat (ai-chat + TTS)
+
+### 3. Ce se păstrează
+- Tot modul text (chat scris cu streaming + TTS) rămâne intact
+- Istoricul conversațiilor text rămâne
+- Quick actions, markdown rendering — toate la fel
+
+### 4. Ce se elimină
+- `voiceMode` state și logica Scribe-loop (auto-restart mic) — înlocuită de agentul nativ
+- `restartMicForVoiceMode` — nu mai e nevoie
+
+## Pași de setup (o singură dată)
+
+1. Mergi la [ElevenLabs Dashboard → Agents](https://elevenlabs.io/app/conversational-ai)
+2. Creează un agent nou → alege vocea dorită → Enable overrides
+3. Copiază Agent ID
+4. Îl adăugăm ca secret `ELEVENLABS_AGENT_ID` în platformă
+
+## Fișiere
+
+| Acțiune | Fișier |
+|---|---|
+| **Crează** | `supabase/functions/elevenlabs-agent-token/index.ts` |
+| **Modifică** | `src/components/AIChatPanel.tsx` |
+
+## Detalii tehnice
+
+- `useConversation` din `@elevenlabs/react` gestionează WebRTC, turn-taking, VAD automat
+- Promptul dinamic via `overrides.agent.prompt.prompt` — agentul primește tot contextul EduForYou
+- `onMessage` callback pentru transcripturi (user_transcript, agent_response) — afișate în UI
+- `conversation.isSpeaking` pentru animații de speaking
+- `conversation.status` pentru starea conexiunii
 
