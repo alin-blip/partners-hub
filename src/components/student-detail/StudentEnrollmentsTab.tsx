@@ -13,15 +13,12 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { notifyAgentOfStatusChange } from "@/lib/enrollment-emails";
 import { CourseDetailsInfoCard } from "@/components/CourseDetailsInfoCard";
-import { ChevronDown, ChevronUp, ArrowRightLeft, AlertTriangle } from "lucide-react";
+import { ChevronDown, ChevronUp, ArrowRightLeft, AlertTriangle, CalendarDays, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-
-const STATUSES = [
-  "new_application", "processing", "assessment_booked", "pass", "fail",
-  "additional_requirements", "final_offer", "enrolled",
-  "commission_25_ready", "commission_paid", "withdrawn", "cancelled",
-];
+import { AssessmentBookingDialog } from "./AssessmentBookingDialog";
+import { getVisibleStatuses, getDisplayStatus, getAdminEditableStatuses, canAgentBookAssessment, canAgentRequestCancel } from "@/lib/status-utils";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Props {
   studentId: string;
