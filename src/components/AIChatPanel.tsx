@@ -211,6 +211,7 @@ function AIAvatar({ className = "h-7 w-7" }: { className?: string }) {
 /* ── Call Mode View ──────────────────────────────────────── */
 
 function CallModeView() {
+  const { profile } = useAuth();
   const [callTranscript, setCallTranscript] = useState<Msg[]>([]);
   const [callConnecting, setCallConnecting] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState("en");
@@ -469,6 +470,7 @@ function CallModeView() {
 /* ── main component ──────────────────────────────────────── */
 
 export function AIChatPanel() {
+  const { profile } = useAuth();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
