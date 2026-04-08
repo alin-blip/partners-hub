@@ -241,7 +241,15 @@ function CallModeView() {
       const signedUrl = data.signed_url;
       if (!signedUrl) throw new Error("No signed URL received");
 
-      await conversation.startSession({ signedUrl });
+      await conversation.startSession({
+        signedUrl,
+        overrides: {
+          agent: {
+            prompt: { prompt: data.systemPrompt },
+            firstMessage: data.firstMessage,
+          },
+        },
+      });
     } catch (err: any) {
       console.error("Failed to start call:", err);
       toast.error(err.message || "Could not start the call");
