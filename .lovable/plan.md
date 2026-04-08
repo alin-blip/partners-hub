@@ -1,38 +1,59 @@
 
 
-## Goal
-When course details are updated (e.g., removing OPT test requirements), the AI assistant should immediately reflect those changes — without needing to manually update the knowledge base.
+# Redesign AI Chat Quick Actions + Add To-Do Context + Voice Circle
 
-## Problem
-The AI chat function only reads from `ai_knowledge_base` (static, manually-maintained entries). It never queries the `course_details` table, which holds the live, up-to-date course requirements. So when you edit a course's admission test info, the AI keeps repeating the old information from the knowledge base.
+## What changes
 
-## Solution
-Add a live `course_details` query to the AI chat edge function, so it builds its context from **both** the static knowledge base **and** the real-time course requirements table.
+### 1. Update quick action buttons in `AIChatPanel.tsx`
 
-## Implementation
+Replace current `QUICK_ACTIONS` array:
+- Remove "Visa guidance"
+- Add "Available Universities" → prompt: "What universities are available for enrollment?"
+- Add "Available Locations" → prompt: "What locations/campuses are available?"
+- Keep "Enrollment process" and "Commission structure"
+- Keep "My students"
+- Add "What should I do now?" → prompt: "Based on my pending tasks, student statuses, and enrollment progress, what should I do next? Give me a prioritized action list."
 
-### 1. Update `supabase/functions/ai-chat/index.ts`
-After the existing knowledge base fetch, add a new section that:
-- Queries `course_details` joined with `courses` and `universities` to get course name, university name, and all requirement fields
-- Formats this into a `[Live Course Requirements]` section in the system prompt
-- Groups entries by university for readability
-- Each course entry shows: admission_test_info, interview_info, entry_requirements, documents_required, additional_info (only non-null fields)
+### 2. Inject tasks data into AI context (`ai-chat/index.ts` + `elevenlabs-agent-token/index.ts`)
 
-### 2. Update `supabase/functions/elevenlabs-agent-token/index.ts`
-Apply the same live course data injection so Call Mode also has up-to-date course information.
+For agents: after the existing student/enrollment fetch, also query:
+```sql
+SELECT id, title, description, status, priority, deadline, student_id 
+FROM tasks 
+WHERE (assigned_to = userId OR created_by = userId) AND status != 'done'
+ORDER BY priority DESC, created_at DESC LIMIT 30
+```
 
-### 3. System prompt adjustment
-Add a note in the system prompt instructing the AI:
-- "The [Live Course Requirements] section contains the most up-to-date course data. If it conflicts with the knowledge base, always prefer the live data."
+Append a `[Your Tasks]` section to the system prompt listing pending tasks with their priority, deadline, and linked student name. Also add enrollment statuses that need action (e.g., "applied" → next step is documents).
 
-This ensures that even if old knowledge base entries still mention OPT for Computing, the AI will prioritize the live data showing no OPT.
+Add instruction: "When the user asks 'what should I do now', analyze their pending tasks, student enrollment statuses, and suggest a prioritized action list with specific next steps."
 
-## Result
-- Any change to course requirements in the platform is immediately available to the AI
-- No manual knowledge base updates needed for course-level changes
-- Both Text Mode and Call Mode will reflect the latest data
+For admins/owners: similar task fetch scoped to their role.
+
+### 3. Inject universities + campuses data into both edge functions
+
+Query available universities with campuses:
+```sql
+SELECT name, campuses(name, city) FROM universities WHERE is_active = true
+```
+
+Add `[Available Universities & Locations]` section to system prompt so the AI can answer "available universities" and "available locations" questions from live data.
+
+### 4. Add voice circle below quick action buttons (`AIChatPanel.tsx`)
+
+In the empty-state welcome view (when no messages), below the quick action buttons, add a mic circle button that switches to call mode (`setMode("call")`). Styled as a gradient circle with a `Mic` icon and label "Tap to talk".
+
+### 5. Layout of quick actions
+
+Change from horizontal flex-wrap to a grid of small pill buttons (3 columns on desktop, 2 on mobile). The voice circle sits centered below them.
 
 ## Files to update
-- `supabase/functions/ai-chat/index.ts`
-- `supabase/functions/elevenlabs-agent-token/index.ts`
+- `src/components/AIChatPanel.tsx` — quick actions, voice circle, layout
+- `supabase/functions/ai-chat/index.ts` — add tasks + universities/campuses context
+- `supabase/functions/elevenlabs-agent-token/index.ts` — same context additions
+
+## Safety
+- All changes are additive (new queries, new prompt sections)
+- No existing tables/RLS modified
+- No breaking changes to existing functionality
 
