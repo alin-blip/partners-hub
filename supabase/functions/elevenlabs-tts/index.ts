@@ -33,8 +33,9 @@ serve(async (req) => {
     const safeText = text.slice(0, 5000);
     const voice = voiceId || "EXAVITQu4vr4xnSDxMaL"; // Sarah default
 
+    // Use streaming endpoint with turbo model for faster TTS
     const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_44100_128`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${voice}/stream?output_format=mp3_44100_128`,
       {
         method: "POST",
         headers: {
@@ -43,7 +44,7 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           text: safeText,
-          model_id: "eleven_multilingual_v2",
+          model_id: "eleven_turbo_v2_5",
           voice_settings: {
             stability: 0.5,
             similarity_boost: 0.75,
@@ -63,12 +64,12 @@ serve(async (req) => {
       );
     }
 
-    const audioBuffer = await response.arrayBuffer();
-
-    return new Response(audioBuffer, {
+    // Stream the audio response back
+    return new Response(response.body, {
       headers: {
         ...corsHeaders,
         "Content-Type": "audio/mpeg",
+        "Transfer-Encoding": "chunked",
       },
     });
   } catch (err) {
