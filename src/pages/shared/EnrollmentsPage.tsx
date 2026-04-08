@@ -154,7 +154,7 @@ export default function EnrollmentsPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="All">All Statuses</SelectItem>
-              {STATUSES.map((s) => <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>)}
+              {filterStatuses.map((s) => <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -196,16 +196,16 @@ export default function EnrollmentsPage() {
                         onValueChange={(v) => updateStatus.mutate({ id: e.id, status: v, oldStatus: e.status })}
                       >
                         <SelectTrigger className="w-[180px] h-8">
-                          <StatusBadge status={e.status} />
+                          <StatusBadge status={getDisplayStatus(e.status, role)} />
                         </SelectTrigger>
                         <SelectContent>
-                          {STATUSES.map((s) => (
+                          {editableStatuses.map((s) => (
                             <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     ) : (
-                      <StatusBadge status={e.status} />
+                      <StatusBadge status={getDisplayStatus(e.status, role)} />
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
