@@ -199,14 +199,14 @@ function CallModeView() {
       toast.error("Eroare la apel. Încearcă din nou.");
       setCallConnecting(false);
     },
-    onMessage: (message) => {
-      if (message.type === "user_transcript") {
-        const text = (message as any).user_transcription_event?.user_transcript;
+    onMessage: (message: any) => {
+      if (message?.type === "user_transcript") {
+        const text = message?.user_transcription_event?.user_transcript;
         if (text) {
           setCallTranscript((prev) => [...prev, { role: "user", content: text, timestamp: new Date() }]);
         }
-      } else if (message.type === "agent_response") {
-        const text = (message as any).agent_response_event?.agent_response;
+      } else if (message?.type === "agent_response") {
+        const text = message?.agent_response_event?.agent_response;
         if (text) {
           setCallTranscript((prev) => [...prev, { role: "assistant", content: text, timestamp: new Date() }]);
         }
