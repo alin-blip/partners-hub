@@ -374,14 +374,6 @@ function AIChatPanelInner() {
       // Start the ElevenLabs Conversational Agent session
       await conversation.startSession({
         conversationToken: token,
-        connectionType: "webrtc",
-        overrides: {
-          agent: {
-            prompt: { prompt: systemPrompt },
-            firstMessage: firstMessage,
-            language: "ro",
-          },
-        },
       });
 
       setVoiceMode(true);
