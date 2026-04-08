@@ -677,9 +677,41 @@ export default function OwnerDashboard() {
           )}
         </div>
 
-        {/* Recent Enrollments */}
+        {/* Recent Enrollments with Filters */}
         <div className="space-y-4">
-          <h2 className="text-lg font-semibold">Recent Enrollments</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <h2 className="text-lg font-semibold">Recent Enrollments</h2>
+            <div className="flex gap-2">
+              <Select value={filterAdmin} onValueChange={(v) => { setFilterAdmin(v); setFilterAgent("all"); }}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="All Admins" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Admins</SelectItem>
+                  <SelectItem value="none">No Admin</SelectItem>
+                  {admins.map((a: any) => (
+                    <SelectItem key={a.id} value={a.id}>{a.full_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={filterAgent} onValueChange={setFilterAgent}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="All Agents" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Agents</SelectItem>
+                  {(filterAdmin === "all"
+                    ? agents
+                    : filterAdmin === "none"
+                    ? agents.filter((a: any) => !a.admin_id)
+                    : agents.filter((a: any) => a.admin_id === filterAdmin)
+                  ).map((a: any) => (
+                    <SelectItem key={a.id} value={a.id}>{a.full_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <div className="rounded-lg border bg-card">
             <Table>
               <TableHeader>
@@ -693,25 +725,39 @@ export default function OwnerDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentEnrollments.map((e: any) => {
-                  const agentProfile = profileMap.get(e.students?.agent_id);
-                  return (
-                    <TableRow key={e.id}>
-                      <TableCell className="font-medium">
-                        {e.students?.first_name} {e.students?.last_name}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {agentProfile?.full_name || "—"}
-                      </TableCell>
-                      <TableCell>{e.universities?.name}</TableCell>
-                      <TableCell>{e.courses?.name}</TableCell>
-                      <TableCell><StatusBadge status={e.status} /></TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {format(new Date(e.created_at), "dd MMM yyyy")}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {recentEnrollments
+                  .filter((e: any) => {
+                    const agentId = e.students?.agent_id;
+                    if (filterAgent !== "all") return agentId === filterAgent;
+                    if (filterAdmin !== "all") {
+                      if (filterAdmin === "none") {
+                        const agentP = profileMap.get(agentId);
+                        return agentP && !agentP.admin_id;
+                      }
+                      const agentP = profileMap.get(agentId);
+                      return agentP?.admin_id === filterAdmin;
+                    }
+                    return true;
+                  })
+                  .map((e: any) => {
+                    const agentProfile = profileMap.get(e.students?.agent_id);
+                    return (
+                      <TableRow key={e.id}>
+                        <TableCell className="font-medium">
+                          {e.students?.first_name} {e.students?.last_name}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {agentProfile?.full_name || "—"}
+                        </TableCell>
+                        <TableCell>{e.universities?.name}</TableCell>
+                        <TableCell>{e.courses?.name}</TableCell>
+                        <TableCell><StatusBadge status={e.status} /></TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {format(new Date(e.created_at), "dd MMM yyyy")}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 {recentEnrollments.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
@@ -721,7 +767,7 @@ export default function OwnerDashboard() {
                 )}
               </TableBody>
             </Table>
-        </div>
+          </div>
 
         {/* Email Log */}
         <EmailLogSection />
