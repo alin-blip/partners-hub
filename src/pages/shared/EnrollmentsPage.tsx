@@ -20,8 +20,9 @@ import { useNavigate } from "react-router-dom";
 import { notifyAgentOfStatusChange } from "@/lib/enrollment-emails";
 
 const STATUSES = [
-  "applied", "documents_pending", "documents_submitted", "processing",
-  "offer_received", "accepted", "funding", "enrolled", "active", "paid_by_university", "rejected", "withdrawn",
+  "new_application", "processing", "assessment_booked", "pass", "fail",
+  "additional_requirements", "final_offer", "enrolled",
+  "commission_25_ready", "commission_paid", "withdrawn", "cancelled",
 ];
 const PAGE_SIZE = 20;
 

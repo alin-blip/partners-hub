@@ -100,7 +100,7 @@ export default function AgentDashboard() {
     enabled: !!user,
   });
 
-  const activeEnrollments = enrollments.filter((e: any) => e.status === "active").length;
+  const activeEnrollments = enrollments.filter((e: any) => e.status === "enrolled").length;
   const totalCommission = snapshots.reduce((s: number, snap: any) => s + Number(snap.agent_rate), 0);
   const totalPaid = myPayments.reduce((s: number, p: any) => s + Number(p.amount), 0);
   const totalRemaining = totalCommission - totalPaid;

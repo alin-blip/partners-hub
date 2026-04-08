@@ -236,7 +236,7 @@ export default function EnrollStudent() {
       const { error: enrollError } = await supabase.from("enrollments").insert({
         student_id: student.id, university_id: universityId,
         campus_id: campusId || null, course_id: courseId, intake_id: intakeId || null,
-        status: "applied",
+        status: "new_application",
       });
       if (enrollError) throw enrollError;
 

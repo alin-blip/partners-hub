@@ -56,19 +56,21 @@ const DONUT_COLORS = [
 ];
 
 const PIPELINE_STATUSES = [
-  "applied", "documents_pending", "processing", "offer_received",
-  "accepted", "funding", "enrolled", "active",
+  "new_application", "processing", "assessment_booked", "pass",
+  "additional_requirements", "final_offer", "enrolled",
+  "commission_25_ready", "commission_paid",
 ];
 
 const STATUS_LABELS: Record<string, string> = {
-  applied: "Applied",
-  documents_pending: "Docs Pending",
+  new_application: "New Application",
   processing: "Processing",
-  offer_received: "Offer Received",
-  accepted: "Accepted",
-  funding: "Funding",
+  assessment_booked: "Assessment Booked",
+  pass: "Pass",
+  additional_requirements: "Additional Req.",
+  final_offer: "Final Offer",
   enrolled: "Enrolled",
-  active: "Active",
+  commission_25_ready: "Comm. 25% Ready",
+  commission_paid: "Comm. Paid",
 };
 
 export default function OwnerDashboard() {
@@ -191,7 +193,7 @@ export default function OwnerDashboard() {
     const agentId = studentAgentMap.get((e as any).student_id);
     if (agentId) {
       agentTotalEnrollments.set(agentId, (agentTotalEnrollments.get(agentId) || 0) + 1);
-      if (e.status === "active") {
+      if (e.status === "enrolled") {
         agentActiveEnrollments.set(agentId, (agentActiveEnrollments.get(agentId) || 0) + 1);
       }
     }
@@ -202,7 +204,7 @@ export default function OwnerDashboard() {
     agentStudentCounts.set(s.agent_id, (agentStudentCounts.get(s.agent_id) || 0) + 1);
   }
 
-  const pipelineCount = allEnrollments.filter((e: any) => !["active", "rejected"].includes(e.status)).length;
+  const pipelineCount = allEnrollments.filter((e: any) => !["fail", "withdrawn", "cancelled", "transferred"].includes(e.status)).length;
 
   const totalLeads = leads.length;
   const convertedLeads = leads.filter((l: any) => l.status === "converted").length;

@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
         campus_id: transferReq.new_campus_id,
         course_id: transferReq.new_course_id,
         intake_id: transferReq.new_intake_id,
-        status: "applied",
+        status: "new_application",
       });
 
     if (insertError) throw insertError;

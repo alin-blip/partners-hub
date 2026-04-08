@@ -18,8 +18,9 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const STATUSES = [
-  "applied", "documents_pending", "documents_submitted", "processing",
-  "offer_received", "accepted", "funding", "enrolled", "active", "paid_by_university", "rejected", "withdrawn",
+  "new_application", "processing", "assessment_booked", "pass", "fail",
+  "additional_requirements", "final_offer", "enrolled",
+  "commission_25_ready", "commission_paid", "withdrawn", "cancelled",
 ];
 
 interface Props {
@@ -181,7 +182,7 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
           campus_id: transferCampusId || null,
           course_id: transferCourseId,
           intake_id: transferIntakeId || null,
-          status: "applied",
+          status: "new_application",
         });
       if (insertError) throw insertError;
 
@@ -249,7 +250,7 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
 
   const getAvailableStatuses = (currentStatus: string) => {
     if (hasSignedConsent) return STATUSES;
-    return ["applied"];
+    return ["new_application"];
   };
 
   return (
@@ -262,7 +263,7 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
               <Alert className="border-destructive/50 bg-destructive/10">
                 <AlertTriangle className="h-4 w-4 text-destructive" />
                 <AlertDescription className="text-sm text-destructive">
-                  Consent form must be signed before the status can progress beyond <strong>Applied</strong>.
+                  Consent form must be signed before the status can progress beyond <strong>New Application</strong>.
                 </AlertDescription>
               </Alert>
             </div>

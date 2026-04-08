@@ -460,7 +460,7 @@ export default function LeadsPage() {
           course_id: lead.course_id,
           campus_id: lead.campus_id || null,
           intake_id: lead.intake_id || null,
-          status: "applied",
+          status: "new_application",
         });
         if (enrollErr) console.error("Enrollment creation failed:", enrollErr);
       }
