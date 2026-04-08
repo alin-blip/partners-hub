@@ -263,7 +263,7 @@ function CallModeView() {
           agent: {
             prompt: { prompt: data.systemPrompt },
             firstMessage: data.firstMessage,
-            language: selectedLanguage,
+            language: selectedLanguage as "en" | "ro" | "es" | "fr" | "de" | "it" | "pt" | "ar" | "hi" | "zh",
           },
         },
       });
