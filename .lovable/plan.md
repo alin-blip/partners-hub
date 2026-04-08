@@ -1,32 +1,91 @@
 
-Problema reală:
-- Nu mai e eroare de provider sau de cheie API.
-- Blocajul actual este la conexiunea audio: logurile arată `v1 RTC path not found` și apoi `could not establish pc connection`.
 
-Do I know what the issue is?
-- Da.
-- Din ce se vede în cod și în lockfile:
-  - `src/components/AIChatPanel.tsx` pornește corect sesiunea cu `conversationToken`
-  - edge function-ul `elevenlabs-agent-token` pare să dea token valid
-  - `bun.lock` rezolvă `livekit-client@2.18.1`
-  - această versiune încearcă ruta `/rtc/v1`, iar aici asta produce exact eroarea din consolă
+# Refacere completă panou AI — Voce + Transcript, fără WebRTC
 
-Fișiere implicate:
-- `package.json`
-- lockfile-ul activ (`bun.lock`, și doar dacă e nevoie `package-lock.json`)
-- posibil un mic cleanup în `src/components/AIChatPanel.tsx`
+## Problema de fond
 
-Plan:
-1. Voi fixa cauza de bază prin pin/override pentru `livekit-client` la o versiune compatibilă cu SDK-ul ElevenLabs folosit aici.
-2. Voi actualiza rezolvarea dependențelor în lockfile, ca proiectul să nu mai încarce `2.18.1`.
-3. Voi păstra pornirea sesiunii în forma simplă `startSession({ conversationToken })`, fără `overrides` și fără `connectionType`.
-4. Voi curăța codul din `AIChatPanel.tsx` ca să nu mai folosească/deserializeze valori nefolosite (`systemPrompt`, `firstMessage`) și voi lăsa mesaje de eroare mai clare.
-5. Voi verifica după fix că:
-   - dispare `v1 RTC path not found`
-   - dispare `could not establish pc connection`
-   - butonul nu mai rămâne blocat pe „Se conectează…”
+Agentul vocal ElevenLabs Conversational AI (WebRTC prin `livekit-client`) nu funcționează — eroarea `v1 RTC path not found` persistă indiferent de version pinning, override-uri sau simplificări. Cauza este un conflict de versiuni între `@elevenlabs/react` SDK și serverele LiveKit folosite de ElevenLabs, pe care nu îl putem controla din client.
 
-Detalii tehnice:
-- Problema nu mai pare să fie în token, agent ID sau cheia API.
-- Este foarte probabil un conflict de versiuni transitive între `@elevenlabs/react` și `livekit-client`.
-- Soluția corectă este să repar compatibilitatea dependenței, nu să mai adaug încă un workaround în UI.
+## Soluția: eliminăm WebRTC, păstrăm voce + text
+
+In loc de agentul conversational (speech-to-speech via WebRTC), folosim o arhitectură care **deja funcționează** parțial în cod:
+
+```text
+User scrie mesaj → ai-chat (Gemini streaming) → răspuns text afișat în chat
+                                               → elevenlabs-tts → audio redat automat
+```
+
+Aceasta elimină complet dependența de `@elevenlabs/react`, `livekit-client`, `ConversationProvider` și tot codul WebRTC.
+
+## Ce se schimbă
+
+### 1. Eliminăm dependințele problematice
+
+**`package.json`**:
+- Scoatem `@elevenlabs/react` din dependencies
+- Scoatem secțiunea `overrides` cu `livekit-client`
+
+### 2. Rescriem `src/components/AIChatPanel.tsx` de la zero
+
+**Interfața nouă — minimalistă și curată:**
+- Un singur buton FAB (floating action button) care deschide panoul
+- Header simplu: titlu + buton „New Chat" + buton „History"
+- Zona de mesaje cu bule de chat (user/assistant)
+- Input bar: câmp text + buton Send + indicator audio „Vorbește..."
+- Răspunsul AI: apare ca text (streaming) ȘI se redă automat ca audio (TTS propoziție cu propoziție)
+- Buton Stop audio vizibil când AI vorbește
+
+**Ce eliminăm:**
+- Butonul Phone/PhoneOff (mod vocal WebRTC)
+- Butonul Volume2/VolumeX (toggle autoSpeak) — vocea e mereu activă
+- `ConversationProvider` wrapper
+- `useConversation` hook
+- `voiceMode`, `voiceConnecting`, `isAgentSpeaking` states
+- `startVoiceConversation`, `stopVoiceConversation` functions
+- SoundWave component (simplificăm cu un simplu indicator text)
+- CSS animations complexe (mic-pulse, voice-mode-pulse)
+
+**Ce păstrăm și îmbunătățim:**
+- `streamChat()` — funcția de streaming text cu Gemini (funcționează)
+- `fetchTTSChunk()` — TTS per propoziție (funcționează)
+- Audio queue player (playNextInQueue, enqueueAudio, stopAllAudio)
+- Conversation history (load/save)
+- Quick action chips
+- Markdown rendering pentru răspunsuri
+- Typing indicator
+
+### 3. Edge functions — rămân neschimbate
+
+- `ai-chat` — streaming text (Gemini) ✓
+- `elevenlabs-tts` — audio per propoziție ✓
+- `elevenlabs-agent-token` — nu mai e necesar, dar îl lăsăm (nu deranjează)
+
+### 4. `DashboardLayout.tsx` — import simplificat
+
+Nu mai avem nevoie de `ConversationProvider`, componenta exportată va fi directă.
+
+## Structura noii componente
+
+```text
+AIChatPanel
+├── FAB button (deschide Sheet)
+├── Sheet
+│   ├── Header (titlu, new chat, history)
+│   ├── History view (lista conversații)
+│   └── Chat view
+│       ├── Welcome screen + Quick Actions (când nu e mesaj)
+│       ├── Message list (scroll)
+│       │   ├── User bubble
+│       │   ├── Assistant bubble (markdown)
+│       │   ├── Typing indicator
+│       │   └── Audio indicator ("Vorbește..." + Stop)
+│       └── Input bar (text + send button)
+```
+
+## Detalii tehnice
+
+- Eliminarea `@elevenlabs/react` reduce bundle-ul semnificativ (nu se mai descarcă livekit-client ~500KB)
+- Vocea funcționează prin TTS API standard (REST), nu WebRTC — fiabil 100%
+- Fiecare propoziție din răspuns este trimisă la TTS imediat ce e completă, dând senzația de răspuns vocal rapid
+- Nu e nevoie de permisiune de microfon
+
