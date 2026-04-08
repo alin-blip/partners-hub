@@ -29,17 +29,17 @@ function getStorageKey(userId: string) {
 function getReadIds(userId?: string): Set<string> {
   if (!userId) return new Set();
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(getStorageKey(userId));
     return raw ? new Set(JSON.parse(raw)) : new Set();
   } catch { return new Set(); }
 }
 
-function markAsRead(id: string) {
-  const ids = getReadIds();
+function markAsRead(id: string, userId: string) {
+  const ids = getReadIds(userId);
   ids.add(id);
   // Keep only last 200 to avoid bloat
   const arr = [...ids].slice(-200);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+  localStorage.setItem(getStorageKey(userId), JSON.stringify(arr));
 }
 
 export function NotificationBell() {
@@ -47,7 +47,7 @@ export function NotificationBell() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [readIds, setReadIds] = useState<Set<string>>(getReadIds);
+  const [readIds, setReadIds] = useState<Set<string>>(() => getReadIds(user?.id));
   const prefix = role === "owner" ? "/owner" : role === "admin" ? "/admin" : "/agent";
 
   const { data: notifications = [] } = useQuery({
