@@ -1,20 +1,23 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
+import { useConversation } from "@elevenlabs/react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Bot, Send, Plus, MessageSquare, ChevronLeft, Sparkles, Square } from "lucide-react";
+import { Bot, Send, Plus, MessageSquare, ChevronLeft, Sparkles, Square, Phone, PhoneOff, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 
 type Msg = { role: "user" | "assistant"; content: string; timestamp?: Date };
+type PanelMode = "text" | "call";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 const TTS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`;
+const AGENT_TOKEN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-agent-token`;
 
 /* ── helpers ─────────────────────────────────────────────── */
 
@@ -176,6 +179,164 @@ function TypingIndicator() {
   );
 }
 
+/* ── Call Mode View ──────────────────────────────────────── */
+
+function CallModeView() {
+  const [callTranscript, setCallTranscript] = useState<Msg[]>([]);
+  const [callConnecting, setCallConnecting] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const conversation = useConversation({
+    onConnect: () => {
+      setCallConnecting(false);
+      toast.success("Apel conectat!");
+    },
+    onDisconnect: () => {
+      setCallConnecting(false);
+    },
+    onError: (error) => {
+      console.error("Call error:", error);
+      toast.error("Eroare la apel. Încearcă din nou.");
+      setCallConnecting(false);
+    },
+    onMessage: (message) => {
+      if (message.type === "user_transcript") {
+        const text = (message as any).user_transcription_event?.user_transcript;
+        if (text) {
+          setCallTranscript((prev) => [...prev, { role: "user", content: text, timestamp: new Date() }]);
+        }
+      } else if (message.type === "agent_response") {
+        const text = (message as any).agent_response_event?.agent_response;
+        if (text) {
+          setCallTranscript((prev) => [...prev, { role: "assistant", content: text, timestamp: new Date() }]);
+        }
+      }
+    },
+  });
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [callTranscript]);
+
+  const startCall = useCallback(async () => {
+    setCallConnecting(true);
+    setCallTranscript([]);
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+
+      const resp = await fetch(AGENT_TOKEN_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+      });
+
+      if (!resp.ok) throw new Error(`Token error: ${resp.status}`);
+      const { token } = await resp.json();
+      if (!token) throw new Error("No conversation token received");
+
+      await conversation.startSession({ conversationToken: token });
+    } catch (err: any) {
+      console.error("Failed to start call:", err);
+      toast.error(err.message || "Nu s-a putut porni apelul");
+      setCallConnecting(false);
+    }
+  }, [conversation]);
+
+  const endCall = useCallback(async () => {
+    await conversation.endSession();
+  }, [conversation]);
+
+  const isConnected = conversation.status === "connected";
+  const isSpeaking = conversation.isSpeaking;
+
+  const statusText = callConnecting
+    ? "Se conectează…"
+    : isConnected
+      ? isSpeaking
+        ? "Vorbește…"
+        : "Ascultă…"
+      : "Apasă pentru a suna";
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Call UI */}
+      <div className="flex-1 flex flex-col items-center justify-center gap-6 px-6">
+        {/* Animated Avatar */}
+        <div className="relative">
+          <div
+            className={`h-24 w-24 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-xl transition-all duration-500 ${
+              isConnected && isSpeaking ? "scale-110" : "scale-100"
+            }`}
+          >
+            <Bot className="h-12 w-12 text-primary-foreground" />
+          </div>
+          {isConnected && (
+            <span
+              className={`absolute inset-0 rounded-full border-2 animate-ping ${
+                isSpeaking ? "border-primary/40" : "border-green-400/40"
+              }`}
+            />
+          )}
+        </div>
+
+        {/* Status */}
+        <div className="text-center space-y-1">
+          <p className="text-lg font-semibold text-foreground">EduForYou AI</p>
+          <p className={`text-sm font-medium ${
+            isConnected
+              ? isSpeaking ? "text-primary" : "text-green-500"
+              : callConnecting ? "text-muted-foreground" : "text-muted-foreground"
+          }`}>
+            {statusText}
+          </p>
+        </div>
+
+        {/* Call Button */}
+        {!isConnected ? (
+          <Button
+            onClick={startCall}
+            disabled={callConnecting}
+            size="lg"
+            className="h-16 w-16 rounded-full bg-green-500 hover:bg-green-600 text-white shadow-xl"
+          >
+            <Phone className="h-7 w-7" />
+          </Button>
+        ) : (
+          <Button
+            onClick={endCall}
+            size="lg"
+            variant="destructive"
+            className="h-16 w-16 rounded-full shadow-xl"
+          >
+            <PhoneOff className="h-7 w-7" />
+          </Button>
+        )}
+      </div>
+
+      {/* Live Transcript */}
+      {callTranscript.length > 0 && (
+        <div className="border-t border-border/50 max-h-[200px]">
+          <p className="text-[11px] text-muted-foreground px-4 pt-2 pb-1 font-medium uppercase tracking-wide">Transcript</p>
+          <div ref={scrollRef} className="overflow-y-auto px-4 pb-3 space-y-2 max-h-[160px]">
+            {callTranscript.map((msg, i) => (
+              <div key={i} className={`text-xs ${msg.role === "user" ? "text-right text-muted-foreground" : "text-left text-foreground"}`}>
+                <span className="font-medium">{msg.role === "user" ? "Tu" : "AI"}: </span>
+                {msg.content}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── main component ──────────────────────────────────────── */
 
 export function AIChatPanel() {
@@ -186,6 +347,7 @@ export function AIChatPanel() {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [mode, setMode] = useState<PanelMode>("text");
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioQueueRef = useRef<string[]>([]);
@@ -313,7 +475,6 @@ export function AIChatPanel() {
         return [...prev, { role: "assistant", content: assistantSoFar, timestamp: new Date() }];
       });
 
-      // Sentence-chunked TTS — always on
       if (!cancelledRef.current) {
         ttsBuffer += chunk;
         const { sentences, remainder } = extractSentences(ttsBuffer);
@@ -387,7 +548,7 @@ export function AIChatPanel() {
                   </SheetTitle>
                   {!showHistory && (
                     <p className="text-[11px] text-muted-foreground">
-                      {speaking ? "🔊 Vorbește…" : "Disponibil 24/7"}
+                      {mode === "text" && speaking ? "🔊 Vorbește…" : mode === "call" ? "Mod Apel" : "Disponibil 24/7"}
                     </p>
                   )}
                 </div>
@@ -395,12 +556,41 @@ export function AIChatPanel() {
               <div className="flex items-center gap-1">
                 {!showHistory && (
                   <>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setShowHistory(true)} title="Istoric">
-                      <MessageSquare className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={startNewChat} title="Chat Nou">
-                      <Plus className="h-4 w-4" />
-                    </Button>
+                    {/* Mode Toggle */}
+                    <div className="flex items-center bg-muted/60 rounded-full p-0.5 mr-1">
+                      <button
+                        onClick={() => setMode("text")}
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all ${
+                          mode === "text"
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <MessageCircle className="h-3 w-3" />
+                        Chat
+                      </button>
+                      <button
+                        onClick={() => setMode("call")}
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all ${
+                          mode === "call"
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <Phone className="h-3 w-3" />
+                        Call
+                      </button>
+                    </div>
+                    {mode === "text" && (
+                      <>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setShowHistory(true)} title="Istoric">
+                          <MessageSquare className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={startNewChat} title="Chat Nou">
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
                   </>
                 )}
               </div>
@@ -432,6 +622,8 @@ export function AIChatPanel() {
                 )}
               </div>
             </ScrollArea>
+          ) : mode === "call" ? (
+            <CallModeView />
           ) : (
             <>
               {/* Messages */}
