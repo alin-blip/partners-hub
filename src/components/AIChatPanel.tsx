@@ -797,3 +797,11 @@ function AIChatPanelInner() {
     </>
   );
 }
+
+export function AIChatPanel() {
+  return (
+    <ConversationProvider>
+      <AIChatPanelInner />
+    </ConversationProvider>
+  );
+}
