@@ -1,63 +1,54 @@
 
 
-# Plan: Enhanced Export Dialog with Category Selection and Format Choice
+# Plan: Continuous Voice Conversation Mode
 
-## What changes
+## What the user wants
+A "conversation mode" button where the mic stays active continuously — user speaks, AI responds with voice, then mic auto-resumes for the next question. No need to press mic each time. Text mode stays text-only.
 
-Replace the current "Download All" button with an "Export Data" button that opens a dialog where the owner can:
-1. **Select categories** via checkboxes (Universities, Campuses, Courses, Course Details, Intakes, Timetable Options + Groups, Commission Tiers, Brand Settings, Promotions)
-2. **Choose format**: JSON, CSV, or TXT summary
-3. Download a ZIP containing only the selected categories in the chosen format
+## How it works today
+1. User presses mic → Scribe listens → commits transcript → sends to AI → TTS plays → **stops**
+2. User must press mic again for next question
 
-## Missing data in current export
-- `course_details` (entry requirements, documents required, personal statement guidelines, etc.)
-- `course_timetable_groups` (which courses/campuses map to which timetable option)
+## Solution: Auto-loop voice mode
 
-Both will be added as selectable categories.
+### New flow
+1. User clicks a **"Conversație Vocală"** (phone icon) button to enter voice mode
+2. Mic starts listening automatically
+3. User speaks → transcript committed → sent to AI
+4. AI responds with streaming TTS
+5. **When TTS finishes playing → mic automatically restarts** (loop)
+6. User clicks "Oprește conversația" to exit voice mode
+7. If user types text instead → AI responds in text only, no auto-mic restart
 
-## Implementation
+### UI changes
+- Add a **voice conversation toggle button** in the header (next to volume/history buttons) — a Phone or Headphones icon
+- When voice mode is active: header shows a pulsing indicator, input bar transforms to show "Conversație vocală activă..." with a large stop button
+- The existing mic button stays for one-shot voice input in text mode
 
-### File: `src/pages/owner/SettingsPage.tsx`
+### Technical changes in `AIChatPanel.tsx`
 
-**Remove** the inline `downloadAllData` function and the simple "Download All" button.
+**New state:**
+- `voiceMode: boolean` — continuous conversation mode active
 
-**Add** an `ExportDialog` component (inline in the same file) containing:
-- State: `exportOpen`, `selectedCategories` (Set of strings), `exportFormat` ("json" | "csv" | "txt")
-- Checkboxes for each category with a "Select All / Deselect All" toggle
-- Radio group or select for format (JSON, CSV, TXT Summary)
-- "Export" button that:
-  1. Fetches only the selected tables via `Promise.all` (conditionally)
-  2. For **JSON**: bundles each selected category as `{category}.json` in a ZIP
-  3. For **CSV**: converts each table to CSV (headers from keys, rows from values) and bundles as `{category}.csv`
-  4. For **TXT**: generates the human-readable summary (existing logic, extended with course details and timetable data)
-  5. Downloads the ZIP
+**Modified logic:**
+- `playNextInQueue()`: when queue is empty AND `voiceMode` is true → call `startListeningAgain()` after a short delay (500ms)
+- `startListeningAgain()`: fetches new scribe token and reconnects mic
+- `onCommittedTranscript`: in voice mode, auto-submits (already does this)
+- `send()`: if triggered from voice mode, keeps `voiceMode = true` so the loop continues
+- `send()`: if triggered from typing (keyboard), does NOT restart mic — pure text mode
+- Exiting voice mode: disconnects scribe, stops audio, resets state
 
-**Categories map**:
-
-| Checkbox label | Tables fetched |
-|---|---|
-| Universities | `universities` |
-| Campuses | `campuses` + join universities(name) |
-| Courses | `courses` + join universities(name) |
-| Course Details | `course_details` + join courses(name, universities(name)) |
-| Intakes | `intakes` + join universities(name) |
-| Timetable Options | `timetable_options` + `course_timetable_groups` joined |
-| Commission Tiers | `commission_tiers` + join universities(name) |
-| Brand Settings | `brand_settings` |
-| Promotions | `promotions` |
-
-**CSV helper**: Simple function that takes an array of objects, extracts unique keys as headers, and writes comma-separated rows with proper escaping.
+**Edge case handling:**
+- If user types while in voice mode → exit voice mode, send as text
+- If AI is still generating when user speaks → stop current audio, send new message
+- Token refresh: get new scribe token each time mic restarts (tokens are single-use)
 
 ## Files modified
-1. `src/pages/owner/SettingsPage.tsx` — replace download button + add ExportDialog with category checkboxes and format selector
+1. `src/components/AIChatPanel.tsx` — add `voiceMode` state, auto-restart logic, UI for voice conversation mode
 
 ## Files created
-None.
+None
 
-## Technical details
-- Uses existing `jszip` dependency for ZIP generation
-- CSV conversion: flat fields only, nested objects (like `universities.name`) flattened to `university_name`
-- Checkbox component already available from `@/components/ui/checkbox`
-- RadioGroup from `@/components/ui/radio-group` for format selection
-- No DB changes needed
+## No backend changes needed
+Same edge functions (ai-chat, elevenlabs-tts, elevenlabs-scribe-token) — no modifications required.
 
