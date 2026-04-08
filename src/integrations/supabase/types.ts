@@ -373,6 +373,82 @@ export type Database = {
         }
         Relationships: []
       }
+      billing_details: {
+        Row: {
+          account_holder_name: string | null
+          account_number: string | null
+          bank_name: string | null
+          company_address: string | null
+          company_name: string | null
+          company_number: string | null
+          created_at: string
+          iban: string | null
+          id: string
+          is_company: boolean
+          sort_code: string | null
+          swift_bic: string | null
+          updated_at: string
+          user_id: string
+          vat_number: string | null
+        }
+        Insert: {
+          account_holder_name?: string | null
+          account_number?: string | null
+          bank_name?: string | null
+          company_address?: string | null
+          company_name?: string | null
+          company_number?: string | null
+          created_at?: string
+          iban?: string | null
+          id?: string
+          is_company?: boolean
+          sort_code?: string | null
+          swift_bic?: string | null
+          updated_at?: string
+          user_id: string
+          vat_number?: string | null
+        }
+        Update: {
+          account_holder_name?: string | null
+          account_number?: string | null
+          bank_name?: string | null
+          company_address?: string | null
+          company_name?: string | null
+          company_number?: string | null
+          created_at?: string
+          iban?: string | null
+          id?: string
+          is_company?: boolean
+          sort_code?: string | null
+          swift_bic?: string | null
+          updated_at?: string
+          user_id?: string
+          vat_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_details_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "conversation_partner_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_details_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_details_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "public_agent_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brand_settings: {
         Row: {
           brand_prompt: string
@@ -1173,6 +1249,77 @@ export type Database = {
             columns: ["university_id"]
             isOneToOne: false
             referencedRelation: "universities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_requests: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          invoice_number: string | null
+          notes: string | null
+          owner_notes: string | null
+          paid_at: string | null
+          requester_id: string
+          snapshot_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          invoice_number?: string | null
+          notes?: string | null
+          owner_notes?: string | null
+          paid_at?: string | null
+          requester_id: string
+          snapshot_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          invoice_number?: string | null
+          notes?: string | null
+          owner_notes?: string | null
+          paid_at?: string | null
+          requester_id?: string
+          snapshot_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_requests_requester_id_fkey"
+            columns: ["requester_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_partner_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_requests_requester_id_fkey"
+            columns: ["requester_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_requests_requester_id_fkey"
+            columns: ["requester_id"]
+            isOneToOne: false
+            referencedRelation: "public_agent_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_requests_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "commission_snapshots"
             referencedColumns: ["id"]
           },
         ]
