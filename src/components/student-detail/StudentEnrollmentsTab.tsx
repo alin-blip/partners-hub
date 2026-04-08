@@ -528,6 +528,45 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Assessment Booking Dialog */}
+      <AssessmentBookingDialog
+        open={!!assessmentEnrollmentId}
+        onOpenChange={(o) => { if (!o) setAssessmentEnrollmentId(null); }}
+        onConfirm={handleBookAssessment}
+        loading={bookingLoading}
+      />
+
+      {/* Cancellation Request Dialog */}
+      <Dialog open={!!cancelEnrollmentId} onOpenChange={(o) => { if (!o) { setCancelEnrollmentId(null); setCancelReason(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <XCircle className="w-5 h-5 text-destructive" />
+              Request Cancellation
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This will send a cancellation request to your admin for approval. The enrollment will only be cancelled after approval.
+          </p>
+          <div>
+            <Label>Reason (optional)</Label>
+            <Textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Why should this enrollment be cancelled?"
+              className="mt-1"
+              rows={3}
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => { setCancelEnrollmentId(null); setCancelReason(""); }}>Cancel</Button>
+            <Button variant="destructive" onClick={handleRequestCancel} disabled={cancelLoading}>
+              {cancelLoading ? "Submitting…" : "Submit Request"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
