@@ -1,116 +1,34 @@
 
 
-# Role-Based Status Change Permissions + Assessment Booking
+# Fix: Stale Status Values in Two Locations
 
-## What Changes
+## Problem Found
 
-### 1. Agent Permissions — Restricted Status Changes
-Agents can ONLY do two things:
-- **Set "Assessment Booked"** — but must pick a date and time (calendar + time picker dialog)
-- **Request "Cancelled"** — does NOT change status immediately; sends an approval request to their Admin (or Owner if no admin)
+The email **sending logic itself works correctly** — `formatStatus()` dynamically converts any snake_case status to Title Case (e.g., `new_application` → "New Application"). The raw DB values flow through properly.
 
-All other status changes are blocked for agents.
+However, there are **two places still using OLD status values**:
 
-### 2. Admin Permissions
-Admins can change any status (except commission statuses, per the previous visibility plan) for students belonging to their team agents.
-
-### 3. Owner Permissions
-Full control — can change any status on any enrollment.
-
-### 4. Assessment Booking Dialog
-When an agent selects "Assessment Booked":
-- A dialog opens with a **date picker** (Calendar component) and **time picker**
-- The date/time is saved to new columns `assessment_date` and `assessment_time` on the `enrollments` table
-- Only after confirming does the status change
-
-### 5. Cancellation Approval Flow
-When an agent clicks "Cancel":
-- A confirmation dialog appears explaining approval is needed
-- An entry is created in a new `cancellation_requests` table (enrollment_id, requested_by, status: pending)
-- The admin (or owner) sees pending requests and can approve/reject
-- Only on approval does the enrollment status change to `cancelled`
-
-## Database Changes
-
-```sql
--- Add assessment fields to enrollments
-ALTER TABLE public.enrollments 
-  ADD COLUMN assessment_date date,
-  ADD COLUMN assessment_time time;
-
--- Cancellation approval requests
-CREATE TABLE public.cancellation_requests (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  enrollment_id uuid REFERENCES public.enrollments(id) ON DELETE CASCADE NOT NULL,
-  requested_by uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
-  reviewed_by uuid REFERENCES auth.users(id),
-  created_at timestamptz DEFAULT now(),
-  reviewed_at timestamptz
-);
-
-ALTER TABLE public.cancellation_requests ENABLE ROW LEVEL SECURITY;
-
--- Agent can see/create their own requests
-CREATE POLICY "Agent manages own cancellation requests" ON public.cancellation_requests
-  FOR ALL TO authenticated
-  USING (requested_by = auth.uid())
-  WITH CHECK (requested_by = auth.uid());
-
--- Admin sees team requests
-CREATE POLICY "Admin views team cancellation requests" ON public.cancellation_requests
-  FOR SELECT TO authenticated
-  USING (has_role(auth.uid(), 'admin'::app_role) AND requested_by IN (
-    SELECT id FROM public.profiles WHERE admin_id = auth.uid()
-  ));
-
--- Admin can update (approve/reject) team requests
-CREATE POLICY "Admin updates team cancellation requests" ON public.cancellation_requests
-  FOR UPDATE TO authenticated
-  USING (has_role(auth.uid(), 'admin'::app_role) AND requested_by IN (
-    SELECT id FROM public.profiles WHERE admin_id = auth.uid()
-  ));
-
--- Owner full access
-CREATE POLICY "Owner full access cancellation requests" ON public.cancellation_requests
-  FOR ALL TO authenticated
-  USING (has_role(auth.uid(), 'owner'::app_role));
+### 1. `StudentNotesTab.tsx` — Quick Status Update dropdown (lines 28-31)
+Still has the OLD list:
 ```
-
-## Frontend Changes
-
-### Files to modify:
-
-1. **`src/components/student-detail/StudentEnrollmentsTab.tsx`**
-   - Replace the status `<Select>` for agents with two buttons: "Book Assessment" and "Request Cancel"
-   - "Book Assessment" only shown when status is before `assessment_booked`
-   - "Request Cancel" shows a confirmation dialog, creates a `cancellation_requests` row
-   - Admin/Owner keep the full dropdown (admin excludes commission statuses per visibility plan)
-
-2. **New: `src/components/student-detail/AssessmentBookingDialog.tsx`**
-   - Dialog with Calendar date picker + time input
-   - On confirm: updates enrollment status to `assessment_booked` + saves `assessment_date`/`assessment_time`
-
-3. **`src/pages/shared/EnrollmentsPage.tsx`**
-   - For agents: remove status dropdown, show read-only StatusBadge
-   - Keep status dropdown for admin (filtered) and owner (full)
-
-4. **`src/pages/admin/AdminDashboard.tsx`** — Add a "Pending Cancellations" section showing requests from team agents needing approval
-
-5. **`src/pages/owner/OwnerDashboard.tsx`** — Add "Pending Cancellations" section for all requests
-
-## Permission Summary
-
-```text
-ACTION                    AGENT    ADMIN    OWNER
-──────────────────────────────────────────────────
-View all statuses          ✓*       ✓*       ✓
-Change to assessment_booked ✓(dialog) ✓       ✓
-Change to cancelled        Request   ✓       ✓
-Change other statuses      ✗        ✓       ✓
-Approve cancellations      ✗        ✓(team)  ✓
-Commission statuses        Hidden   Hidden   ✓
-
-* commission statuses shown as "Enrolled"
+"applied", "conditional_offer", "unconditional_offer",
+"enrolled", "deferred", "rejected", "withdrawn"
 ```
+This means the Quick Status Update card shows **wrong/outdated statuses** and would insert invalid values into the DB (violating the new constraint).
+
+### 2. Email template `previewData` (cosmetic only)
+`enrollment-status-change.tsx` line 90-91 has `oldStatus: 'applied'` and `newStatus: 'offer_received'` — these are only used for dashboard preview rendering, not actual emails. Minor but should be updated for consistency.
+
+## Fix Plan
+
+### File 1: `src/components/student-detail/StudentNotesTab.tsx`
+- Replace `ENROLLMENT_STATUSES` array with the new status list from `status-utils.ts`
+- Import `getVisibleStatuses` and `getAdminEditableStatuses` and use role-based filtering (same pattern as `StudentEnrollmentsTab.tsx`)
+- This ensures the Quick Status Update dropdown only shows valid, role-appropriate statuses
+
+### File 2: `supabase/functions/_shared/transactional-email-templates/enrollment-status-change.tsx`
+- Update `previewData` to use new status values: `oldStatus: 'processing'`, `newStatus: 'final_offer'`
+- Redeploy `send-transactional-email` edge function
+
+No database changes needed. No other files affected — the actual email sending pipeline passes raw DB values correctly.
 
