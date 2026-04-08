@@ -17,7 +17,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Upload, Loader2, Palette, Calendar, FileUp, Pencil } from "lucide-react";
+import { Plus, Trash2, Upload, Loader2, Palette, Calendar, FileUp, Pencil, Download } from "lucide-react";
 import { DocumentProcessorDialog } from "@/components/DocumentProcessorDialog";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
@@ -1939,15 +1939,96 @@ export default function SettingsPage() {
   });
 
   const [importOpen, setImportOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  const downloadAllData = async () => {
+    setDownloading(true);
+    try {
+      const [uniRes, campRes, courseRes, intakeRes, tierRes, brandRes, promoRes, ttRes] = await Promise.all([
+        supabase.from("universities").select("*").order("name"),
+        supabase.from("campuses").select("*, universities(name)").order("name"),
+        supabase.from("courses").select("*, universities(name)").order("name"),
+        supabase.from("intakes").select("*, universities(name)").order("start_date"),
+        supabase.from("commission_tiers").select("*, universities(name)").order("min_students"),
+        supabase.from("brand_settings").select("*"),
+        supabase.from("promotions").select("*").order("created_at", { ascending: false }),
+        supabase.from("timetable_options").select("*").order("label"),
+      ]);
+
+      const allData = {
+        exported_at: new Date().toISOString(),
+        universities: uniRes.data || [],
+        campuses: campRes.data || [],
+        courses: courseRes.data || [],
+        intakes: intakeRes.data || [],
+        commission_tiers: tierRes.data || [],
+        brand_settings: brandRes.data || [],
+        promotions: promoRes.data || [],
+        timetable_options: ttRes.data || [],
+      };
+
+      // --- JSON export ---
+      const jsonBlob = new Blob([JSON.stringify(allData, null, 2)], { type: "application/json" });
+
+      // --- Plain-text summary (human-readable) ---
+      let txt = `EduForYou Platform Settings Export\nExported: ${new Date().toLocaleString()}\n${"=".repeat(50)}\n\n`;
+
+      txt += `UNIVERSITIES (${allData.universities.length})\n${"-".repeat(30)}\n`;
+      for (const u of allData.universities) txt += `• ${u.name}\n`;
+
+      txt += `\nCAMPUSES (${allData.campuses.length})\n${"-".repeat(30)}\n`;
+      for (const c of allData.campuses) txt += `• ${c.name} — ${(c as any).universities?.name || "N/A"}${c.city ? ` (${c.city})` : ""}\n`;
+
+      txt += `\nCOURSES (${allData.courses.length})\n${"-".repeat(30)}\n`;
+      for (const c of allData.courses) txt += `• ${c.name} — ${c.level} — ${(c as any).universities?.name || "N/A"}${c.fees ? ` — ${c.fees}` : ""}\n`;
+
+      txt += `\nINTAKES (${allData.intakes.length})\n${"-".repeat(30)}\n`;
+      for (const i of allData.intakes) txt += `• ${i.label} — Start: ${i.start_date} — ${(i as any).universities?.name || "N/A"}\n`;
+
+      txt += `\nCOMMISSION TIERS (${allData.commission_tiers.length})\n${"-".repeat(30)}\n`;
+      for (const t of allData.commission_tiers) txt += `• ${t.tier_name}: ${t.min_students}-${t.max_students ?? "∞"} students → £${t.commission_per_student}/student${(t as any).universities?.name ? ` (${(t as any).universities.name})` : " (Global)"}\n`;
+
+      txt += `\nPROMOTIONS (${allData.promotions.length})\n${"-".repeat(30)}\n`;
+      for (const p of allData.promotions) txt += `• ${p.title} — £${p.bonus_amount} bonus — deadline: ${p.deadline}\n`;
+
+      const txtBlob = new Blob([txt], { type: "text/plain" });
+
+      // --- ZIP both files ---
+      const JSZip = (await import("jszip")).default;
+      const zip = new JSZip();
+      zip.file("platform-settings.json", jsonBlob);
+      zip.file("platform-settings-summary.txt", txtBlob);
+
+      const content = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(content);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `eduforyou-settings-${format(new Date(), "yyyy-MM-dd")}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      toast({ title: "Download complete", description: "Settings exported as ZIP (JSON + summary)" });
+    } catch (err: any) {
+      toast({ title: "Download failed", description: err.message, variant: "destructive" });
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <DashboardLayout allowedRoles={["owner"]}>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold tracking-tight">Platform Settings</h1>
-          <Button onClick={() => setImportOpen(true)} variant="outline">
-            <FileUp className="h-4 w-4 mr-2" /> Import from Document
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={downloadAllData} variant="outline" disabled={downloading}>
+              {downloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+              {downloading ? "Exporting…" : "Download All"}
+            </Button>
+            <Button onClick={() => setImportOpen(true)} variant="outline">
+              <FileUp className="h-4 w-4 mr-2" /> Import from Document
+            </Button>
+          </div>
         </div>
 
         <DocumentProcessorDialog
