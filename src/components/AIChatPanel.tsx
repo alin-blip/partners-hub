@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Bot, Send, Plus, MessageSquare, ChevronLeft, Sparkles, Square, Phone, PhoneOff, MessageCircle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Bot, Send, Plus, MessageSquare, ChevronLeft, Sparkles, Square, Phone, PhoneOff, MessageCircle, Globe, Mic } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -14,6 +15,19 @@ import { formatDistanceToNow } from "date-fns";
 
 type Msg = { role: "user" | "assistant"; content: string; timestamp?: Date };
 type PanelMode = "text" | "call";
+
+const LANGUAGES = [
+  { value: "en", label: "English", flag: "🇬🇧" },
+  { value: "ro", label: "Română", flag: "🇷🇴" },
+  { value: "es", label: "Español", flag: "🇪🇸" },
+  { value: "fr", label: "Français", flag: "🇫🇷" },
+  { value: "de", label: "Deutsch", flag: "🇩🇪" },
+  { value: "it", label: "Italiano", flag: "🇮🇹" },
+  { value: "pt", label: "Português", flag: "🇵🇹" },
+  { value: "ar", label: "العربية", flag: "🇸🇦" },
+  { value: "hi", label: "हिन्दी", flag: "🇮🇳" },
+  { value: "zh", label: "中文", flag: "🇨🇳" },
+];
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 const TTS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`;

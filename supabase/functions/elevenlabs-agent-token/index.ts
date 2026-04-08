@@ -16,6 +16,20 @@ serve(async (req) => {
     if (!ELEVENLABS_API_KEY) throw new Error("ELEVENLABS_API_KEY is not configured");
     if (!ELEVENLABS_AGENT_ID) throw new Error("ELEVENLABS_AGENT_ID is not configured");
 
+    // Parse optional language from request body
+    let requestedLanguage = "en";
+    try {
+      const body = await req.json();
+      if (body?.language) requestedLanguage = body.language;
+    } catch { /* no body or invalid JSON — default to English */ }
+
+    const LANGUAGE_NAMES: Record<string, string> = {
+      en: "English", ro: "Romanian", es: "Spanish", fr: "French",
+      de: "German", it: "Italian", pt: "Portuguese", ar: "Arabic",
+      hi: "Hindi", zh: "Chinese",
+    };
+    const languageName = LANGUAGE_NAMES[requestedLanguage] || "English";
+
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
