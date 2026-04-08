@@ -30,6 +30,7 @@ import { useState, useMemo } from "react";
 import { PromoBanner } from "@/components/PromoBanner";
 import { EmailLogSection } from "@/components/EmailLogSection";
 import { DashboardSearchCard } from "@/components/DashboardSearchCard";
+import { CancellationRequestsSection } from "@/components/CancellationRequestsSection";
 
 const teamChartConfig: ChartConfig = {
   students: { label: "Students", color: "hsl(var(--primary))" },
