@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import ReactMarkdown from "react-markdown";
 import { useConversation, ConversationProvider } from "@elevenlabs/react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -210,6 +211,7 @@ function AIAvatar({ className = "h-7 w-7" }: { className?: string }) {
 /* ── Call Mode View ──────────────────────────────────────── */
 
 function CallModeView() {
+  const { profile } = useAuth();
   const [callTranscript, setCallTranscript] = useState<Msg[]>([]);
   const [callConnecting, setCallConnecting] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState("en");
@@ -449,7 +451,12 @@ function CallModeView() {
                   {msg.content}
                 </span>
                 {msg.role === "user" && (
-                  <span className="shrink-0 h-5 w-5 rounded-full bg-accent/20 flex items-center justify-center text-[8px] text-accent-foreground font-bold mt-0.5">U</span>
+                  <Avatar className="h-5 w-5 shrink-0 mt-0.5">
+                    {profile?.avatar_url && <AvatarImage src={profile.avatar_url} />}
+                    <AvatarFallback className="bg-primary text-primary-foreground text-[7px] font-bold">
+                      {profile?.full_name?.charAt(0)?.toUpperCase() || "U"}
+                    </AvatarFallback>
+                  </Avatar>
                 )}
               </div>
             ))}
@@ -463,6 +470,7 @@ function CallModeView() {
 /* ── main component ──────────────────────────────────────── */
 
 export function AIChatPanel() {
+  const { profile } = useAuth();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -837,7 +845,10 @@ export function AIChatPanel() {
                     </div>
                     {msg.role === "user" && (
                       <Avatar className="h-7 w-7 shrink-0 mt-0.5">
-                        <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-bold">YOU</AvatarFallback>
+                        {profile?.avatar_url && <AvatarImage src={profile.avatar_url} />}
+                        <AvatarFallback className="bg-primary text-primary-foreground text-[10px] font-bold">
+                          {profile?.full_name?.charAt(0)?.toUpperCase() || "YOU"}
+                        </AvatarFallback>
                       </Avatar>
                     )}
                   </div>
