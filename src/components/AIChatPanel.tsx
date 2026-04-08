@@ -175,10 +175,12 @@ async function fetchTTSChunk(text: string): Promise<string | null> {
 type Conversation = { id: string; title: string; updated_at: string };
 
 const QUICK_ACTIONS = [
-  { label: "📋 Commission structure", prompt: "How do agent commissions work?" },
+  { label: "🏫 Available Universities", prompt: "What universities are available for enrollment?" },
+  { label: "📍 Available Locations", prompt: "What locations/campuses are available?" },
   { label: "🎓 Enrollment process", prompt: "What are the enrollment steps?" },
-  { label: "🛂 Visa guidance", prompt: "Explain UK Student Visa requirements" },
+  { label: "📋 Commission structure", prompt: "How do agent commissions work?" },
   { label: "📊 My students", prompt: "Show me a summary of my students" },
+  { label: "✅ What should I do now?", prompt: "Based on my pending tasks, student statuses, and enrollment progress, what should I do next? Give me a prioritized action list." },
 ];
 
 /* ── sub-components ──────────────────────────────────────── */
@@ -756,17 +758,26 @@ export function AIChatPanel() {
                         I'm the EduForYou AI assistant. Ask me a question, and I'll respond with text and voice.
                       </p>
                     </div>
-                    <div className="flex flex-wrap gap-2 justify-center max-w-[340px]">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-w-[380px]">
                       {QUICK_ACTIONS.map((action) => (
                         <button
                           key={action.prompt}
                           onClick={() => send(action.prompt)}
-                          className="px-3 py-1.5 text-xs rounded-full border border-border/60 bg-background hover:bg-primary/5 hover:border-primary/30 transition-all duration-200 text-foreground/80"
+                          className="px-3 py-2 text-xs rounded-xl border border-border/60 bg-background hover:bg-primary/5 hover:border-primary/30 transition-all duration-200 text-foreground/80 text-center leading-tight"
                         >
                           {action.label}
                         </button>
                       ))}
                     </div>
+                    {/* Voice circle */}
+                    <button
+                      onClick={() => setMode("call")}
+                      className="mt-2 h-14 w-14 rounded-full bg-gradient-to-br from-primary to-primary/70 hover:from-primary/90 hover:to-primary/60 shadow-xl flex items-center justify-center transition-all duration-300 hover:scale-110 group"
+                      title="Tap to talk"
+                    >
+                      <Mic className="h-6 w-6 text-primary-foreground group-hover:scale-110 transition-transform" />
+                    </button>
+                    <p className="text-[11px] text-muted-foreground -mt-1">Tap to talk</p>
                   </div>
                 )}
 
