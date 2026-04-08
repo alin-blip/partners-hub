@@ -1,91 +1,69 @@
 
 
-# Refacere completă panou AI — Voce + Transcript, fără WebRTC
+# Refacere AIChatPanel — 2 moduri: Text-to-Text + Call Mode
 
-## Problema de fond
+## Situația actuală
 
-Agentul vocal ElevenLabs Conversational AI (WebRTC prin `livekit-client`) nu funcționează — eroarea `v1 RTC path not found` persistă indiferent de version pinning, override-uri sau simplificări. Cauza este un conflict de versiuni între `@elevenlabs/react` SDK și serverele LiveKit folosite de ElevenLabs, pe care nu îl putem controla din client.
+Componenta `AIChatPanel.tsx` funcționează doar în modul text+TTS (scrie mesaj → primește text streaming + audio automat). Nu există `@elevenlabs/react` în `package.json` (a fost eliminat). Edge function-ul `elevenlabs-agent-token` returnează un `conversationToken` WebRTC, dar nu este folosit nicăieri.
 
-## Soluția: eliminăm WebRTC, păstrăm voce + text
+## Ce construim
 
-In loc de agentul conversational (speech-to-speech via WebRTC), folosim o arhitectură care **deja funcționează** parțial în cod:
+Panoul AI va avea **2 moduri**, comutabile dintr-un toggle vizibil:
 
-```text
-User scrie mesaj → ai-chat (Gemini streaming) → răspuns text afișat în chat
-                                               → elevenlabs-tts → audio redat automat
-```
+### Mod 1: Text-to-Text (Chat)
+- Exact ce avem acum: scrii mesaj → primești răspuns text (Gemini streaming) + audio TTS automat
+- Fără modificări majore la logica existentă
 
-Aceasta elimină complet dependența de `@elevenlabs/react`, `livekit-client`, `ConversationProvider` și tot codul WebRTC.
+### Mod 2: Call Mode (Voce live)
+- Readucem `@elevenlabs/react` ca dependență
+- Buton mare "Start Call" — solicită permisiune microfon, obține token de la `elevenlabs-agent-token`, pornește sesiunea WebRTC
+- Interfață minimală: avatar animat, indicator "Listening..." / "Speaking...", buton "End Call"
+- Fără overrides, fără connectionType — doar `startSession({ conversationToken })`
+- Transcript live opțional (afișează ce spune userul și ce răspunde agentul)
 
-## Ce se schimbă
-
-### 1. Eliminăm dependințele problematice
-
-**`package.json`**:
-- Scoatem `@elevenlabs/react` din dependencies
-- Scoatem secțiunea `overrides` cu `livekit-client`
-
-### 2. Rescriem `src/components/AIChatPanel.tsx` de la zero
-
-**Interfața nouă — minimalistă și curată:**
-- Un singur buton FAB (floating action button) care deschide panoul
-- Header simplu: titlu + buton „New Chat" + buton „History"
-- Zona de mesaje cu bule de chat (user/assistant)
-- Input bar: câmp text + buton Send + indicator audio „Vorbește..."
-- Răspunsul AI: apare ca text (streaming) ȘI se redă automat ca audio (TTS propoziție cu propoziție)
-- Buton Stop audio vizibil când AI vorbește
-
-**Ce eliminăm:**
-- Butonul Phone/PhoneOff (mod vocal WebRTC)
-- Butonul Volume2/VolumeX (toggle autoSpeak) — vocea e mereu activă
-- `ConversationProvider` wrapper
-- `useConversation` hook
-- `voiceMode`, `voiceConnecting`, `isAgentSpeaking` states
-- `startVoiceConversation`, `stopVoiceConversation` functions
-- SoundWave component (simplificăm cu un simplu indicator text)
-- CSS animations complexe (mic-pulse, voice-mode-pulse)
-
-**Ce păstrăm și îmbunătățim:**
-- `streamChat()` — funcția de streaming text cu Gemini (funcționează)
-- `fetchTTSChunk()` — TTS per propoziție (funcționează)
-- Audio queue player (playNextInQueue, enqueueAudio, stopAllAudio)
-- Conversation history (load/save)
-- Quick action chips
-- Markdown rendering pentru răspunsuri
-- Typing indicator
-
-### 3. Edge functions — rămân neschimbate
-
-- `ai-chat` — streaming text (Gemini) ✓
-- `elevenlabs-tts` — audio per propoziție ✓
-- `elevenlabs-agent-token` — nu mai e necesar, dar îl lăsăm (nu deranjează)
-
-### 4. `DashboardLayout.tsx` — import simplificat
-
-Nu mai avem nevoie de `ConversationProvider`, componenta exportată va fi directă.
-
-## Structura noii componente
+## Structura UI
 
 ```text
 AIChatPanel
 ├── FAB button (deschide Sheet)
 ├── Sheet
-│   ├── Header (titlu, new chat, history)
-│   ├── History view (lista conversații)
-│   └── Chat view
-│       ├── Welcome screen + Quick Actions (când nu e mesaj)
-│       ├── Message list (scroll)
-│       │   ├── User bubble
-│       │   ├── Assistant bubble (markdown)
-│       │   ├── Typing indicator
-│       │   └── Audio indicator ("Vorbește..." + Stop)
-│       └── Input bar (text + send button)
+│   ├── Header (titlu + toggle Text/Call + history + new chat)
+│   ├── History view (neschimbat)
+│   ├── Chat view (Mod Text — neschimbat)
+│   └── Call view (Mod Call — NOU)
+│       ├── Avatar animat central (pulsează când vorbește)
+│       ├── Status: "Apasă Start" / "Se conectează..." / "Ascultă..." / "Vorbește..."
+│       ├── Transcript area (user + agent messages)
+│       ├── Start Call / End Call button
 ```
+
+## Modificări fișiere
+
+### 1. `package.json`
+- Adăugăm `@elevenlabs/react` înapoi (ultima versiune)
+- Adăugăm `overrides: { "livekit-client": "2.16.1" }` pentru compatibilitate
+
+### 2. `src/components/AIChatPanel.tsx` — restructurare completă
+
+- Adăugăm state `mode: "text" | "call"` cu un toggle vizibil în header
+- **Mod Text**: păstrăm tot codul existent (streamChat, TTS, mesaje, history)
+- **Mod Call**: secțiune nouă cu:
+  - `useConversation` hook din `@elevenlabs/react`
+  - Funcție `startCall()`: fetch token → `conversation.startSession({ conversationToken })`
+  - Funcție `endCall()`: `conversation.endSession()`
+  - UI: avatar pulsant, status text, transcript live, buton start/end
+  - `onMessage` handler pentru transcript (user_transcript + agent_response)
+
+### 3. Edge functions — neschimbate
+- `ai-chat` — rămâne pentru modul Text
+- `elevenlabs-tts` — rămâne pentru modul Text  
+- `elevenlabs-agent-token` — rămâne pentru modul Call (deja funcțional)
 
 ## Detalii tehnice
 
-- Eliminarea `@elevenlabs/react` reduce bundle-ul semnificativ (nu se mai descarcă livekit-client ~500KB)
-- Vocea funcționează prin TTS API standard (REST), nu WebRTC — fiabil 100%
-- Fiecare propoziție din răspuns este trimisă la TTS imediat ce e completă, dând senzația de răspuns vocal rapid
-- Nu e nevoie de permisiune de microfon
+- Toggle-ul Text/Call va fi un grup de 2 butoane sau `ToggleGroup` în header
+- În modul Call, zona de mesaje și input bar dispar — sunt înlocuite de interfața de call
+- Istoricul conversațiilor rămâne doar pentru modul Text (call-urile nu se salvează)
+- `livekit-client` trebuie fixat la `2.16.1` via overrides pentru a evita eroarea `v1 RTC path not found`
+- `startSession` va folosi DOAR `{ conversationToken }` — fără overrides, fără connectionType
 
