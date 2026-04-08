@@ -1,50 +1,32 @@
 
+Problema reală:
+- Nu mai e eroare de provider sau de cheie API.
+- Blocajul actual este la conexiunea audio: logurile arată `v1 RTC path not found` și apoi `could not establish pc connection`.
 
-# Fix: Agentul vocal se conectează dar nu pornește
+Do I know what the issue is?
+- Da.
+- Din ce se vede în cod și în lockfile:
+  - `src/components/AIChatPanel.tsx` pornește corect sesiunea cu `conversationToken`
+  - edge function-ul `elevenlabs-agent-token` pare să dea token valid
+  - `bun.lock` rezolvă `livekit-client@2.18.1`
+  - această versiune încearcă ruta `/rtc/v1`, iar aici asta produce exact eroarea din consolă
 
-## Problema
+Fișiere implicate:
+- `package.json`
+- lockfile-ul activ (`bun.lock`, și doar dacă e nevoie `package-lock.json`)
+- posibil un mic cleanup în `src/components/AIChatPanel.tsx`
 
-Eroarea din consolă: **"Initial connection failed: v1 RTC path not found"** + conversația se oprește la "Se conectează..."
+Plan:
+1. Voi fixa cauza de bază prin pin/override pentru `livekit-client` la o versiune compatibilă cu SDK-ul ElevenLabs folosit aici.
+2. Voi actualiza rezolvarea dependențelor în lockfile, ca proiectul să nu mai încarce `2.18.1`.
+3. Voi păstra pornirea sesiunii în forma simplă `startSession({ conversationToken })`, fără `overrides` și fără `connectionType`.
+4. Voi curăța codul din `AIChatPanel.tsx` ca să nu mai folosească/deserializeze valori nefolosite (`systemPrompt`, `firstMessage`) și voi lăsa mesaje de eroare mai clare.
+5. Voi verifica după fix că:
+   - dispare `v1 RTC path not found`
+   - dispare `could not establish pc connection`
+   - butonul nu mai rămâne blocat pe „Se conectează…”
 
-Cauza: parametrul `overrides` pasat în `startSession()` **abortează sesiunea** — este un [bug confirmat în SDK-ul ElevenLabs](https://github.com/elevenlabs/packages/issues/92). De asemenea, `connectionType: "webrtc"` este redundant când se folosește `conversationToken` (se detectează automat).
-
-## Soluția
-
-Eliminăm `overrides` și `connectionType` din `startSession()`. Agentul va folosi promptul configurat direct în ElevenLabs Dashboard.
-
-### Fișier: `src/components/AIChatPanel.tsx`
-
-**Modificare** — simplificăm apelul `startSession`:
-
-```typescript
-// ÎNAINTE (nu funcționează):
-await conversation.startSession({
-  conversationToken: token,
-  connectionType: "webrtc",
-  overrides: {
-    agent: {
-      prompt: { prompt: systemPrompt },
-      firstMessage: firstMessage,
-      language: "ro",
-    },
-  },
-});
-
-// DUPĂ (fix):
-await conversation.startSession({
-  conversationToken: token,
-});
-```
-
-## Ce înseamnă asta
-
-- Agentul vocal va folosi **promptul și vocea configurate direct în ElevenLabs Dashboard**
-- Contextul dinamic (studenți, enrollment-uri) nu va mai fi injectat per sesiune — trebuie configurat manual în agentul ElevenLabs
-- Edge function-ul `elevenlabs-agent-token` rămâne funcțional (returnează token-ul), dar `systemPrompt` și `firstMessage` nu mai sunt folosite pe client
-
-## Detalii tehnice
-
-- `overrides` în `startSession` este un bug cunoscut în `@elevenlabs/react` ≥ 1.0 (GitHub issue #92)
-- Documentația oficială arată `overrides` doar în constructorul `useConversation`, nu în `startSession`
-- `connectionType: "webrtc"` este auto-detectat când se folosește `conversationToken`
-
+Detalii tehnice:
+- Problema nu mai pare să fie în token, agent ID sau cheia API.
+- Este foarte probabil un conflict de versiuni transitive între `@elevenlabs/react` și `livekit-client`.
+- Soluția corectă este să repar compatibilitatea dependenței, nu să mai adaug încă un workaround în UI.
