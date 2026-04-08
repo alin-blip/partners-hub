@@ -586,7 +586,6 @@ export function AIChatPanel() {
     stopAllAudio();
 
     let assistantSoFar = "";
-    let ttsBuffer = "";
 
     const upsert = (chunk: string) => {
       assistantSoFar += chunk;
@@ -597,32 +596,15 @@ export function AIChatPanel() {
         }
         return [...prev, { role: "assistant", content: assistantSoFar, timestamp: new Date() }];
       });
-
-      if (!cancelledRef.current) {
-        ttsBuffer += chunk;
-        const { sentences, remainder } = extractSentences(ttsBuffer);
-        if (sentences.length > 0) {
-          for (const sentence of sentences) {
-            fetchTTSChunk(sentence).then((url) => {
-              if (url && !cancelledRef.current) enqueueAudio(url);
-            });
-          }
-          ttsBuffer = remainder;
-        }
-      }
     };
 
     await streamChat({
       messages: newMessages,
       conversationId: activeConversationId,
       onDelta: upsert,
-      onDone: async () => {
+      onDone: () => {
         setLoading(false);
         queryClient.invalidateQueries({ queryKey: ["ai-conversations"] });
-        if (ttsBuffer.trim() && !cancelledRef.current) {
-          const url = await fetchTTSChunk(ttsBuffer);
-          if (url && !cancelledRef.current) enqueueAudio(url);
-        }
       },
       onError: (err) => { toast.error(err); setLoading(false); },
       onConversationId: (id) => setActiveConversationId(id),
