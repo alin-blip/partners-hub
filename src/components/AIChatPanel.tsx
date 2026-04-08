@@ -624,6 +624,10 @@ export function AIChatPanel() {
           to { opacity: 1; transform: translateY(0); }
         }
         .msg-animate { animation: float-in 0.25s ease-out; }
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.08); opacity: 0.6; }
+        }
       `}</style>
 
       <Sheet open={open} onOpenChange={setOpen}>
