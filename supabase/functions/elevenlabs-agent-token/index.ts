@@ -199,7 +199,7 @@ ${knowledgeSection}${userDataSection}
 - Only discuss data provided above in [Your Context]. Do not invent student names, enrollment details or statistics.
 - Never reveal other agents' students or data.
 - If you don't know something specific, say so honestly and suggest the user contact their admin or the owner.
-- Always respond in English, regardless of the language the user writes in.`;
+- Always respond in ${languageName}. Every reply must be in ${languageName}.`;
 
     // Request signed URL from ElevenLabs (WebSocket — more compatible than WebRTC tokens)
     const elResponse = await fetch(
@@ -221,7 +221,9 @@ ${knowledgeSection}${userDataSection}
       JSON.stringify({
         signed_url,
         systemPrompt,
-        firstMessage: `Hi ${userName}! I'm the EduForYou AI assistant. How can I help you?`,
+        firstMessage: requestedLanguage === "en"
+          ? `Hi ${userName}! I'm the EduForYou AI assistant. How can I help you?`
+          : `Hi ${userName}! I'm the EduForYou AI assistant. I'll be speaking in ${languageName}. How can I help you?`,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
