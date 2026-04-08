@@ -575,7 +575,7 @@ export function AIChatPanel() {
     const text = (overrideText || input).trim();
     if (!text || loading) return;
 
-    unlockAudio();
+    // No TTS in text chat mode
     cancelledRef.current = false;
 
     const userMsg: Msg = { role: "user", content: text, timestamp: new Date() };
