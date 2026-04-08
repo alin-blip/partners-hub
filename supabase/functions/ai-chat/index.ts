@@ -111,6 +111,40 @@ serve(async (req) => {
       }
     }
 
+    // --- Fetch Live Course Requirements ---
+    let courseRequirementsSection = "";
+    try {
+      const { data: courseDetails } = await adminClient
+        .from("course_details")
+        .select("admission_test_info, interview_info, entry_requirements, documents_required, additional_info, courses(name, universities(name))");
+
+      if (courseDetails && courseDetails.length > 0) {
+        const byUni: Record<string, string[]> = {};
+        for (const cd of courseDetails) {
+          const courseName = (cd as any).courses?.name || "Unknown Course";
+          const uniName = (cd as any).courses?.universities?.name || "Unknown University";
+          const fields: string[] = [];
+          if (cd.entry_requirements) fields.push(`Entry Requirements: ${cd.entry_requirements}`);
+          if (cd.admission_test_info) fields.push(`Admission Test: ${cd.admission_test_info}`);
+          if (cd.interview_info) fields.push(`Interview: ${cd.interview_info}`);
+          if (cd.documents_required) fields.push(`Documents: ${cd.documents_required}`);
+          if (cd.additional_info) fields.push(`Additional: ${cd.additional_info}`);
+          if (fields.length > 0) {
+            if (!byUni[uniName]) byUni[uniName] = [];
+            byUni[uniName].push(`  • ${courseName}\n    ${fields.join("\n    ")}`);
+          }
+        }
+        if (Object.keys(byUni).length > 0) {
+          courseRequirementsSection = "\n\n[Live Course Requirements]\n";
+          for (const [uni, courses] of Object.entries(byUni)) {
+            courseRequirementsSection += `\n--- ${uni} ---\n${courses.join("\n")}\n`;
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching course details:", err);
+    }
+
     // --- Fetch User-Scoped Data ---
     let userDataSection = "";
     if (userId && userRole) {
@@ -222,10 +256,11 @@ Key company facts:
 - Commission is calculated per enrolled student based on tier thresholds.
 - Documents required: passport, previous qualifications, English test results, financial evidence.
 - The platform has a Resource Hub with templates, guides, FAQ, training materials and brand assets.
-${knowledgeSection}${userDataSection}
+${knowledgeSection}${courseRequirementsSection}${userDataSection}
 [Rules]
 - Only discuss data provided above in [Your Context]. Do not invent student names, enrollment details or statistics.
 - Never reveal other agents' students or data.
+- The [Live Course Requirements] section contains the most up-to-date course data. If it conflicts with the knowledge base, ALWAYS prefer the live data.
 - If you don't know something specific, say so honestly and suggest the user contact their admin or the owner.
 - Always respond in English, regardless of the language the user writes in.`;
 
