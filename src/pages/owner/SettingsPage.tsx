@@ -1941,65 +1941,170 @@ export default function SettingsPage() {
   });
 
   const [importOpen, setImportOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set([
+    "universities", "campuses", "courses", "course_details", "intakes",
+    "timetable", "commission_tiers", "brand_settings", "promotions",
+  ]));
+  const [exportFormat, setExportFormat] = useState<"json" | "csv" | "txt">("json");
 
-  const downloadAllData = async () => {
+  const allCategories = [
+    { key: "universities", label: "Universities" },
+    { key: "campuses", label: "Campuses" },
+    { key: "courses", label: "Courses" },
+    { key: "course_details", label: "Course Details" },
+    { key: "intakes", label: "Intakes" },
+    { key: "timetable", label: "Timetable Options & Groups" },
+    { key: "commission_tiers", label: "Commission Tiers" },
+    { key: "brand_settings", label: "Brand Settings" },
+    { key: "promotions", label: "Promotions" },
+  ];
+
+  const toggleCategory = (key: string) => {
+    setSelectedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selectedCategories.size === allCategories.length) {
+      setSelectedCategories(new Set());
+    } else {
+      setSelectedCategories(new Set(allCategories.map((c) => c.key)));
+    }
+  };
+
+  const flattenObj = (obj: any, prefix = ""): Record<string, string> => {
+    const result: Record<string, string> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      const key = prefix ? `${prefix}_${k}` : k;
+      if (v && typeof v === "object" && !Array.isArray(v)) {
+        Object.assign(result, flattenObj(v, key));
+      } else {
+        result[key] = v == null ? "" : String(v);
+      }
+    }
+    return result;
+  };
+
+  const toCsv = (data: any[]): string => {
+    if (!data.length) return "";
+    const flat = data.map((d) => flattenObj(d));
+    const headers = [...new Set(flat.flatMap((f) => Object.keys(f)))];
+    const escape = (v: string) => v.includes(",") || v.includes('"') || v.includes("\n") ? `"${v.replace(/"/g, '""')}"` : v;
+    return [headers.join(","), ...flat.map((row) => headers.map((h) => escape(row[h] || "")).join(","))].join("\n");
+  };
+
+  const exportData = async () => {
+    if (selectedCategories.size === 0) {
+      toast({ title: "Select at least one category", variant: "destructive" });
+      return;
+    }
     setDownloading(true);
     try {
-      const [uniRes, campRes, courseRes, intakeRes, tierRes, brandRes, promoRes, ttRes] = await Promise.all([
-        supabase.from("universities").select("*").order("name"),
-        supabase.from("campuses").select("*, universities(name)").order("name"),
-        supabase.from("courses").select("*, universities(name)").order("name"),
-        supabase.from("intakes").select("*, universities(name)").order("start_date"),
-        supabase.from("commission_tiers").select("*, universities(name)").order("min_students"),
-        supabase.from("brand_settings").select("*"),
-        supabase.from("promotions").select("*").order("created_at", { ascending: false }),
-        supabase.from("timetable_options").select("*").order("label"),
-      ]);
+      const sel = selectedCategories;
+      const fetches: Record<string, Promise<any>> = {};
 
-      const allData = {
-        exported_at: new Date().toISOString(),
-        universities: uniRes.data || [],
-        campuses: campRes.data || [],
-        courses: courseRes.data || [],
-        intakes: intakeRes.data || [],
-        commission_tiers: tierRes.data || [],
-        brand_settings: brandRes.data || [],
-        promotions: promoRes.data || [],
-        timetable_options: ttRes.data || [],
-      };
+      if (sel.has("universities")) fetches.universities = supabase.from("universities").select("*").order("name").then((r) => r.data || []);
+      if (sel.has("campuses")) fetches.campuses = supabase.from("campuses").select("*, universities(name)").order("name").then((r) => r.data || []);
+      if (sel.has("courses")) fetches.courses = supabase.from("courses").select("*, universities(name)").order("name").then((r) => r.data || []);
+      if (sel.has("course_details")) fetches.course_details = supabase.from("course_details").select("*, courses(name, universities(name))").then((r) => r.data || []);
+      if (sel.has("intakes")) fetches.intakes = supabase.from("intakes").select("*, universities(name)").order("start_date").then((r) => r.data || []);
+      if (sel.has("timetable")) {
+        fetches.timetable_options = supabase.from("timetable_options").select("*, universities(name)").order("label").then((r) => r.data || []);
+        fetches.course_timetable_groups = supabase.from("course_timetable_groups").select("*, courses(name), campuses(name), timetable_options(label), universities(name)").then((r) => r.data || []);
+      }
+      if (sel.has("commission_tiers")) fetches.commission_tiers = supabase.from("commission_tiers").select("*, universities(name)").order("min_students").then((r) => r.data || []);
+      if (sel.has("brand_settings")) fetches.brand_settings = supabase.from("brand_settings").select("*").then((r) => r.data || []);
+      if (sel.has("promotions")) fetches.promotions = supabase.from("promotions").select("*").order("created_at", { ascending: false }).then((r) => r.data || []);
 
-      // --- JSON export ---
-      const jsonBlob = new Blob([JSON.stringify(allData, null, 2)], { type: "application/json" });
+      const keys = Object.keys(fetches);
+      const results = await Promise.all(Object.values(fetches));
+      const dataMap: Record<string, any[]> = {};
+      keys.forEach((k, i) => (dataMap[k] = results[i]));
 
-      // --- Plain-text summary (human-readable) ---
-      let txt = `EduForYou Platform Settings Export\nExported: ${new Date().toLocaleString()}\n${"=".repeat(50)}\n\n`;
-
-      txt += `UNIVERSITIES (${allData.universities.length})\n${"-".repeat(30)}\n`;
-      for (const u of allData.universities) txt += `• ${u.name}\n`;
-
-      txt += `\nCAMPUSES (${allData.campuses.length})\n${"-".repeat(30)}\n`;
-      for (const c of allData.campuses) txt += `• ${c.name} — ${(c as any).universities?.name || "N/A"}${c.city ? ` (${c.city})` : ""}\n`;
-
-      txt += `\nCOURSES (${allData.courses.length})\n${"-".repeat(30)}\n`;
-      for (const c of allData.courses) txt += `• ${c.name} — ${c.level} — ${(c as any).universities?.name || "N/A"}${c.fees ? ` — ${c.fees}` : ""}\n`;
-
-      txt += `\nINTAKES (${allData.intakes.length})\n${"-".repeat(30)}\n`;
-      for (const i of allData.intakes) txt += `• ${i.label} — Start: ${i.start_date} — ${(i as any).universities?.name || "N/A"}\n`;
-
-      txt += `\nCOMMISSION TIERS (${allData.commission_tiers.length})\n${"-".repeat(30)}\n`;
-      for (const t of allData.commission_tiers) txt += `• ${t.tier_name}: ${t.min_students}-${t.max_students ?? "∞"} students → £${t.commission_per_student}/student${(t as any).universities?.name ? ` (${(t as any).universities.name})` : " (Global)"}\n`;
-
-      txt += `\nPROMOTIONS (${allData.promotions.length})\n${"-".repeat(30)}\n`;
-      for (const p of allData.promotions) txt += `• ${p.title} — £${p.bonus_amount} bonus — deadline: ${p.deadline}\n`;
-
-      const txtBlob = new Blob([txt], { type: "text/plain" });
-
-      // --- ZIP both files ---
       const JSZip = (await import("jszip")).default;
       const zip = new JSZip();
-      zip.file("platform-settings.json", jsonBlob);
-      zip.file("platform-settings-summary.txt", txtBlob);
+
+      if (exportFormat === "json") {
+        for (const [k, v] of Object.entries(dataMap)) {
+          zip.file(`${k}.json`, JSON.stringify(v, null, 2));
+        }
+      } else if (exportFormat === "csv") {
+        for (const [k, v] of Object.entries(dataMap)) {
+          zip.file(`${k}.csv`, toCsv(v));
+        }
+      } else {
+        // TXT summary
+        let txt = `EduForYou Platform Settings Export\nExported: ${new Date().toLocaleString()}\n${"=".repeat(50)}\n\n`;
+
+        if (dataMap.universities) {
+          txt += `UNIVERSITIES (${dataMap.universities.length})\n${"-".repeat(30)}\n`;
+          for (const u of dataMap.universities) txt += `• ${u.name}\n`;
+          txt += "\n";
+        }
+        if (dataMap.campuses) {
+          txt += `CAMPUSES (${dataMap.campuses.length})\n${"-".repeat(30)}\n`;
+          for (const c of dataMap.campuses) txt += `• ${c.name} — ${c.universities?.name || "N/A"}${c.city ? ` (${c.city})` : ""}\n`;
+          txt += "\n";
+        }
+        if (dataMap.courses) {
+          txt += `COURSES (${dataMap.courses.length})\n${"-".repeat(30)}\n`;
+          for (const c of dataMap.courses) txt += `• ${c.name} — ${c.level} — ${c.universities?.name || "N/A"}${c.fees ? ` — ${c.fees}` : ""}${c.duration ? ` — ${c.duration}` : ""}\n`;
+          txt += "\n";
+        }
+        if (dataMap.course_details) {
+          txt += `COURSE DETAILS (${dataMap.course_details.length})\n${"-".repeat(30)}\n`;
+          for (const d of dataMap.course_details) {
+            txt += `• ${d.courses?.name || "Unknown"} (${d.courses?.universities?.name || "N/A"})\n`;
+            if (d.entry_requirements) txt += `  Entry Requirements: ${d.entry_requirements}\n`;
+            if (d.documents_required) txt += `  Documents: ${d.documents_required}\n`;
+            if (d.personal_statement_guidelines) txt += `  Personal Statement: ${d.personal_statement_guidelines}\n`;
+            if (d.admission_test_info) txt += `  Admission Test: ${d.admission_test_info}\n`;
+            if (d.interview_info) txt += `  Interview: ${d.interview_info}\n`;
+            if (d.additional_info) txt += `  Additional: ${d.additional_info}\n`;
+          }
+          txt += "\n";
+        }
+        if (dataMap.intakes) {
+          txt += `INTAKES (${dataMap.intakes.length})\n${"-".repeat(30)}\n`;
+          for (const i of dataMap.intakes) txt += `• ${i.label} — Start: ${i.start_date}${i.application_deadline ? ` — Deadline: ${i.application_deadline}` : ""} — ${i.universities?.name || "N/A"}\n`;
+          txt += "\n";
+        }
+        if (dataMap.timetable_options) {
+          txt += `TIMETABLE OPTIONS (${dataMap.timetable_options.length})\n${"-".repeat(30)}\n`;
+          for (const t of dataMap.timetable_options) txt += `• ${t.label} — ${t.universities?.name || "N/A"}\n`;
+          txt += "\n";
+        }
+        if (dataMap.course_timetable_groups) {
+          txt += `COURSE TIMETABLE GROUPS (${dataMap.course_timetable_groups.length})\n${"-".repeat(30)}\n`;
+          for (const g of dataMap.course_timetable_groups) txt += `• ${g.courses?.name || "?"} → ${g.timetable_options?.label || "?"} (${g.campuses?.name || "All campuses"}) — ${g.universities?.name || "N/A"}\n`;
+          txt += "\n";
+        }
+        if (dataMap.commission_tiers) {
+          txt += `COMMISSION TIERS (${dataMap.commission_tiers.length})\n${"-".repeat(30)}\n`;
+          for (const t of dataMap.commission_tiers) txt += `• ${t.tier_name}: ${t.min_students}-${t.max_students ?? "∞"} students → £${t.commission_per_student}/student${t.universities?.name ? ` (${t.universities.name})` : " (Global)"}\n`;
+          txt += "\n";
+        }
+        if (dataMap.promotions) {
+          txt += `PROMOTIONS (${dataMap.promotions.length})\n${"-".repeat(30)}\n`;
+          for (const p of dataMap.promotions) txt += `• ${p.title} — £${p.bonus_amount} bonus — deadline: ${p.deadline}\n`;
+          txt += "\n";
+        }
+        if (dataMap.brand_settings) {
+          txt += `BRAND SETTINGS\n${"-".repeat(30)}\n`;
+          for (const b of dataMap.brand_settings) {
+            if (b.brand_prompt) txt += `• Brand Prompt: ${b.brand_prompt}\n`;
+            if (b.logo_url) txt += `• Logo URL: ${b.logo_url}\n`;
+          }
+          txt += "\n";
+        }
+
+        zip.file("platform-settings-summary.txt", txt);
+      }
 
       const content = await zip.generateAsync({ type: "blob" });
       const url = URL.createObjectURL(content);
@@ -2009,9 +2114,10 @@ export default function SettingsPage() {
       a.click();
       URL.revokeObjectURL(url);
 
-      toast({ title: "Download complete", description: "Settings exported as ZIP (JSON + summary)" });
+      toast({ title: "Export complete", description: `${selectedCategories.size} categories exported as ${exportFormat.toUpperCase()}` });
+      setExportOpen(false);
     } catch (err: any) {
-      toast({ title: "Download failed", description: err.message, variant: "destructive" });
+      toast({ title: "Export failed", description: err.message, variant: "destructive" });
     } finally {
       setDownloading(false);
     }
@@ -2023,10 +2129,61 @@ export default function SettingsPage() {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold tracking-tight">Platform Settings</h1>
           <div className="flex gap-2">
-            <Button onClick={downloadAllData} variant="outline" disabled={downloading}>
-              {downloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-              {downloading ? "Exporting…" : "Download All"}
-            </Button>
+            <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Download className="h-4 w-4 mr-2" /> Export Data
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Export Platform Data</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-2">
+                  {/* Category selection */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium">Categories</Label>
+                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={toggleAll}>
+                        {selectedCategories.size === allCategories.length ? "Deselect All" : "Select All"}
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 border rounded-md p-3">
+                      {allCategories.map((cat) => (
+                        <label key={cat.key} className="flex items-center gap-2 cursor-pointer text-sm">
+                          <Checkbox
+                            checked={selectedCategories.has(cat.key)}
+                            onCheckedChange={() => toggleCategory(cat.key)}
+                          />
+                          {cat.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Format selection */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Format</Label>
+                    <RadioGroup value={exportFormat} onValueChange={(v) => setExportFormat(v as any)} className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer text-sm">
+                        <RadioGroupItem value="json" /> JSON
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer text-sm">
+                        <RadioGroupItem value="csv" /> CSV
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer text-sm">
+                        <RadioGroupItem value="txt" /> TXT Summary
+                      </label>
+                    </RadioGroup>
+                  </div>
+
+                  <Button onClick={exportData} className="w-full" disabled={downloading || selectedCategories.size === 0}>
+                    {downloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                    {downloading ? "Exporting…" : `Export ${selectedCategories.size} categories`}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
             <Button onClick={() => setImportOpen(true)} variant="outline">
               <FileUp className="h-4 w-4 mr-2" /> Import from Document
             </Button>
