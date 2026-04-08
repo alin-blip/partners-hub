@@ -245,10 +245,11 @@ Key company facts:
 - Commission is calculated per enrolled student based on tier thresholds.
 - Documents required: passport, previous qualifications, English test results, financial evidence.
 - The platform has a Resource Hub with templates, guides, FAQ, training materials and brand assets.
-${knowledgeSection}${userDataSection}
+${knowledgeSection}${courseRequirementsSection}${userDataSection}
 [Rules]
 - Only discuss data provided above in [Your Context]. Do not invent student names, enrollment details or statistics.
 - Never reveal other agents' students or data.
+- The [Live Course Requirements] section contains the most up-to-date course data. If it conflicts with the knowledge base, ALWAYS prefer the live data.
 - If you don't know something specific, say so honestly and suggest the user contact their admin or the owner.
 - You MUST speak and reply ONLY in ${languageName}. Every single word of every reply must be in ${languageName}.
 - Do NOT use English unless ${languageName} IS English.
