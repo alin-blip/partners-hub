@@ -145,6 +145,51 @@ serve(async (req) => {
       console.error("Error fetching course details:", err);
     }
 
+    // --- Fetch Available Universities & Locations ---
+    let universitiesSection = "";
+    try {
+      const { data: universities } = await adminClient
+        .from("universities")
+        .select("name, is_active, campuses(name, city)")
+        .eq("is_active", true);
+
+      if (universities && universities.length > 0) {
+        universitiesSection = "\n\n[Available Universities & Locations]\n";
+        for (const uni of universities) {
+          const campusList = ((uni as any).campuses || [])
+            .map((c: any) => `${c.name}${c.city ? ` (${c.city})` : ""}`)
+            .join(", ");
+          universitiesSection += `- ${uni.name}${campusList ? `: ${campusList}` : ""}\n`;
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching universities:", err);
+    }
+
+    // --- Fetch User Tasks ---
+    let tasksSection = "";
+    if (userId) {
+      try {
+        const { data: tasks } = await adminClient
+          .from("tasks")
+          .select("title, description, status, priority, deadline, student_id")
+          .or(`assigned_to.eq.${userId},created_by.eq.${userId}`)
+          .neq("status", "done")
+          .order("created_at", { ascending: false })
+          .limit(30);
+
+        if (tasks && tasks.length > 0) {
+          tasksSection = "\n\n[Your Tasks]\n";
+          for (const t of tasks) {
+            const dl = t.deadline ? ` | Deadline: ${new Date(t.deadline).toLocaleDateString()}` : "";
+            tasksSection += `- [${t.priority || "normal"}] ${t.title}${t.status !== "todo" ? ` (${t.status})` : ""}${dl}\n`;
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching tasks:", err);
+      }
+    }
+
     // --- Fetch User-Scoped Data ---
     let userDataSection = "";
     if (userId && userRole) {
@@ -256,11 +301,12 @@ Key company facts:
 - Commission is calculated per enrolled student based on tier thresholds.
 - Documents required: passport, previous qualifications, English test results, financial evidence.
 - The platform has a Resource Hub with templates, guides, FAQ, training materials and brand assets.
-${knowledgeSection}${courseRequirementsSection}${userDataSection}
+${knowledgeSection}${courseRequirementsSection}${universitiesSection}${tasksSection}${userDataSection}
 [Rules]
 - Only discuss data provided above in [Your Context]. Do not invent student names, enrollment details or statistics.
 - Never reveal other agents' students or data.
 - The [Live Course Requirements] section contains the most up-to-date course data. If it conflicts with the knowledge base, ALWAYS prefer the live data.
+- When the user asks "what should I do now" or similar, analyze their pending tasks from [Your Tasks], student enrollment statuses, and suggest a prioritized action list with specific next steps.
 - If you don't know something specific, say so honestly and suggest the user contact their admin or the owner.
 - Always respond in English, regardless of the language the user writes in.`;
 
