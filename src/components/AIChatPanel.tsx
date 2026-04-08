@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
-import { useScribe, CommitStrategy } from "@elevenlabs/react";
+import { useConversation } from "@elevenlabs/react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Bot, Send, Plus, MessageSquare, ChevronLeft, Mic, MicOff, Volume2, VolumeX, Sparkles, Square, Phone, PhoneOff } from "lucide-react";
+import { Bot, Send, Plus, MessageSquare, ChevronLeft, Volume2, VolumeX, Sparkles, Square, Phone, PhoneOff } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -201,48 +201,60 @@ export function AIChatPanel() {
   const [showHistory, setShowHistory] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(true);
-  const [listening, setListening] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
+  const [voiceConnecting, setVoiceConnecting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioQueueRef = useRef<string[]>([]);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const isPlayingRef = useRef(false);
   const cancelledRef = useRef(false);
-  const pendingSubmitRef = useRef(false);
-  const voiceModeRef = useRef(false);
   const queryClient = useQueryClient();
 
-  // Keep ref in sync with state for use in callbacks
-  useEffect(() => {
-    voiceModeRef.current = voiceMode;
-  }, [voiceMode]);
-
-  // ElevenLabs Scribe v2 Realtime
-  const scribe = useScribe({
-    modelId: "scribe_v2_realtime",
-    commitStrategy: CommitStrategy.VAD,
-    onPartialTranscript: (data) => {
-      if (listening) {
-        setInput(data.text);
+  // ElevenLabs Conversational AI Agent
+  const conversation = useConversation({
+    onConnect: () => {
+      console.log("ElevenLabs Agent connected");
+      setVoiceConnecting(false);
+    },
+    onDisconnect: () => {
+      console.log("ElevenLabs Agent disconnected");
+      setVoiceMode(false);
+      setVoiceConnecting(false);
+    },
+    onMessage: (message: any) => {
+      if (message.type === "user_transcript") {
+        const text = message.user_transcription_event?.user_transcript;
+        if (text?.trim()) {
+          setMessages((prev) => [...prev, { role: "user", content: text.trim(), timestamp: new Date() }]);
+        }
+      } else if (message.type === "agent_response") {
+        const text = message.agent_response_event?.agent_response;
+        if (text?.trim()) {
+          setMessages((prev) => [...prev, { role: "assistant", content: text.trim(), timestamp: new Date() }]);
+        }
+      } else if (message.type === "agent_response_correction") {
+        const corrected = message.agent_response_correction_event?.corrected_agent_response;
+        if (corrected !== undefined) {
+          setMessages((prev) => {
+            const updated = [...prev];
+            for (let i = updated.length - 1; i >= 0; i--) {
+              if (updated[i].role === "assistant") {
+                updated[i] = { ...updated[i], content: corrected };
+                break;
+              }
+            }
+            return updated;
+          });
+        }
       }
     },
-    onCommittedTranscript: (data) => {
-      if (data.text.trim()) {
-        setInput(data.text.trim());
-        pendingSubmitRef.current = true;
-      }
+    onError: (error: any) => {
+      console.error("ElevenLabs Agent error:", error);
+      toast.error("Eroare la conexiunea vocală.");
+      setVoiceMode(false);
+      setVoiceConnecting(false);
     },
   });
-
-  // Auto-submit when committed transcript arrives
-  useEffect(() => {
-    if (pendingSubmitRef.current && input.trim() && !loading) {
-      pendingSubmitRef.current = false;
-      scribe.disconnect();
-      setListening(false);
-      send();
-    }
-  }, [input]);
 
   const { data: conversations = [] } = useQuery({
     queryKey: ["ai-conversations"],
@@ -266,52 +278,17 @@ export function AIChatPanel() {
   useEffect(() => {
     return () => {
       stopAllAudio();
-      if (scribe.isConnected) {
-        scribe.disconnect();
+      if (conversation.status === "connected") {
+        conversation.endSession();
       }
     };
   }, []);
 
-  // Restart mic for voice conversation mode
-  const restartMicForVoiceMode = useCallback(async () => {
-    if (!voiceModeRef.current) return;
-    
-    try {
-      const { data, error } = await supabase.functions.invoke("elevenlabs-scribe-token");
-      if (error || !data?.token) {
-        console.error("Failed to get scribe token for voice mode restart");
-        setVoiceMode(false);
-        return;
-      }
-
-      await scribe.connect({
-        token: data.token,
-        microphone: {
-          echoCancellation: true,
-          noiseSuppression: true,
-        },
-      });
-      setListening(true);
-    } catch (err) {
-      console.error("Voice mode mic restart error:", err);
-      setVoiceMode(false);
-      setListening(false);
-    }
-  }, [scribe]);
-
-  // Audio queue player
+  // Audio queue player for text mode TTS
   const playNextInQueue = useCallback(async () => {
     if (isPlayingRef.current || cancelledRef.current) return;
     if (audioQueueRef.current.length === 0) {
       setSpeaking(false);
-      // Voice mode: auto-restart mic after TTS finishes
-      if (voiceModeRef.current) {
-        setTimeout(() => {
-          if (voiceModeRef.current) {
-            restartMicForVoiceMode();
-          }
-        }, 500);
-      }
       return;
     }
 
@@ -338,7 +315,7 @@ export function AIChatPanel() {
         playNextInQueue();
       }
     }
-  }, [restartMicForVoiceMode]);
+  }, []);
 
   const enqueueAudio = useCallback((url: string) => {
     audioQueueRef.current.push(url);
@@ -360,83 +337,72 @@ export function AIChatPanel() {
     setTimeout(() => { cancelledRef.current = false; }, 50);
   }, []);
 
-  // Start voice conversation mode
+  // Start voice conversation with ElevenLabs Agent
   const startVoiceConversation = useCallback(async () => {
     unlockAudio();
     stopAllAudio();
-    setAutoSpeak(true);
-    setVoiceMode(true);
+    setVoiceConnecting(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("elevenlabs-scribe-token");
-      if (error || !data?.token) {
-        toast.error("Nu s-a putut porni conversația vocală.");
-        setVoiceMode(false);
-        return;
+      // Request microphone permission
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // Get token + system prompt from edge function
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-agent-token`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(err.error || `Error ${response.status}`);
       }
 
-      await scribe.connect({
-        token: data.token,
-        microphone: {
-          echoCancellation: true,
-          noiseSuppression: true,
+      const { token, systemPrompt, firstMessage } = await response.json();
+
+      if (!token) throw new Error("No conversation token received");
+
+      // Start the ElevenLabs Conversational Agent session
+      await conversation.startSession({
+        conversationToken: token,
+        connectionType: "webrtc",
+        overrides: {
+          agent: {
+            prompt: { prompt: systemPrompt },
+            firstMessage: firstMessage,
+            language: "ro",
+          },
         },
       });
-      setListening(true);
-      setInput("");
-    } catch (err) {
+
+      setVoiceMode(true);
+    } catch (err: any) {
       console.error("Voice conversation start error:", err);
-      toast.error("Eroare la pornirea conversației vocale.");
+      toast.error(err?.message || "Nu s-a putut porni conversația vocală.");
       setVoiceMode(false);
+      setVoiceConnecting(false);
     }
-  }, [scribe, stopAllAudio]);
+  }, [conversation, stopAllAudio]);
 
-  // Stop voice conversation mode
-  const stopVoiceConversation = useCallback(() => {
-    setVoiceMode(false);
-    if (scribe.isConnected) {
-      scribe.disconnect();
-    }
-    setListening(false);
-    stopAllAudio();
-  }, [scribe, stopAllAudio]);
-
-  const toggleListening = useCallback(async () => {
-    // If in voice mode and user clicks mic, exit voice mode
-    if (voiceMode) {
-      stopVoiceConversation();
-      return;
-    }
-
-    if (listening || scribe.isConnected) {
-      scribe.disconnect();
-      setListening(false);
-      return;
-    }
-
-    stopAllAudio();
-
+  // Stop voice conversation
+  const stopVoiceConversation = useCallback(async () => {
     try {
-      const { data, error } = await supabase.functions.invoke("elevenlabs-scribe-token");
-      if (error || !data?.token) {
-        toast.error("Nu s-a putut obține tokenul pentru recunoaștere vocală.");
-        return;
-      }
-
-      await scribe.connect({
-        token: data.token,
-        microphone: {
-          echoCancellation: true,
-          noiseSuppression: true,
-        },
-      });
-      setListening(true);
-      setInput("");
-    } catch (err) {
-      console.error("Scribe connect error:", err);
-      toast.error("Eroare la pornirea microfonului. Verifică permisiunile.");
+      await conversation.endSession();
+    } catch {
+      // ignore
     }
-  }, [listening, scribe, stopAllAudio, voiceMode, stopVoiceConversation]);
+    setVoiceMode(false);
+    setVoiceConnecting(false);
+  }, [conversation]);
 
   const loadConversation = useCallback(async (convId: string) => {
     const { data } = await supabase
@@ -470,9 +436,8 @@ export function AIChatPanel() {
     unlockAudio();
     cancelledRef.current = false;
 
-    // If user typed manually while in voice mode, exit voice mode
-    const isFromKeyboard = !pendingSubmitRef.current && !overrideText;
-    if (isFromKeyboard && voiceMode) {
+    // If in voice mode and user types, exit voice mode
+    if (voiceMode) {
       stopVoiceConversation();
     }
 
@@ -485,7 +450,6 @@ export function AIChatPanel() {
 
     let assistantSoFar = "";
     let ttsBuffer = "";
-    let sentencesSent = 0;
 
     const upsert = (chunk: string) => {
       assistantSoFar += chunk;
@@ -497,13 +461,12 @@ export function AIChatPanel() {
         return [...prev, { role: "assistant", content: assistantSoFar, timestamp: new Date() }];
       });
 
-      // Sentence-chunked TTS: detect sentences and send to TTS immediately
+      // Sentence-chunked TTS
       if (autoSpeak && !cancelledRef.current) {
         ttsBuffer += chunk;
         const { sentences, remainder } = extractSentences(ttsBuffer);
         if (sentences.length > 0) {
           for (const sentence of sentences) {
-            sentencesSent++;
             fetchTTSChunk(sentence).then((url) => {
               if (url && !cancelledRef.current) {
                 enqueueAudio(url);
@@ -534,14 +497,13 @@ export function AIChatPanel() {
       onError: (err) => {
         toast.error(err);
         setLoading(false);
-        // If in voice mode, restart mic even on error so user can try again
-        if (voiceModeRef.current) {
-          setTimeout(() => restartMicForVoiceMode(), 500);
-        }
       },
       onConversationId: (id) => setActiveConversationId(id),
     });
   };
+
+  const isAgentSpeaking = conversation.isSpeaking;
+  const isVoiceConnected = conversation.status === "connected";
 
   return (
     <>
@@ -607,7 +569,7 @@ export function AIChatPanel() {
                   </SheetTitle>
                   {!showHistory && (
                     <p className="text-[11px] text-muted-foreground">
-                      {voiceMode ? "Conversație vocală activă" : "Powered by AI • Disponibil 24/7"}
+                      {voiceMode ? "Conversație vocală activă" : voiceConnecting ? "Se conectează…" : "Powered by AI • Disponibil 24/7"}
                     </p>
                   )}
                 </div>
@@ -622,7 +584,7 @@ export function AIChatPanel() {
                       className={`h-8 w-8 rounded-full ${voiceMode ? "voice-mode-pulse" : ""}`}
                       onClick={voiceMode ? stopVoiceConversation : startVoiceConversation}
                       title={voiceMode ? "Oprește conversația vocală" : "Pornește conversație vocală"}
-                      disabled={loading}
+                      disabled={loading || voiceConnecting}
                     >
                       {voiceMode ? <PhoneOff className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
                     </Button>
@@ -676,7 +638,7 @@ export function AIChatPanel() {
             <>
               {/* Messages */}
               <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-                {messages.length === 0 && (
+                {messages.length === 0 && !voiceMode && (
                   <div className="flex flex-col items-center justify-center h-full text-center gap-5 py-8">
                     <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
                       <Sparkles className="h-8 w-8 text-primary" />
@@ -754,21 +716,8 @@ export function AIChatPanel() {
                     </div>
                   </div>
                 )}
-                {/* Listening indicator */}
-                {listening && !voiceMode && (
-                  <div className="flex items-center justify-center gap-3 py-4 msg-animate">
-                    <div className="flex items-center gap-3 px-4 py-2.5 rounded-full bg-destructive/10 border border-destructive/20">
-                      <div className="h-2.5 w-2.5 rounded-full bg-destructive animate-pulse" />
-                      <span className="text-sm text-destructive font-medium">Ascultă…</span>
-                      <SoundWave active={true} />
-                      <Button variant="destructive" size="sm" className="h-7 rounded-full text-xs" onClick={toggleListening}>
-                        <MicOff className="h-3.5 w-3.5 mr-1" /> Stop
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                {/* Speaking indicator */}
-                {speaking && (
+                {/* Speaking indicator for text mode TTS */}
+                {speaking && !voiceMode && (
                   <div className="flex items-center justify-center gap-3 py-2 msg-animate">
                     <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
                       <SoundWave active={true} />
@@ -783,30 +732,25 @@ export function AIChatPanel() {
 
               {/* Input Bar */}
               <div className="border-t border-border/50 px-4 py-3 shrink-0 bg-background/80 backdrop-blur-sm">
-                {voiceMode ? (
+                {voiceMode || voiceConnecting ? (
                   /* Voice conversation mode input bar */
                   <div className="flex items-center justify-center gap-3">
                     <div className="flex items-center gap-3 px-5 py-3 rounded-full bg-destructive/10 border border-destructive/20 flex-1 justify-center">
-                      {listening && !loading && (
+                      {voiceConnecting && (
+                        <span className="text-sm font-medium text-muted-foreground">Se conectează…</span>
+                      )}
+                      {isVoiceConnected && !isAgentSpeaking && (
                         <>
                           <div className="h-3 w-3 rounded-full bg-destructive animate-pulse" />
                           <SoundWave active={true} />
-                          <span className="text-sm font-medium text-destructive">
-                            {input ? input : "Te ascultă…"}
-                          </span>
+                          <span className="text-sm font-medium text-destructive">Te ascultă…</span>
                         </>
                       )}
-                      {loading && (
-                        <span className="text-sm font-medium text-muted-foreground">Se procesează…</span>
-                      )}
-                      {speaking && !loading && !listening && (
+                      {isVoiceConnected && isAgentSpeaking && (
                         <>
                           <SoundWave active={true} />
                           <span className="text-sm font-medium text-primary">AI vorbește…</span>
                         </>
-                      )}
-                      {!listening && !loading && !speaking && (
-                        <span className="text-sm font-medium text-muted-foreground">Se reconectează…</span>
                       )}
                     </div>
                     <Button
@@ -830,22 +774,11 @@ export function AIChatPanel() {
                       <Input
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        placeholder={listening ? "Ascultă…" : "Scrie un mesaj…"}
+                        placeholder="Scrie un mesaj…"
                         disabled={loading}
                         className="rounded-full pl-4 pr-4 h-11 bg-muted/50 border-border/50 focus-visible:ring-primary/30"
                       />
                     </div>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant={listening ? "destructive" : "ghost"}
-                      className={`h-11 w-11 rounded-full shrink-0 ${listening ? "mic-pulse" : "hover:bg-primary/10"}`}
-                      onClick={toggleListening}
-                      title={listening ? "Oprește ascultarea" : "Pornește microfonul"}
-                      disabled={loading}
-                    >
-                      {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                    </Button>
                     <Button
                       type="submit"
                       size="icon"
