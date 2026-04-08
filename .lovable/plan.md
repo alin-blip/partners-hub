@@ -1,63 +1,63 @@
 
 
-# Plan: Upgrade EduForYou AI Assistant — Voice + Speed + Design
+# Plan: Enhanced Export Dialog with Category Selection and Format Choice
 
-## Problems identified
-1. **TTS is slow**: Uses `eleven_multilingual_v2` (high quality but slow). Full response waits to complete before TTS starts.
-2. **No streaming TTS**: Entire AI response must finish, then entire TTS audio must generate, then playback starts — double wait.
-3. **Design is basic**: Simple sheet panel with flat bubbles, no visual polish.
+## What changes
 
-## Solution
+Replace the current "Download All" button with an "Export Data" button that opens a dialog where the owner can:
+1. **Select categories** via checkboxes (Universities, Campuses, Courses, Course Details, Intakes, Timetable Options + Groups, Commission Tiers, Brand Settings, Promotions)
+2. **Choose format**: JSON, CSV, or TXT summary
+3. Download a ZIP containing only the selected categories in the chosen format
 
-### 1. Streaming TTS — Speak While AI Responds
-Instead of waiting for the full AI response, split the response into sentences and start TTS for the first sentence immediately while the rest streams in. This gives near-instant voice feedback.
+## Missing data in current export
+- `course_details` (entry requirements, documents required, personal statement guidelines, etc.)
+- `course_timetable_groups` (which courses/campuses map to which timetable option)
 
-**Edge function change** (`elevenlabs-tts/index.ts`):
-- Switch to `/stream` endpoint: `https://api.elevenlabs.io/v1/text-to-speech/${voice}/stream`
-- Use `eleven_turbo_v2_5` model (2-3x faster than multilingual_v2, still multilingual)
-- Return chunked audio stream
+Both will be added as selectable categories.
 
-**Client change** (`AIChatPanel.tsx`):
-- Accumulate AI response text. When a sentence boundary is detected (`. ` / `? ` / `! ` / `\n`), send that chunk to TTS
-- Queue audio chunks for sequential playback — user hears first sentence within ~1-2 seconds
-- Cancel queued audio on stop
+## Implementation
 
-### 2. Faster AI Model
-- Change `ai-chat/index.ts` from `google/gemini-3-flash-preview` to `google/gemini-2.5-flash` — faster responses, still high quality
+### File: `src/pages/owner/SettingsPage.tsx`
 
-### 3. Redesigned Chat UI
-Completely refresh the `AIChatPanel.tsx` design:
+**Remove** the inline `downloadAllData` function and the simple "Download All" button.
 
-- **Glassmorphic header** with gradient accent and animated status dot
-- **Avatar bubbles**: Bot avatar (branded icon) on assistant messages, user initial on user messages
-- **Typing indicator**: Animated 3-dot bounce instead of plain spinner
-- **Voice mode visual**: Animated sound wave bars when listening/speaking (CSS animation)
-- **Message timestamps**: Subtle relative time on each message
-- **Quick action chips**: Suggested questions on empty state ("How do commissions work?", "Visa guidance", "My students")
-- **Smooth animations**: Messages slide in with `animate-in`
-- **Better input bar**: Rounded pill shape, mic button with pulse animation when active, gradient send button
-- **Dark mode polished**: Proper contrast and glass effects
+**Add** an `ExportDialog` component (inline in the same file) containing:
+- State: `exportOpen`, `selectedCategories` (Set of strings), `exportFormat` ("json" | "csv" | "txt")
+- Checkboxes for each category with a "Select All / Deselect All" toggle
+- Radio group or select for format (JSON, CSV, TXT Summary)
+- "Export" button that:
+  1. Fetches only the selected tables via `Promise.all` (conditionally)
+  2. For **JSON**: bundles each selected category as `{category}.json` in a ZIP
+  3. For **CSV**: converts each table to CSV (headers from keys, rows from values) and bundles as `{category}.csv`
+  4. For **TXT**: generates the human-readable summary (existing logic, extended with course details and timetable data)
+  5. Downloads the ZIP
 
-### 4. Sentence-Chunked TTS Architecture
+**Categories map**:
 
-```text
-AI Stream:  "Hello, I can help you with that. Let me check your students..."
-             ↓ sentence 1 detected          ↓ sentence 2 detected
-TTS Queue:  [fetch("Hello, I can help...")]  [fetch("Let me check...")]
-Playback:   ▶ plays sentence 1              ▶ plays sentence 2 (queued)
-```
+| Checkbox label | Tables fetched |
+|---|---|
+| Universities | `universities` |
+| Campuses | `campuses` + join universities(name) |
+| Courses | `courses` + join universities(name) |
+| Course Details | `course_details` + join courses(name, universities(name)) |
+| Intakes | `intakes` + join universities(name) |
+| Timetable Options | `timetable_options` + `course_timetable_groups` joined |
+| Commission Tiers | `commission_tiers` + join universities(name) |
+| Brand Settings | `brand_settings` |
+| Promotions | `promotions` |
 
-## Files Modified
-1. `supabase/functions/elevenlabs-tts/index.ts` — Switch to streaming endpoint + turbo model
-2. `supabase/functions/ai-chat/index.ts` — Switch to `google/gemini-2.5-flash`
-3. `src/components/AIChatPanel.tsx` — Complete redesign + sentence-chunked TTS logic
+**CSV helper**: Simple function that takes an array of objects, extracts unique keys as headers, and writes comma-separated rows with proper escaping.
 
-## Files Created
-None — all changes within existing files.
+## Files modified
+1. `src/pages/owner/SettingsPage.tsx` — replace download button + add ExportDialog with category checkboxes and format selector
 
-## Impact
-- Voice response starts 3-5x faster (sentence streaming + turbo model)
-- AI text response ~40% faster (gemini-2.5-flash)
-- Modern, polished chat UI
-- Zero breaking changes — same conversation persistence, same knowledge base
+## Files created
+None.
+
+## Technical details
+- Uses existing `jszip` dependency for ZIP generation
+- CSV conversion: flat fields only, nested objects (like `universities.name`) flattened to `university_name`
+- Checkbox component already available from `@/components/ui/checkbox`
+- RadioGroup from `@/components/ui/radio-group` for format selection
+- No DB changes needed
 
