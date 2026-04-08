@@ -189,14 +189,14 @@ function CallModeView() {
   const conversation = useConversation({
     onConnect: () => {
       setCallConnecting(false);
-      toast.success("Apel conectat!");
+      toast.success("Call connected!");
     },
     onDisconnect: () => {
       setCallConnecting(false);
     },
     onError: (error) => {
       console.error("Call error:", error);
-      toast.error("Eroare la apel. Încearcă din nou.");
+      toast.error("Call failed. Please try again.");
       setCallConnecting(false);
     },
     onMessage: (message: any) => {
@@ -237,13 +237,14 @@ function CallModeView() {
       });
 
       if (!resp.ok) throw new Error(`Token error: ${resp.status}`);
-      const { token } = await resp.json();
-      if (!token) throw new Error("No conversation token received");
+      const data = await resp.json();
+      const signedUrl = data.signed_url;
+      if (!signedUrl) throw new Error("No signed URL received");
 
-      await conversation.startSession({ conversationToken: token });
+      await conversation.startSession({ signedUrl });
     } catch (err: any) {
       console.error("Failed to start call:", err);
-      toast.error(err.message || "Nu s-a putut porni apelul");
+      toast.error(err.message || "Could not start the call");
       setCallConnecting(false);
     }
   }, [conversation]);
@@ -256,12 +257,12 @@ function CallModeView() {
   const isSpeaking = conversation.isSpeaking;
 
   const statusText = callConnecting
-    ? "Se conectează…"
+    ? "Connecting…"
     : isConnected
       ? isSpeaking
-        ? "Vorbește…"
-        : "Ascultă…"
-      : "Apasă pentru a suna";
+        ? "Speaking…"
+        : "Listening…"
+      : "Press to call";
 
   return (
     <div className="flex flex-col h-full">
@@ -279,7 +280,7 @@ function CallModeView() {
           {isConnected && (
             <span
               className={`absolute inset-0 rounded-full border-2 animate-ping ${
-                isSpeaking ? "border-primary/40" : "border-green-400/40"
+                isSpeaking ? "border-primary/40" : "border-accent/40"
               }`}
             />
           )}
@@ -290,8 +291,8 @@ function CallModeView() {
           <p className="text-lg font-semibold text-foreground">EduForYou AI</p>
           <p className={`text-sm font-medium ${
             isConnected
-              ? isSpeaking ? "text-primary" : "text-green-500"
-              : callConnecting ? "text-muted-foreground" : "text-muted-foreground"
+              ? isSpeaking ? "text-primary" : "text-accent-foreground"
+              : "text-muted-foreground"
           }`}>
             {statusText}
           </p>
@@ -303,7 +304,7 @@ function CallModeView() {
             onClick={startCall}
             disabled={callConnecting}
             size="lg"
-            className="h-16 w-16 rounded-full bg-green-500 hover:bg-green-600 text-white shadow-xl"
+            className="h-16 w-16 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-xl"
           >
             <Phone className="h-7 w-7" />
           </Button>
@@ -326,7 +327,7 @@ function CallModeView() {
           <div ref={scrollRef} className="overflow-y-auto px-4 pb-3 space-y-2 max-h-[160px]">
             {callTranscript.map((msg, i) => (
               <div key={i} className={`text-xs ${msg.role === "user" ? "text-right text-muted-foreground" : "text-left text-foreground"}`}>
-                <span className="font-medium">{msg.role === "user" ? "Tu" : "AI"}: </span>
+                <span className="font-medium">{msg.role === "user" ? "You" : "AI"}: </span>
                 {msg.content}
               </div>
             ))}
