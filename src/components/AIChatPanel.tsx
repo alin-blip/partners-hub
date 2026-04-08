@@ -192,7 +192,7 @@ function SoundWave({ active }: { active: boolean }) {
   );
 }
 
-export function AIChatPanel() {
+function AIChatPanelInner() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
