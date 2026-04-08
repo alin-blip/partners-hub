@@ -198,6 +198,7 @@ function TypingIndicator() {
 function CallModeView() {
   const [callTranscript, setCallTranscript] = useState<Msg[]>([]);
   const [callConnecting, setCallConnecting] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState("en");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const conversation = useConversation({
@@ -248,6 +249,7 @@ function CallModeView() {
           Authorization: `Bearer ${accessToken || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
+        body: JSON.stringify({ language: selectedLanguage }),
       });
 
       if (!resp.ok) throw new Error(`Token error: ${resp.status}`);
@@ -269,7 +271,7 @@ function CallModeView() {
       toast.error(err.message || "Could not start the call");
       setCallConnecting(false);
     }
-  }, [conversation]);
+  }, [conversation, selectedLanguage]);
 
   const endCall = useCallback(async () => {
     await conversation.endSession();
@@ -277,6 +279,7 @@ function CallModeView() {
 
   const isConnected = conversation.status === "connected";
   const isSpeaking = conversation.isSpeaking;
+  const selectedLang = LANGUAGES.find((l) => l.value === selectedLanguage);
 
   const statusText = callConnecting
     ? "Connecting…"
@@ -284,73 +287,155 @@ function CallModeView() {
       ? isSpeaking
         ? "Speaking…"
         : "Listening…"
-      : "Press to call";
+      : "Ready to call";
 
   return (
     <div className="flex flex-col h-full">
-      {/* Call UI */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-6 px-6">
-        {/* Animated Avatar */}
-        <div className="relative">
+      {/* Call Visual Area */}
+      <div className="flex-1 flex flex-col items-center justify-center gap-5 px-6 relative overflow-hidden">
+        {/* Background animated rings */}
+        {isConnected && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className={`absolute h-48 w-48 rounded-full border transition-all duration-1000 ${isSpeaking ? "border-primary/20 scale-110" : "border-accent/10 scale-100"}`} style={{ animation: "pulse 3s ease-in-out infinite" }} />
+            <div className={`absolute h-64 w-64 rounded-full border transition-all duration-1000 ${isSpeaking ? "border-primary/10 scale-110" : "border-accent/5 scale-100"}`} style={{ animation: "pulse 3s ease-in-out infinite 0.5s" }} />
+            <div className={`absolute h-80 w-80 rounded-full border transition-all duration-1000 ${isSpeaking ? "border-primary/5 scale-105" : "border-accent/[0.03] scale-100"}`} style={{ animation: "pulse 3s ease-in-out infinite 1s" }} />
+          </div>
+        )}
+
+        {/* Main avatar orb */}
+        <div className="relative z-10">
           <div
-            className={`h-24 w-24 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-xl transition-all duration-500 ${
-              isConnected && isSpeaking ? "scale-110" : "scale-100"
+            className={`h-28 w-28 rounded-full flex items-center justify-center shadow-2xl transition-all duration-700 ${
+              isConnected
+                ? isSpeaking
+                  ? "bg-gradient-to-br from-primary via-primary/80 to-accent scale-110 shadow-primary/30"
+                  : "bg-gradient-to-br from-accent/80 via-accent to-accent/60 scale-100 shadow-accent/20"
+                : "bg-gradient-to-br from-muted to-muted/80 shadow-md"
             }`}
           >
-            <Bot className="h-12 w-12 text-primary-foreground" />
+            {isConnected ? (
+              <div className="flex items-center gap-[3px]">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div
+                    key={i}
+                    className={`w-1 rounded-full bg-primary-foreground/90 transition-all ${
+                      isSpeaking ? "animate-bounce" : "h-3"
+                    }`}
+                    style={{
+                      height: isSpeaking ? undefined : "12px",
+                      animationDelay: isSpeaking ? `${i * 120}ms` : undefined,
+                      animationDuration: isSpeaking ? "0.6s" : undefined,
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <Mic className="h-10 w-10 text-muted-foreground/60" />
+            )}
           </div>
           {isConnected && (
-            <span
-              className={`absolute inset-0 rounded-full border-2 animate-ping ${
-                isSpeaking ? "border-primary/40" : "border-accent/40"
-              }`}
-            />
+            <span className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-green-500 border-2 border-background shadow-sm" />
           )}
         </div>
 
-        {/* Status */}
-        <div className="text-center space-y-1">
+        {/* Status text */}
+        <div className="text-center space-y-1 z-10">
           <p className="text-lg font-semibold text-foreground">EduForYou AI</p>
-          <p className={`text-sm font-medium ${
+          <p className={`text-sm font-medium transition-colors duration-300 ${
             isConnected
-              ? isSpeaking ? "text-primary" : "text-accent-foreground"
-              : "text-muted-foreground"
+              ? isSpeaking ? "text-primary" : "text-accent"
+              : callConnecting ? "text-muted-foreground animate-pulse" : "text-muted-foreground"
           }`}>
             {statusText}
           </p>
         </div>
 
-        {/* Call Button */}
-        {!isConnected ? (
-          <Button
-            onClick={startCall}
-            disabled={callConnecting}
-            size="lg"
-            className="h-16 w-16 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-xl"
-          >
-            <Phone className="h-7 w-7" />
-          </Button>
-        ) : (
-          <Button
-            onClick={endCall}
-            size="lg"
-            variant="destructive"
-            className="h-16 w-16 rounded-full shadow-xl"
-          >
-            <PhoneOff className="h-7 w-7" />
-          </Button>
+        {/* Language selector — only shown before call starts */}
+        {!isConnected && !callConnecting && (
+          <div className="z-10 w-full max-w-[220px]">
+            <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider mb-1.5 flex items-center gap-1.5 justify-center">
+              <Globe className="h-3 w-3" />
+              Conversation Language
+            </label>
+            <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+              <SelectTrigger className="h-10 rounded-xl bg-muted/50 border-border/50 text-sm">
+                <SelectValue>
+                  {selectedLang && (
+                    <span className="flex items-center gap-2">
+                      <span>{selectedLang.flag}</span>
+                      <span>{selectedLang.label}</span>
+                    </span>
+                  )}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {LANGUAGES.map((lang) => (
+                  <SelectItem key={lang.value} value={lang.value}>
+                    <span className="flex items-center gap-2">
+                      <span>{lang.flag}</span>
+                      <span>{lang.label}</span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {/* Call / End call button */}
+        <div className="z-10">
+          {!isConnected ? (
+            <Button
+              onClick={startCall}
+              disabled={callConnecting}
+              size="lg"
+              className="h-14 px-8 rounded-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-xl gap-2.5 text-sm font-semibold transition-all duration-300 hover:scale-105 hover:shadow-2xl"
+            >
+              <Phone className="h-5 w-5" />
+              {callConnecting ? "Connecting…" : "Start Call"}
+            </Button>
+          ) : (
+            <Button
+              onClick={endCall}
+              size="lg"
+              variant="destructive"
+              className="h-14 px-8 rounded-full shadow-xl gap-2.5 text-sm font-semibold transition-all duration-300 hover:scale-105"
+            >
+              <PhoneOff className="h-5 w-5" />
+              End Call
+            </Button>
+          )}
+        </div>
+
+        {/* Current language indicator during call */}
+        {isConnected && selectedLang && (
+          <div className="z-10 flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted/60 border border-border/40 text-xs text-muted-foreground">
+            <span>{selectedLang.flag}</span>
+            <span>{selectedLang.label}</span>
+          </div>
         )}
       </div>
 
       {/* Live Transcript */}
       {callTranscript.length > 0 && (
-        <div className="border-t border-border/50 max-h-[200px]">
+        <div className="border-t border-border/50 max-h-[200px] bg-muted/20">
           <p className="text-[11px] text-muted-foreground px-4 pt-2 pb-1 font-medium uppercase tracking-wide">Transcript</p>
           <div ref={scrollRef} className="overflow-y-auto px-4 pb-3 space-y-2 max-h-[160px]">
             {callTranscript.map((msg, i) => (
-              <div key={i} className={`text-xs ${msg.role === "user" ? "text-right text-muted-foreground" : "text-left text-foreground"}`}>
-                <span className="font-medium">{msg.role === "user" ? "You" : "AI"}: </span>
-                {msg.content}
+              <div key={i} className={`flex gap-2 items-start text-xs msg-animate ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                {msg.role === "assistant" && (
+                  <span className="shrink-0 h-5 w-5 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-[8px] text-primary-foreground font-bold mt-0.5">AI</span>
+                )}
+                <span className={`inline-block max-w-[80%] px-2.5 py-1.5 rounded-xl ${
+                  msg.role === "user"
+                    ? "bg-primary/10 text-foreground rounded-br-sm"
+                    : "bg-muted/70 text-foreground border border-border/30 rounded-bl-sm"
+                }`}>
+                  {msg.content}
+                </span>
+                {msg.role === "user" && (
+                  <span className="shrink-0 h-5 w-5 rounded-full bg-accent/20 flex items-center justify-center text-[8px] text-accent-foreground font-bold mt-0.5">U</span>
+                )}
               </div>
             ))}
           </div>
