@@ -9,6 +9,9 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { format, subMonths, startOfMonth } from "date-fns";
@@ -70,6 +73,8 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function OwnerDashboard() {
   const [openAdmins, setOpenAdmins] = useState<Set<string>>(new Set());
+  const [filterAgent, setFilterAgent] = useState<string>("all");
+  const [filterAdmin, setFilterAdmin] = useState<string>("all");
 
   const { data: students = [] } = useQuery({
     queryKey: ["owner-students-all"],
