@@ -29,6 +29,8 @@ export default function EnrollmentsPage() {
   const navigate = useNavigate();
   const canEdit = role === "owner" || role === "admin";
   const prefix = role === "owner" ? "/owner" : role === "admin" ? "/admin" : "/agent";
+  const filterStatuses = getVisibleStatuses(role);
+  const editableStatuses = role === "owner" ? getVisibleStatuses("owner") : getAdminEditableStatuses();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [page, setPage] = useState(0);
