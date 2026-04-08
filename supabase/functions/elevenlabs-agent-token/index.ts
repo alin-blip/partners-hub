@@ -185,11 +185,11 @@ ${knowledgeSection}${userDataSection}
 - Only discuss data provided above in [Your Context]. Do not invent student names, enrollment details or statistics.
 - Never reveal other agents' students or data.
 - If you don't know something specific, say so honestly and suggest the user contact their admin or the owner.
-- Always respond in the same language the user writes in.`;
+- Always respond in English, regardless of the language the user writes in.`;
 
-    // Request conversation token from ElevenLabs
+    // Request signed URL from ElevenLabs (WebSocket — more compatible than WebRTC tokens)
     const elResponse = await fetch(
-      `https://api.elevenlabs.io/v1/convai/conversation/token?agent_id=${ELEVENLABS_AGENT_ID}`,
+      `https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id=${ELEVENLABS_AGENT_ID}`,
       {
         headers: { "xi-api-key": ELEVENLABS_API_KEY },
       }
@@ -197,17 +197,17 @@ ${knowledgeSection}${userDataSection}
 
     if (!elResponse.ok) {
       const errText = await elResponse.text();
-      console.error("ElevenLabs token error:", elResponse.status, errText);
+      console.error("ElevenLabs signed-url error:", elResponse.status, errText);
       throw new Error(`ElevenLabs API error: ${elResponse.status}`);
     }
 
-    const { token: conversationToken } = await elResponse.json();
+    const { signed_url } = await elResponse.json();
 
     return new Response(
       JSON.stringify({
-        token: conversationToken,
+        signed_url,
         systemPrompt,
-        firstMessage: `Bună ${userName}! Sunt asistentul AI EduForYou. Cu ce te pot ajuta?`,
+        firstMessage: `Hi ${userName}! I'm the EduForYou AI assistant. How can I help you?`,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

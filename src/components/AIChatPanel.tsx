@@ -88,8 +88,8 @@ async function streamChat({
 
   if (!resp.ok) {
     const body = await resp.json().catch(() => ({ error: "Unknown error" }));
-    if (resp.status === 429) { onError("Prea multe cereri. Încearcă din nou în câteva secunde."); return; }
-    if (resp.status === 402) { onError("Credit AI insuficient. Adaugă fonduri în Settings → Usage."); return; }
+    if (resp.status === 429) { onError("Too many requests. Please try again in a few seconds."); return; }
+    if (resp.status === 402) { onError("Insufficient AI credit. Add funds in Settings → Usage."); return; }
     onError(body.error || `Error ${resp.status}`);
     return;
   }
