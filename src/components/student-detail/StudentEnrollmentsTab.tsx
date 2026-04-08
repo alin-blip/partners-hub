@@ -245,9 +245,63 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
     }
   };
 
+  // Assessment booking dialog
+  const [assessmentEnrollmentId, setAssessmentEnrollmentId] = useState<string | null>(null);
+  const [bookingLoading, setBookingLoading] = useState(false);
+
+  // Cancellation request dialog
+  const [cancelEnrollmentId, setCancelEnrollmentId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelLoading, setCancelLoading] = useState(false);
+
   const getAvailableStatuses = (currentStatus: string) => {
-    if (hasSignedConsent) return STATUSES;
-    return ["new_application"];
+    if (!hasSignedConsent) return ["new_application"];
+    if (role === "owner") return getVisibleStatuses("owner");
+    if (role === "admin") return getAdminEditableStatuses();
+    return []; // agents don't use dropdown
+  };
+
+  const handleBookAssessment = async (date: Date, time: string) => {
+    if (!assessmentEnrollmentId) return;
+    setBookingLoading(true);
+    try {
+      const dateStr = format(date, "yyyy-MM-dd");
+      const { error } = await supabase.from("enrollments").update({
+        status: "assessment_booked",
+        assessment_date: dateStr,
+        assessment_time: time,
+      }).eq("id", assessmentEnrollmentId);
+      if (error) throw error;
+      qc.invalidateQueries({ queryKey: ["student-enrollments", studentId] });
+      toast({ title: "Assessment booked", description: `${format(date, "dd MMM yyyy")} at ${time}` });
+      setAssessmentEnrollmentId(null);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
+  const handleRequestCancel = async () => {
+    if (!cancelEnrollmentId) return;
+    setCancelLoading(true);
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) throw new Error("Not authenticated");
+      const { error } = await supabase.from("cancellation_requests").insert({
+        enrollment_id: cancelEnrollmentId,
+        requested_by: currentUser.id,
+        reason: cancelReason || null,
+      });
+      if (error) throw error;
+      toast({ title: "Cancellation requested", description: "Your admin will review and approve or reject." });
+      setCancelEnrollmentId(null);
+      setCancelReason("");
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setCancelLoading(false);
+    }
   };
 
   return (
