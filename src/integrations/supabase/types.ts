@@ -558,6 +558,7 @@ export type Database = {
           admin_rate: number
           agent_id: string
           agent_rate: number
+          commission_tranches: number
           created_at: string
           eligible_at: string
           enrollment_id: string
@@ -574,6 +575,7 @@ export type Database = {
           admin_rate?: number
           agent_id: string
           agent_rate?: number
+          commission_tranches?: number
           created_at?: string
           eligible_at?: string
           enrollment_id: string
@@ -590,6 +592,7 @@ export type Database = {
           admin_rate?: number
           agent_id?: string
           agent_rate?: number
+          commission_tranches?: number
           created_at?: string
           eligible_at?: string
           enrollment_id?: string
