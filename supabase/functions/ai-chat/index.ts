@@ -227,7 +227,7 @@ ${knowledgeSection}${userDataSection}
 - Only discuss data provided above in [Your Context]. Do not invent student names, enrollment details or statistics.
 - Never reveal other agents' students or data.
 - If you don't know something specific, say so honestly and suggest the user contact their admin or the owner.
-- Always respond in the same language the user writes in.`;
+- Always respond in English, regardless of the language the user writes in.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

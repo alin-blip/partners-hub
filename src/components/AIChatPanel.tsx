@@ -88,8 +88,8 @@ async function streamChat({
 
   if (!resp.ok) {
     const body = await resp.json().catch(() => ({ error: "Unknown error" }));
-    if (resp.status === 429) { onError("Prea multe cereri. Încearcă din nou în câteva secunde."); return; }
-    if (resp.status === 402) { onError("Credit AI insuficient. Adaugă fonduri în Settings → Usage."); return; }
+    if (resp.status === 429) { onError("Too many requests. Please try again in a few seconds."); return; }
+    if (resp.status === 402) { onError("Insufficient AI credit. Add funds in Settings → Usage."); return; }
     onError(body.error || `Error ${resp.status}`);
     return;
   }
@@ -189,14 +189,14 @@ function CallModeView() {
   const conversation = useConversation({
     onConnect: () => {
       setCallConnecting(false);
-      toast.success("Apel conectat!");
+      toast.success("Call connected!");
     },
     onDisconnect: () => {
       setCallConnecting(false);
     },
     onError: (error) => {
       console.error("Call error:", error);
-      toast.error("Eroare la apel. Încearcă din nou.");
+      toast.error("Call failed. Please try again.");
       setCallConnecting(false);
     },
     onMessage: (message: any) => {
@@ -237,13 +237,14 @@ function CallModeView() {
       });
 
       if (!resp.ok) throw new Error(`Token error: ${resp.status}`);
-      const { token } = await resp.json();
-      if (!token) throw new Error("No conversation token received");
+      const data = await resp.json();
+      const signedUrl = data.signed_url;
+      if (!signedUrl) throw new Error("No signed URL received");
 
-      await conversation.startSession({ conversationToken: token });
+      await conversation.startSession({ signedUrl });
     } catch (err: any) {
       console.error("Failed to start call:", err);
-      toast.error(err.message || "Nu s-a putut porni apelul");
+      toast.error(err.message || "Could not start the call");
       setCallConnecting(false);
     }
   }, [conversation]);
@@ -256,12 +257,12 @@ function CallModeView() {
   const isSpeaking = conversation.isSpeaking;
 
   const statusText = callConnecting
-    ? "Se conectează…"
+    ? "Connecting…"
     : isConnected
       ? isSpeaking
-        ? "Vorbește…"
-        : "Ascultă…"
-      : "Apasă pentru a suna";
+        ? "Speaking…"
+        : "Listening…"
+      : "Press to call";
 
   return (
     <div className="flex flex-col h-full">
@@ -279,7 +280,7 @@ function CallModeView() {
           {isConnected && (
             <span
               className={`absolute inset-0 rounded-full border-2 animate-ping ${
-                isSpeaking ? "border-primary/40" : "border-green-400/40"
+                isSpeaking ? "border-primary/40" : "border-accent/40"
               }`}
             />
           )}
@@ -290,8 +291,8 @@ function CallModeView() {
           <p className="text-lg font-semibold text-foreground">EduForYou AI</p>
           <p className={`text-sm font-medium ${
             isConnected
-              ? isSpeaking ? "text-primary" : "text-green-500"
-              : callConnecting ? "text-muted-foreground" : "text-muted-foreground"
+              ? isSpeaking ? "text-primary" : "text-accent-foreground"
+              : "text-muted-foreground"
           }`}>
             {statusText}
           </p>
@@ -303,7 +304,7 @@ function CallModeView() {
             onClick={startCall}
             disabled={callConnecting}
             size="lg"
-            className="h-16 w-16 rounded-full bg-green-500 hover:bg-green-600 text-white shadow-xl"
+            className="h-16 w-16 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-xl"
           >
             <Phone className="h-7 w-7" />
           </Button>
@@ -326,7 +327,7 @@ function CallModeView() {
           <div ref={scrollRef} className="overflow-y-auto px-4 pb-3 space-y-2 max-h-[160px]">
             {callTranscript.map((msg, i) => (
               <div key={i} className={`text-xs ${msg.role === "user" ? "text-right text-muted-foreground" : "text-left text-foreground"}`}>
-                <span className="font-medium">{msg.role === "user" ? "Tu" : "AI"}: </span>
+                <span className="font-medium">{msg.role === "user" ? "You" : "AI"}: </span>
                 {msg.content}
               </div>
             ))}
@@ -544,11 +545,11 @@ export function AIChatPanel() {
                 )}
                 <div>
                   <SheetTitle className="text-sm font-semibold">
-                    {showHistory ? "Istoric Conversații" : "EduForYou AI"}
+                    {showHistory ? "Chat History" : "EduForYou AI"}
                   </SheetTitle>
                   {!showHistory && (
                     <p className="text-[11px] text-muted-foreground">
-                      {mode === "text" && speaking ? "🔊 Vorbește…" : mode === "call" ? "Mod Apel" : "Disponibil 24/7"}
+                      {mode === "text" && speaking ? "🔊 Speaking…" : mode === "call" ? "Call Mode" : "Available 24/7"}
                     </p>
                   )}
                 </div>
@@ -583,10 +584,10 @@ export function AIChatPanel() {
                     </div>
                     {mode === "text" && (
                       <>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setShowHistory(true)} title="Istoric">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setShowHistory(true)} title="History">
                           <MessageSquare className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={startNewChat} title="Chat Nou">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={startNewChat} title="New Chat">
                           <Plus className="h-4 w-4" />
                         </Button>
                       </>
@@ -601,7 +602,7 @@ export function AIChatPanel() {
             <ScrollArea className="flex-1">
               <div className="p-4 space-y-2">
                 <Button variant="outline" className="w-full justify-start gap-2 mb-3 rounded-xl h-11" onClick={startNewChat}>
-                  <Plus className="h-4 w-4" /> Conversație Nouă
+                  <Plus className="h-4 w-4" /> New Conversation
                 </Button>
                 {conversations.map((conv) => (
                   <button
@@ -618,13 +619,15 @@ export function AIChatPanel() {
                   </button>
                 ))}
                 {conversations.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-12">Nicio conversație încă</p>
+                  <p className="text-sm text-muted-foreground text-center py-12">No conversations yet</p>
                 )}
               </div>
             </ScrollArea>
           ) : mode === "call" ? (
             <ConversationProvider>
-              <CallModeView />
+              <div>
+                <CallModeView />
+              </div>
             </ConversationProvider>
           ) : (
             <>
@@ -636,9 +639,9 @@ export function AIChatPanel() {
                       <Sparkles className="h-8 w-8 text-primary" />
                     </div>
                     <div className="space-y-1.5">
-                      <p className="text-base font-semibold">Bun venit! 👋</p>
+                      <p className="text-base font-semibold">Welcome! 👋</p>
                       <p className="text-sm text-muted-foreground max-w-[280px]">
-                        Sunt asistentul AI EduForYou. Scrie o întrebare, iar eu voi răspunde în text și voce.
+                        I'm the EduForYou AI assistant. Ask me a question, and I'll respond with text and voice.
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2 justify-center max-w-[340px]">
@@ -684,7 +687,7 @@ export function AIChatPanel() {
                     </div>
                     {msg.role === "user" && (
                       <Avatar className="h-7 w-7 shrink-0 mt-0.5">
-                        <AvatarFallback className="bg-accent text-accent-foreground text-[10px] font-bold">TU</AvatarFallback>
+                        <AvatarFallback className="bg-accent text-accent-foreground text-[10px] font-bold">YOU</AvatarFallback>
                       </Avatar>
                     )}
                   </div>
@@ -706,7 +709,7 @@ export function AIChatPanel() {
                 {speaking && (
                   <div className="flex items-center justify-center gap-3 py-2 msg-animate">
                     <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
-                      <span className="text-sm text-primary font-medium">🔊 Vorbește…</span>
+                      <span className="text-sm text-primary font-medium">🔊 Speaking…</span>
                       <Button variant="outline" size="sm" className="h-7 rounded-full text-xs" onClick={stopAllAudio}>
                         <Square className="h-3 w-3 mr-1" /> Stop
                       </Button>
@@ -724,7 +727,7 @@ export function AIChatPanel() {
                   <Input
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Scrie un mesaj…"
+                    placeholder="Type a message…"
                     disabled={loading}
                     className="flex-1 rounded-full pl-4 pr-4 h-11 bg-muted/50 border-border/50 focus-visible:ring-primary/30"
                   />
