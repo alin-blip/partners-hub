@@ -367,9 +367,11 @@ function AIChatPanelInner() {
         throw new Error(err.error || `Error ${response.status}`);
       }
 
-      const { token, systemPrompt, firstMessage } = await response.json();
+      const data = await response.json();
+      const token = data?.token;
 
       if (!token) throw new Error("No conversation token received");
+      console.log("ElevenLabs token received, starting session…");
 
       // Start the ElevenLabs Conversational Agent session
       await conversation.startSession({
