@@ -1,69 +1,90 @@
 
+Goal: keep the 2 modes, make all panel text English, and fix Call Mode so it no longer depends on the failing WebRTC path.
 
-# Refacere AIChatPanel — 2 moduri: Text-to-Text + Call Mode
+What the actual issue is:
+- The current Call Mode still starts with `conversationToken`, which makes the SDK try a WebRTC peer connection.
+- Your logs show the real blocker: `v1 RTC path not found` / `could not establish pc connection`.
+- The `ConversationProvider` error was fixed, but there is still a secondary integration problem: the provider is mounted in a way that triggers a React ref warning.
+- The panel copy is still mixed Romanian/English, and the backend prompts still tell the AI to answer in the user’s language.
 
-## Situația actuală
+Implementation plan
 
-Componenta `AIChatPanel.tsx` funcționează doar în modul text+TTS (scrie mesaj → primește text streaming + audio automat). Nu există `@elevenlabs/react` în `package.json` (a fost eliminat). Edge function-ul `elevenlabs-agent-token` returnează un `conversationToken` WebRTC, dar nu este folosit nicăieri.
+1. Standardize everything to English
+- Update all visible AI panel copy in `src/components/AIChatPanel.tsx`:
+  - header labels
+  - buttons
+  - placeholders
+  - history labels
+  - quick actions
+  - status texts
+  - transcript labels
+  - toast messages
+  - avatar fallback labels (`YOU` instead of `TU`)
+- Replace the Romanian default greeting and all Romanian UI strings.
 
-## Ce construim
+2. Force English responses in both modes
+- Update `supabase/functions/ai-chat/index.ts`:
+  - remove the “respond in the same language the user writes in” rule
+  - replace it with “always respond in English”
+- Update `supabase/functions/elevenlabs-agent-token/index.ts` the same way.
+- Change the call-mode first message to English as well.
 
-Panoul AI va avea **2 moduri**, comutabile dintr-un toggle vizibil:
+3. Fix Call Mode by switching transport
+- Keep Call Mode as live voice, but stop using the WebRTC token flow as the primary connection path.
+- Change `supabase/functions/elevenlabs-agent-token/index.ts` to return a `signedUrl` from ElevenLabs `get-signed-url` instead of only returning a WebRTC token, or return both during transition.
+- Update `src/components/AIChatPanel.tsx` so `startCall()` uses:
+  - microphone permission
+  - fetch signed URL
+  - `startSession({ signedUrl })`
+- This moves Call Mode away from the failing peer-connection path and uses the more compatible socket-based session.
 
-### Mod 1: Text-to-Text (Chat)
-- Exact ce avem acum: scrii mesaj → primești răspuns text (Gemini streaming) + audio TTS automat
-- Fără modificări majore la logica existentă
+4. Clean up the ElevenLabs React integration
+- Keep `ConversationProvider`, but mount it on a stable wrapper element instead of directly around a plain function child that causes the ref warning.
+- Refactor Call Mode to follow the SDK pattern more closely:
+  - provider owns callbacks/options
+  - call UI consumes state via `useConversation` or granular hooks
+- Ensure call session ends when:
+  - switching from Call to Text mode
+  - closing the sheet
+  - leaving the page
 
-### Mod 2: Call Mode (Voce live)
-- Readucem `@elevenlabs/react` ca dependență
-- Buton mare "Start Call" — solicită permisiune microfon, obține token de la `elevenlabs-agent-token`, pornește sesiunea WebRTC
-- Interfață minimală: avatar animat, indicator "Listening..." / "Speaking...", buton "End Call"
-- Fără overrides, fără connectionType — doar `startSession({ conversationToken })`
-- Transcript live opțional (afișează ce spune userul și ce răspunde agentul)
+5. Make Call Mode UX clearer
+- Keep the 2-mode toggle: `Text` and `Call`
+- In Call Mode show English-only states:
+  - `Ready to start`
+  - `Connecting...`
+  - `Listening...`
+  - `Speaking...`
+  - `Call ended`
+- Keep live transcript in English UI, with clear `You` / `AI` labels.
+- Show a specific failure toast if signed URL/session creation fails.
 
-## Structura UI
+6. Keep Text Mode stable
+- Leave the current text-to-text + TTS flow in place because it is already the reliable path.
+- Only translate the UI and prompts to English.
+- Keep history for text chats only; call transcript remains session-local unless you want it stored later.
 
-```text
-AIChatPanel
-├── FAB button (deschide Sheet)
-├── Sheet
-│   ├── Header (titlu + toggle Text/Call + history + new chat)
-│   ├── History view (neschimbat)
-│   ├── Chat view (Mod Text — neschimbat)
-│   └── Call view (Mod Call — NOU)
-│       ├── Avatar animat central (pulsează când vorbește)
-│       ├── Status: "Apasă Start" / "Se conectează..." / "Ascultă..." / "Vorbește..."
-│       ├── Transcript area (user + agent messages)
-│       ├── Start Call / End Call button
-```
+Files to update
+- `src/components/AIChatPanel.tsx`
+- `supabase/functions/elevenlabs-agent-token/index.ts`
+- `supabase/functions/ai-chat/index.ts`
 
-## Modificări fișiere
+Technical details
+- Root-cause fix: replace WebRTC-first call startup with signed-URL session startup.
+- Secondary fix: remove the provider/ref warning by adjusting the provider subtree structure.
+- No database changes needed.
+- No auth changes needed.
+- Package changes should be minimal; if signed URL flow works cleanly, no extra dependency churn is needed.
 
-### 1. `package.json`
-- Adăugăm `@elevenlabs/react` înapoi (ultima versiune)
-- Adăugăm `overrides: { "livekit-client": "2.16.1" }` pentru compatibilitate
-
-### 2. `src/components/AIChatPanel.tsx` — restructurare completă
-
-- Adăugăm state `mode: "text" | "call"` cu un toggle vizibil în header
-- **Mod Text**: păstrăm tot codul existent (streamChat, TTS, mesaje, history)
-- **Mod Call**: secțiune nouă cu:
-  - `useConversation` hook din `@elevenlabs/react`
-  - Funcție `startCall()`: fetch token → `conversation.startSession({ conversationToken })`
-  - Funcție `endCall()`: `conversation.endSession()`
-  - UI: avatar pulsant, status text, transcript live, buton start/end
-  - `onMessage` handler pentru transcript (user_transcript + agent_response)
-
-### 3. Edge functions — neschimbate
-- `ai-chat` — rămâne pentru modul Text
-- `elevenlabs-tts` — rămâne pentru modul Text  
-- `elevenlabs-agent-token` — rămâne pentru modul Call (deja funcțional)
-
-## Detalii tehnice
-
-- Toggle-ul Text/Call va fi un grup de 2 butoane sau `ToggleGroup` în header
-- În modul Call, zona de mesaje și input bar dispar — sunt înlocuite de interfața de call
-- Istoricul conversațiilor rămâne doar pentru modul Text (call-urile nu se salvează)
-- `livekit-client` trebuie fixat la `2.16.1` via overrides pentru a evita eroarea `v1 RTC path not found`
-- `startSession` va folosi DOAR `{ conversationToken }` — fără overrides, fără connectionType
-
+Validation after implementation
+- Open AI panel and confirm every visible label is English.
+- Text Mode:
+  - send a message in Romanian and confirm reply still comes back in English
+  - confirm transcript + voice still work
+- Call Mode:
+  - click Start Call
+  - confirm mic permission prompt appears
+  - confirm status reaches `Listening...` instead of failing at peer connection
+  - confirm live transcript updates in English UI
+  - confirm End Call fully disconnects
+- Confirm console no longer shows the provider/ref warning and no longer hits the `v1 RTC path not found` flow.
