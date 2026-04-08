@@ -2007,19 +2007,20 @@ export default function SettingsPage() {
     try {
       const sel = selectedCategories;
       const fetches: Record<string, Promise<any>> = {};
+      const f = async (p: PromiseLike<any>) => p;
 
-      if (sel.has("universities")) fetches.universities = supabase.from("universities").select("*").order("name").then((r) => r.data || []);
-      if (sel.has("campuses")) fetches.campuses = supabase.from("campuses").select("*, universities(name)").order("name").then((r) => r.data || []);
-      if (sel.has("courses")) fetches.courses = supabase.from("courses").select("*, universities(name)").order("name").then((r) => r.data || []);
-      if (sel.has("course_details")) fetches.course_details = supabase.from("course_details").select("*, courses(name, universities(name))").then((r) => r.data || []);
-      if (sel.has("intakes")) fetches.intakes = supabase.from("intakes").select("*, universities(name)").order("start_date").then((r) => r.data || []);
+      if (sel.has("universities")) fetches.universities = f(supabase.from("universities").select("*").order("name").then((r) => r.data || []));
+      if (sel.has("campuses")) fetches.campuses = f(supabase.from("campuses").select("*, universities(name)").order("name").then((r) => r.data || []));
+      if (sel.has("courses")) fetches.courses = f(supabase.from("courses").select("*, universities(name)").order("name").then((r) => r.data || []));
+      if (sel.has("course_details")) fetches.course_details = f(supabase.from("course_details").select("*, courses(name, universities(name))").then((r) => r.data || []));
+      if (sel.has("intakes")) fetches.intakes = f(supabase.from("intakes").select("*, universities(name)").order("start_date").then((r) => r.data || []));
       if (sel.has("timetable")) {
-        fetches.timetable_options = supabase.from("timetable_options").select("*, universities(name)").order("label").then((r) => r.data || []);
-        fetches.course_timetable_groups = supabase.from("course_timetable_groups").select("*, courses(name), campuses(name), timetable_options(label), universities(name)").then((r) => r.data || []);
+        fetches.timetable_options = f(supabase.from("timetable_options").select("*, universities(name)").order("label").then((r) => r.data || []));
+        fetches.course_timetable_groups = f(supabase.from("course_timetable_groups").select("*, courses(name), campuses(name), timetable_options(label), universities(name)").then((r) => r.data || []));
       }
-      if (sel.has("commission_tiers")) fetches.commission_tiers = supabase.from("commission_tiers").select("*, universities(name)").order("min_students").then((r) => r.data || []);
-      if (sel.has("brand_settings")) fetches.brand_settings = supabase.from("brand_settings").select("*").then((r) => r.data || []);
-      if (sel.has("promotions")) fetches.promotions = supabase.from("promotions").select("*").order("created_at", { ascending: false }).then((r) => r.data || []);
+      if (sel.has("commission_tiers")) fetches.commission_tiers = f(supabase.from("commission_tiers").select("*, universities(name)").order("min_students").then((r) => r.data || []));
+      if (sel.has("brand_settings")) fetches.brand_settings = f(supabase.from("brand_settings").select("*").then((r) => r.data || []));
+      if (sel.has("promotions")) fetches.promotions = f(supabase.from("promotions").select("*").order("created_at", { ascending: false }).then((r) => r.data || []));
 
       const keys = Object.keys(fetches);
       const results = await Promise.all(Object.values(fetches));
