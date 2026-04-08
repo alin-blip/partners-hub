@@ -1,12 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
-import { useConversation, ConversationProvider } from "@elevenlabs/react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Bot, Send, Plus, MessageSquare, ChevronLeft, Volume2, VolumeX, Sparkles, Square, Phone, PhoneOff } from "lucide-react";
+import { Bot, Send, Plus, MessageSquare, ChevronLeft, Sparkles, Square } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -16,6 +15,8 @@ type Msg = { role: "user" | "assistant"; content: string; timestamp?: Date };
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 const TTS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`;
+
+/* ── helpers ─────────────────────────────────────────────── */
 
 function stripMarkdown(text: string): string {
   return text
@@ -35,27 +36,25 @@ function stripMarkdown(text: string): string {
     .trim();
 }
 
+function extractSentences(text: string): { sentences: string[]; remainder: string } {
+  const sentences: string[] = [];
+  const regex = /[^.!?\n]+[.!?]+(?:\s|$)/g;
+  let match: RegExpExecArray | null;
+  let lastIndex = 0;
+  while ((match = regex.exec(text)) !== null) {
+    sentences.push(match[0].trim());
+    lastIndex = regex.lastIndex;
+  }
+  return { sentences, remainder: text.slice(lastIndex) };
+}
+
 let audioCtx: AudioContext | null = null;
 function unlockAudio() {
   if (!audioCtx) audioCtx = new AudioContext();
   if (audioCtx.state === "suspended") audioCtx.resume();
 }
 
-// Sentence boundary detector for chunked TTS
-function extractSentences(text: string): { sentences: string[]; remainder: string } {
-  const sentences: string[] = [];
-  const regex = /[^.!?\n]+[.!?]+(?:\s|$)/g;
-  let match: RegExpExecArray | null;
-  let lastIndex = 0;
-
-  while ((match = regex.exec(text)) !== null) {
-    sentences.push(match[0].trim());
-    lastIndex = regex.lastIndex;
-  }
-
-  const remainder = text.slice(lastIndex);
-  return { sentences, remainder };
-}
+/* ── streaming chat ──────────────────────────────────────── */
 
 async function streamChat({
   messages,
@@ -86,6 +85,8 @@ async function streamChat({
 
   if (!resp.ok) {
     const body = await resp.json().catch(() => ({ error: "Unknown error" }));
+    if (resp.status === 429) { onError("Prea multe cereri. Încearcă din nou în câteva secunde."); return; }
+    if (resp.status === 402) { onError("Credit AI insuficient. Adaugă fonduri în Settings → Usage."); return; }
     onError(body.error || `Error ${resp.status}`);
     return;
   }
@@ -125,7 +126,8 @@ async function streamChat({
   onDone();
 }
 
-// Fetch TTS for a sentence, return audio blob URL
+/* ── TTS fetch ───────────────────────────────────────────── */
+
 async function fetchTTSChunk(text: string): Promise<string | null> {
   try {
     const cleanText = stripMarkdown(text);
@@ -144,13 +146,14 @@ async function fetchTTSChunk(text: string): Promise<string | null> {
     });
 
     if (!response.ok) return null;
-
     const audioBlob = await response.blob();
     return URL.createObjectURL(audioBlob);
   } catch {
     return null;
   }
 }
+
+/* ── constants ───────────────────────────────────────────── */
 
 type Conversation = { id: string; title: string; updated_at: string };
 
@@ -161,7 +164,8 @@ const QUICK_ACTIONS = [
   { label: "📊 My students", prompt: "Show me a summary of my students" },
 ];
 
-// Typing indicator component
+/* ── sub-components ──────────────────────────────────────── */
+
 function TypingIndicator() {
   return (
     <div className="flex items-center gap-1 px-1 py-1">
@@ -172,27 +176,9 @@ function TypingIndicator() {
   );
 }
 
-// Sound wave animation for voice activity
-function SoundWave({ active }: { active: boolean }) {
-  if (!active) return null;
-  return (
-    <div className="flex items-center gap-[3px] h-5">
-      {[0, 1, 2, 3, 4].map((i) => (
-        <div
-          key={i}
-          className="w-[3px] rounded-full bg-primary transition-all"
-          style={{
-            animation: "soundwave 0.8s ease-in-out infinite",
-            animationDelay: `${i * 0.1}s`,
-            height: "100%",
-          }}
-        />
-      ))}
-    </div>
-  );
-}
+/* ── main component ──────────────────────────────────────── */
 
-function AIChatPanelInner() {
+export function AIChatPanel() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -200,61 +186,13 @@ function AIChatPanelInner() {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [speaking, setSpeaking] = useState(false);
-  const [autoSpeak, setAutoSpeak] = useState(true);
-  const [voiceMode, setVoiceMode] = useState(false);
-  const [voiceConnecting, setVoiceConnecting] = useState(false);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioQueueRef = useRef<string[]>([]);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const isPlayingRef = useRef(false);
   const cancelledRef = useRef(false);
   const queryClient = useQueryClient();
-
-  // ElevenLabs Conversational AI Agent
-  const conversation = useConversation({
-    onConnect: () => {
-      console.log("ElevenLabs Agent connected");
-      setVoiceConnecting(false);
-    },
-    onDisconnect: () => {
-      console.log("ElevenLabs Agent disconnected");
-      setVoiceMode(false);
-      setVoiceConnecting(false);
-    },
-    onMessage: (message: any) => {
-      if (message.type === "user_transcript") {
-        const text = message.user_transcription_event?.user_transcript;
-        if (text?.trim()) {
-          setMessages((prev) => [...prev, { role: "user", content: text.trim(), timestamp: new Date() }]);
-        }
-      } else if (message.type === "agent_response") {
-        const text = message.agent_response_event?.agent_response;
-        if (text?.trim()) {
-          setMessages((prev) => [...prev, { role: "assistant", content: text.trim(), timestamp: new Date() }]);
-        }
-      } else if (message.type === "agent_response_correction") {
-        const corrected = message.agent_response_correction_event?.corrected_agent_response;
-        if (corrected !== undefined) {
-          setMessages((prev) => {
-            const updated = [...prev];
-            for (let i = updated.length - 1; i >= 0; i--) {
-              if (updated[i].role === "assistant") {
-                updated[i] = { ...updated[i], content: corrected };
-                break;
-              }
-            }
-            return updated;
-          });
-        }
-      }
-    },
-    onError: (error: any) => {
-      console.error("ElevenLabs Agent error:", error);
-      toast.error("Eroare la conexiunea vocală.");
-      setVoiceMode(false);
-      setVoiceConnecting(false);
-    },
-  });
 
   const { data: conversations = [] } = useQuery({
     queryKey: ["ai-conversations"],
@@ -270,59 +208,42 @@ function AIChatPanelInner() {
   });
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
   useEffect(() => {
-    return () => {
-      stopAllAudio();
-      if (conversation.status === "connected") {
-        conversation.endSession();
-      }
-    };
+    return () => stopAllAudio();
   }, []);
 
-  // Audio queue player for text mode TTS
+  /* ── audio queue ─────────────────────────────────────── */
+
   const playNextInQueue = useCallback(async () => {
     if (isPlayingRef.current || cancelledRef.current) return;
-    if (audioQueueRef.current.length === 0) {
-      setSpeaking(false);
-      return;
-    }
+    if (audioQueueRef.current.length === 0) { setSpeaking(false); return; }
 
     isPlayingRef.current = true;
     const url = audioQueueRef.current.shift()!;
-    
+
     try {
       const audio = new Audio(url);
       currentAudioRef.current = audio;
-      
       await new Promise<void>((resolve, reject) => {
         audio.onended = () => resolve();
         audio.onerror = () => reject();
         audio.play().catch(reject);
       });
-      
       URL.revokeObjectURL(url);
-    } catch {
-      // ignore playback errors
-    } finally {
+    } catch { /* ignore */ } finally {
       isPlayingRef.current = false;
       currentAudioRef.current = null;
-      if (!cancelledRef.current) {
-        playNextInQueue();
-      }
+      if (!cancelledRef.current) playNextInQueue();
     }
   }, []);
 
   const enqueueAudio = useCallback((url: string) => {
     audioQueueRef.current.push(url);
     setSpeaking(true);
-    if (!isPlayingRef.current) {
-      playNextInQueue();
-    }
+    if (!isPlayingRef.current) playNextInQueue();
   }, [playNextInQueue]);
 
   const stopAllAudio = useCallback(() => {
@@ -337,66 +258,7 @@ function AIChatPanelInner() {
     setTimeout(() => { cancelledRef.current = false; }, 50);
   }, []);
 
-  // Start voice conversation with ElevenLabs Agent
-  const startVoiceConversation = useCallback(async () => {
-    unlockAudio();
-    stopAllAudio();
-    setVoiceConnecting(true);
-
-    try {
-      // Request microphone permission
-      await navigator.mediaDevices.getUserMedia({ audio: true });
-
-      // Get token + system prompt from edge function
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData?.session?.access_token;
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-agent-token`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: "Unknown error" }));
-        throw new Error(err.error || `Error ${response.status}`);
-      }
-
-      const data = await response.json();
-      const token = data?.token;
-
-      if (!token) throw new Error("No conversation token received");
-      console.log("ElevenLabs token received, starting session…");
-
-      // Start the ElevenLabs Conversational Agent session
-      await conversation.startSession({
-        conversationToken: token,
-      });
-
-      setVoiceMode(true);
-    } catch (err: any) {
-      console.error("Voice conversation start error:", err);
-      toast.error(err?.message || "Nu s-a putut porni conversația vocală.");
-      setVoiceMode(false);
-      setVoiceConnecting(false);
-    }
-  }, [conversation, stopAllAudio]);
-
-  // Stop voice conversation
-  const stopVoiceConversation = useCallback(async () => {
-    try {
-      await conversation.endSession();
-    } catch {
-      // ignore
-    }
-    setVoiceMode(false);
-    setVoiceConnecting(false);
-  }, [conversation]);
+  /* ── conversation management ─────────────────────────── */
 
   const loadConversation = useCallback(async (convId: string) => {
     const { data } = await supabase
@@ -420,8 +282,9 @@ function AIChatPanelInner() {
     setActiveConversationId(null);
     setShowHistory(false);
     stopAllAudio();
-    if (voiceMode) stopVoiceConversation();
   };
+
+  /* ── send message ────────────────────────────────────── */
 
   const send = async (overrideText?: string) => {
     const text = (overrideText || input).trim();
@@ -429,11 +292,6 @@ function AIChatPanelInner() {
 
     unlockAudio();
     cancelledRef.current = false;
-
-    // If in voice mode and user types, exit voice mode
-    if (voiceMode) {
-      stopVoiceConversation();
-    }
 
     const userMsg: Msg = { role: "user", content: text, timestamp: new Date() };
     const newMessages = [...messages, userMsg];
@@ -455,16 +313,14 @@ function AIChatPanelInner() {
         return [...prev, { role: "assistant", content: assistantSoFar, timestamp: new Date() }];
       });
 
-      // Sentence-chunked TTS
-      if (autoSpeak && !cancelledRef.current) {
+      // Sentence-chunked TTS — always on
+      if (!cancelledRef.current) {
         ttsBuffer += chunk;
         const { sentences, remainder } = extractSentences(ttsBuffer);
         if (sentences.length > 0) {
           for (const sentence of sentences) {
             fetchTTSChunk(sentence).then((url) => {
-              if (url && !cancelledRef.current) {
-                enqueueAudio(url);
-              }
+              if (url && !cancelledRef.current) enqueueAudio(url);
             });
           }
           ttsBuffer = remainder;
@@ -479,56 +335,26 @@ function AIChatPanelInner() {
       onDone: async () => {
         setLoading(false);
         queryClient.invalidateQueries({ queryKey: ["ai-conversations"] });
-
-        // Send remaining buffer as final TTS chunk
-        if (autoSpeak && ttsBuffer.trim() && !cancelledRef.current) {
+        if (ttsBuffer.trim() && !cancelledRef.current) {
           const url = await fetchTTSChunk(ttsBuffer);
-          if (url && !cancelledRef.current) {
-            enqueueAudio(url);
-          }
+          if (url && !cancelledRef.current) enqueueAudio(url);
         }
       },
-      onError: (err) => {
-        toast.error(err);
-        setLoading(false);
-      },
+      onError: (err) => { toast.error(err); setLoading(false); },
       onConversationId: (id) => setActiveConversationId(id),
     });
   };
 
-  const isAgentSpeaking = conversation.isSpeaking;
-  const isVoiceConnected = conversation.status === "connected";
+  /* ── render ──────────────────────────────────────────── */
 
   return (
     <>
-      {/* Soundwave CSS animation */}
       <style>{`
-        @keyframes soundwave {
-          0%, 100% { transform: scaleY(0.3); }
-          50% { transform: scaleY(1); }
-        }
         @keyframes float-in {
           from { opacity: 0; transform: translateY(8px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        .msg-animate {
-          animation: float-in 0.25s ease-out;
-        }
-        @keyframes pulse-ring {
-          0% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4); }
-          70% { box-shadow: 0 0 0 10px hsl(var(--primary) / 0); }
-          100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0); }
-        }
-        .mic-pulse {
-          animation: pulse-ring 1.5s infinite;
-        }
-        @keyframes voice-glow {
-          0%, 100% { box-shadow: 0 0 0 0 hsl(var(--destructive) / 0.3); }
-          50% { box-shadow: 0 0 0 8px hsl(var(--destructive) / 0); }
-        }
-        .voice-mode-pulse {
-          animation: voice-glow 2s ease-in-out infinite;
-        }
+        .msg-animate { animation: float-in 0.25s ease-out; }
       `}</style>
 
       <Sheet open={open} onOpenChange={setOpen}>
@@ -540,8 +366,9 @@ function AIChatPanelInner() {
             <Sparkles className="h-6 w-6" />
           </Button>
         </SheetTrigger>
+
         <SheetContent className="w-full sm:w-[480px] p-0 flex flex-col bg-background/95 backdrop-blur-xl border-l border-border/50">
-          {/* Glassmorphic Header */}
+          {/* Header */}
           <SheetHeader className="px-5 py-4 border-b border-border/50 bg-gradient-to-r from-primary/5 via-transparent to-accent/5 shrink-0">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -550,11 +377,8 @@ function AIChatPanelInner() {
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                 ) : (
-                  <div className="relative">
-                    <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-md">
-                      <Bot className="h-5 w-5 text-primary-foreground" />
-                    </div>
-                    <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-background ${voiceMode ? "bg-destructive animate-pulse" : "bg-emerald-500"}`} />
+                  <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-md">
+                    <Bot className="h-5 w-5 text-primary-foreground" />
                   </div>
                 )}
                 <div>
@@ -563,7 +387,7 @@ function AIChatPanelInner() {
                   </SheetTitle>
                   {!showHistory && (
                     <p className="text-[11px] text-muted-foreground">
-                      {voiceMode ? "Conversație vocală activă" : voiceConnecting ? "Se conectează…" : "Powered by AI • Disponibil 24/7"}
+                      {speaking ? "🔊 Vorbește…" : "Disponibil 24/7"}
                     </p>
                   )}
                 </div>
@@ -571,26 +395,6 @@ function AIChatPanelInner() {
               <div className="flex items-center gap-1">
                 {!showHistory && (
                   <>
-                    {/* Voice Conversation Toggle */}
-                    <Button
-                      variant={voiceMode ? "destructive" : "ghost"}
-                      size="icon"
-                      className={`h-8 w-8 rounded-full ${voiceMode ? "voice-mode-pulse" : ""}`}
-                      onClick={voiceMode ? stopVoiceConversation : startVoiceConversation}
-                      title={voiceMode ? "Oprește conversația vocală" : "Pornește conversație vocală"}
-                      disabled={loading || voiceConnecting}
-                    >
-                      {voiceMode ? <PhoneOff className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 rounded-full"
-                      onClick={() => setAutoSpeak(!autoSpeak)}
-                      title={autoSpeak ? "Dezactivează vocea" : "Activează vocea"}
-                    >
-                      {autoSpeak ? <Volume2 className="h-4 w-4 text-primary" /> : <VolumeX className="h-4 w-4 text-muted-foreground" />}
-                    </Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setShowHistory(true)} title="Istoric">
                       <MessageSquare className="h-4 w-4" />
                     </Button>
@@ -632,7 +436,7 @@ function AIChatPanelInner() {
             <>
               {/* Messages */}
               <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-                {messages.length === 0 && !voiceMode && (
+                {messages.length === 0 && (
                   <div className="flex flex-col items-center justify-center h-full text-center gap-5 py-8">
                     <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
                       <Sparkles className="h-8 w-8 text-primary" />
@@ -640,10 +444,9 @@ function AIChatPanelInner() {
                     <div className="space-y-1.5">
                       <p className="text-base font-semibold">Bun venit! 👋</p>
                       <p className="text-sm text-muted-foreground max-w-[280px]">
-                        Sunt asistentul AI EduForYou. Întreabă-mă orice despre înrolări, comisioane sau ghidaj UK.
+                        Sunt asistentul AI EduForYou. Scrie o întrebare, iar eu voi răspunde în text și voce.
                       </p>
                     </div>
-                    {/* Quick Action Chips */}
                     <div className="flex flex-wrap gap-2 justify-center max-w-[340px]">
                       {QUICK_ACTIONS.map((action) => (
                         <button
@@ -657,13 +460,12 @@ function AIChatPanelInner() {
                     </div>
                   </div>
                 )}
+
                 {messages.map((msg, i) => (
                   <div key={i} className={`flex gap-2.5 msg-animate ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                     {msg.role === "assistant" && (
                       <Avatar className="h-7 w-7 shrink-0 mt-0.5">
-                        <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground text-[10px] font-bold">
-                          AI
-                        </AvatarFallback>
+                        <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground text-[10px] font-bold">AI</AvatarFallback>
                       </Avatar>
                     )}
                     <div className="flex flex-col gap-0.5 max-w-[80%]">
@@ -678,9 +480,7 @@ function AIChatPanelInner() {
                           <div className="prose prose-sm max-w-none dark:prose-invert [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
                             <ReactMarkdown>{msg.content}</ReactMarkdown>
                           </div>
-                        ) : (
-                          msg.content
-                        )}
+                        ) : msg.content}
                       </div>
                       {msg.timestamp && (
                         <span className={`text-[10px] text-muted-foreground/60 px-1 ${msg.role === "user" ? "text-right" : ""}`}>
@@ -690,32 +490,29 @@ function AIChatPanelInner() {
                     </div>
                     {msg.role === "user" && (
                       <Avatar className="h-7 w-7 shrink-0 mt-0.5">
-                        <AvatarFallback className="bg-accent text-accent-foreground text-[10px] font-bold">
-                          TU
-                        </AvatarFallback>
+                        <AvatarFallback className="bg-accent text-accent-foreground text-[10px] font-bold">TU</AvatarFallback>
                       </Avatar>
                     )}
                   </div>
                 ))}
-                {/* Typing Indicator */}
+
+                {/* Typing */}
                 {loading && messages[messages.length - 1]?.role === "user" && (
                   <div className="flex gap-2.5 justify-start msg-animate">
                     <Avatar className="h-7 w-7 shrink-0 mt-0.5">
-                      <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground text-[10px] font-bold">
-                        AI
-                      </AvatarFallback>
+                      <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground text-[10px] font-bold">AI</AvatarFallback>
                     </Avatar>
                     <div className="bg-muted/70 border border-border/30 rounded-2xl rounded-bl-md px-4 py-3">
                       <TypingIndicator />
                     </div>
                   </div>
                 )}
-                {/* Speaking indicator for text mode TTS */}
-                {speaking && !voiceMode && (
+
+                {/* Speaking indicator + Stop */}
+                {speaking && (
                   <div className="flex items-center justify-center gap-3 py-2 msg-animate">
                     <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
-                      <SoundWave active={true} />
-                      <span className="text-sm text-primary font-medium">Vorbește…</span>
+                      <span className="text-sm text-primary font-medium">🔊 Vorbește…</span>
                       <Button variant="outline" size="sm" className="h-7 rounded-full text-xs" onClick={stopAllAudio}>
                         <Square className="h-3 w-3 mr-1" /> Stop
                       </Button>
@@ -724,78 +521,33 @@ function AIChatPanelInner() {
                 )}
               </div>
 
-              {/* Input Bar */}
+              {/* Input */}
               <div className="border-t border-border/50 px-4 py-3 shrink-0 bg-background/80 backdrop-blur-sm">
-                {voiceMode || voiceConnecting ? (
-                  /* Voice conversation mode input bar */
-                  <div className="flex items-center justify-center gap-3">
-                    <div className="flex items-center gap-3 px-5 py-3 rounded-full bg-destructive/10 border border-destructive/20 flex-1 justify-center">
-                      {voiceConnecting && (
-                        <span className="text-sm font-medium text-muted-foreground">Se conectează…</span>
-                      )}
-                      {isVoiceConnected && !isAgentSpeaking && (
-                        <>
-                          <div className="h-3 w-3 rounded-full bg-destructive animate-pulse" />
-                          <SoundWave active={true} />
-                          <span className="text-sm font-medium text-destructive">Te ascultă…</span>
-                        </>
-                      )}
-                      {isVoiceConnected && isAgentSpeaking && (
-                        <>
-                          <SoundWave active={true} />
-                          <span className="text-sm font-medium text-primary">AI vorbește…</span>
-                        </>
-                      )}
-                    </div>
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      className="h-11 w-11 rounded-full shrink-0 voice-mode-pulse"
-                      onClick={stopVoiceConversation}
-                      title="Oprește conversația vocală"
-                    >
-                      <PhoneOff className="h-5 w-5" />
-                    </Button>
-                  </div>
-                ) : (
-                  /* Normal text input bar */
-                  <form
-                    id="ai-chat-form"
-                    onSubmit={(e) => { e.preventDefault(); send(); }}
-                    className="flex items-center gap-2"
+                <form
+                  onSubmit={(e) => { e.preventDefault(); send(); }}
+                  className="flex items-center gap-2"
+                >
+                  <Input
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Scrie un mesaj…"
+                    disabled={loading}
+                    className="flex-1 rounded-full pl-4 pr-4 h-11 bg-muted/50 border-border/50 focus-visible:ring-primary/30"
+                  />
+                  <Button
+                    type="submit"
+                    size="icon"
+                    disabled={loading || !input.trim()}
+                    className="h-11 w-11 rounded-full shrink-0 bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-md"
                   >
-                    <div className="flex-1 relative">
-                      <Input
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        placeholder="Scrie un mesaj…"
-                        disabled={loading}
-                        className="rounded-full pl-4 pr-4 h-11 bg-muted/50 border-border/50 focus-visible:ring-primary/30"
-                      />
-                    </div>
-                    <Button
-                      type="submit"
-                      size="icon"
-                      disabled={loading || !input.trim()}
-                      className="h-11 w-11 rounded-full shrink-0 bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-md"
-                    >
-                      <Send className="h-4 w-4" />
-                    </Button>
-                  </form>
-                )}
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </form>
               </div>
             </>
           )}
         </SheetContent>
       </Sheet>
     </>
-  );
-}
-
-export function AIChatPanel() {
-  return (
-    <ConversationProvider>
-      <AIChatPanelInner />
-    </ConversationProvider>
   );
 }
