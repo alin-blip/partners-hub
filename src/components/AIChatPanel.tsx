@@ -623,7 +623,9 @@ export function AIChatPanel() {
               </div>
             </ScrollArea>
           ) : mode === "call" ? (
-            <CallModeView />
+            <ConversationProvider>
+              <CallModeView />
+            </ConversationProvider>
           ) : (
             <>
               {/* Messages */}
