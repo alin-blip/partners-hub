@@ -84,7 +84,8 @@ export default function OwnerDashboard() {
     queryFn: async () => {
       const { data } = await supabase
         .from("commission_snapshots")
-        .select("id, agent_rate, admin_rate, override_amount, snapshot_status, enrollment_id, university_id");
+        .select("id, agent_rate, admin_rate, override_amount, snapshot_status, enrollment_id, university_id")
+        .neq("snapshot_status", "cancelled");
       return (data || []) as any[];
     },
   });

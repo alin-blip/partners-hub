@@ -65,7 +65,8 @@ export default function AgentDashboard() {
       const { data } = await supabase
         .from("commission_snapshots")
         .select("id, agent_rate, snapshot_status, eligible_at, enrollments(intake_id, universities(name), students(first_name, last_name), intakes(label))")
-        .eq("agent_id", user!.id);
+        .eq("agent_id", user!.id)
+        .neq("snapshot_status", "cancelled");
       return (data || []) as any[];
     },
     enabled: !!user,

@@ -32,6 +32,7 @@ const SNAPSHOT_STATUS_LABELS: Record<string, { label: string; color: string }> =
   paying_25: { label: "Paying 25%", color: "bg-blue-500/10 text-blue-700 border-blue-200" },
   ready_full: { label: "Ready Full Payment", color: "bg-green-500/10 text-green-700 border-green-200" },
   paid: { label: "Fully Paid", color: "bg-emerald-600/10 text-emerald-800 border-emerald-300" },
+  cancelled: { label: "Cancelled", color: "bg-destructive/10 text-destructive border-destructive/20" },
 };
 
 export default function CommissionsPage() {
