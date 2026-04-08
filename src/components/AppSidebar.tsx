@@ -21,6 +21,7 @@ import {
   ListTodo,
   School,
   Shield,
+  Receipt,
 } from "lucide-react";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { NavLink } from "@/components/NavLink";
@@ -155,6 +156,7 @@ export function AppSidebar() {
     { title: "Students", url: `${prefix}/students`, icon: Users },
     { title: "Leads", url: `${prefix}/leads`, icon: ContactRound, badge: newLeadsCount },
     { title: "Enrollments", url: `${prefix}/enrollments`, icon: ClipboardList },
+    { title: "Invoices", url: `${prefix}/invoices`, icon: Receipt },
     { title: "Messages", url: `${prefix}/messages`, icon: Mail, badge: unreadCount },
     { title: "Tasks", url: `${prefix}/tasks`, icon: ListTodo, badge: pendingTasksCount },
     { title: "Universities", url: `${prefix}/universities`, icon: School },

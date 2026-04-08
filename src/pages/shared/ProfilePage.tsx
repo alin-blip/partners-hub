@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { Save, Lock, Loader2, Eye, EyeOff } from "lucide-react";
 import { BrandedProfilePicture } from "@/components/BrandedProfilePicture";
+import { BillingDetailsCard } from "@/components/BillingDetailsCard";
 
 export default function ProfilePage() {
   const { user, profile } = useAuth();
@@ -129,6 +130,9 @@ export default function ProfilePage() {
             </form>
           </CardContent>
         </Card>
+
+        {/* Billing & Banking Details */}
+        <BillingDetailsCard />
 
       </div>
     </DashboardLayout>
