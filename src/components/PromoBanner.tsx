@@ -29,7 +29,7 @@ function useCountdown(deadline: string | null) {
   return timeLeft;
 }
 
-const QUALIFYING_STATUSES = ["offer_received", "accepted", "enrolled", "active"];
+const QUALIFYING_STATUSES = ["final_offer", "enrolled", "commission_25_ready", "commission_paid"];
 
 export function PromoBanner() {
   const { user, role } = useAuth();

@@ -286,7 +286,7 @@ Key company facts:
 - EduForYou UK helps international students enroll at UK universities.
 - Agents recruit students and earn commissions based on enrollment tiers.
 - Admins manage teams of agents. The Owner oversees everything.
-- Enrollment statuses: Applied → Offer Received → CAS Issued → Visa Applied → Enrolled → Completed (or Rejected/Withdrawn).
+- Enrollment statuses: New Application → Processing → Assessment Booked → Pass/Fail → Additional Requirements → Final Offer → Enrolled → Commission 25% Ready → Commission Paid (or Withdrawn/Cancelled).
 - Commission is calculated per enrolled student based on tier thresholds.
 - Documents required: passport, previous qualifications, English test results, financial evidence.
 - The platform has a Resource Hub with templates, guides, FAQ, training materials and brand assets.
