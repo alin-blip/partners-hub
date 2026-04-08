@@ -23,6 +23,8 @@ import EnrollmentsPage from "./pages/shared/EnrollmentsPage";
 import EnrollStudent from "./pages/agent/EnrollStudent";
 import StudentDetailPage from "./pages/shared/StudentDetailPage";
 import ProfilePage from "./pages/shared/ProfilePage";
+import InvoicesPage from "./pages/shared/InvoicesPage";
+import OwnerInvoicesPage from "./pages/owner/OwnerInvoicesPage";
 import ResourcesPage from "./pages/shared/ResourcesPage";
 import CreateImagePage from "./pages/shared/CreateImagePage";
 import UnsubscribePage from "./pages/shared/UnsubscribePage";
@@ -72,6 +74,7 @@ const App = () => (
             <Route path="/owner/leads" element={<LeadsPage />} />
             <Route path="/owner/tasks" element={<TasksPage />} />
             
+            <Route path="/owner/invoices" element={<OwnerInvoicesPage />} />
             <Route path="/owner/profile" element={<ProfilePage />} />
             <Route path="/owner/resources" element={<ResourcesPage />} />
             <Route path="/owner/create-image" element={<CreateImagePage />} />
@@ -92,6 +95,7 @@ const App = () => (
             <Route path="/admin/messages" element={<MessagesPage />} />
             <Route path="/admin/agents" element={<AdminAgentsPage />} />
             
+            <Route path="/admin/invoices" element={<InvoicesPage />} />
             <Route path="/admin/profile" element={<ProfilePage />} />
             <Route path="/admin/resources" element={<ResourcesPage />} />
             <Route path="/admin/create-image" element={<CreateImagePage />} />
@@ -110,6 +114,7 @@ const App = () => (
             <Route path="/agent/enrollments" element={<EnrollmentsPage />} />
             <Route path="/agent/messages" element={<MessagesPage />} />
             
+            <Route path="/agent/invoices" element={<InvoicesPage />} />
             <Route path="/agent/profile" element={<ProfilePage />} />
             <Route path="/agent/resources" element={<ResourcesPage />} />
             <Route path="/agent/create-image" element={<CreateImagePage />} />
