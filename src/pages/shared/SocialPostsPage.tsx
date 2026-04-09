@@ -58,6 +58,13 @@ type GeneratedResult = {
   error?: string;
 };
 
+const getGenerationErrorMessage = (errorType?: string, error?: string) => {
+  if (errorType === "daily_limit" || error?.includes("Daily limit")) return "Daily limit reached";
+  if (errorType === "credits_exhausted") return "AI credits exhausted — please contact admin";
+  if (errorType === "rate_limit") return "AI rate limit — please wait a moment and try again";
+  return error || "Generation failed. Please try again later.";
+};
+
 function CaptionDisplay({ caption }: { caption: string }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = async () => {
@@ -232,6 +239,7 @@ export default function SocialPostsPage() {
     }
 
     const results: GeneratedResult[] = [];
+    let shouldSkipFollowUpAi = false;
 
     // Generate images sequentially (each costs a daily slot)
     for (let i = 0; i < selectedPresets.length; i++) {
@@ -259,10 +267,19 @@ export default function SocialPostsPage() {
           }
         );
         const result = await resp.json();
-        if (!resp.ok) {
-          results.push({ preset, error: result.error || "Generation failed" });
-          if (resp.status === 429) {
-            toast.error(result.error?.includes("Daily limit") ? "Daily limit reached" : "AI rate limit — please wait a moment and try again");
+        const hasStructuredError = result?.ok === false;
+        if (!resp.ok || hasStructuredError) {
+          const errorMessage = getGenerationErrorMessage(result?.errorType, result?.error);
+          results.push({ preset, error: errorMessage });
+
+          if (
+            resp.status === 429 ||
+            result?.errorType === "daily_limit" ||
+            result?.errorType === "rate_limit" ||
+            result?.errorType === "credits_exhausted"
+          ) {
+            shouldSkipFollowUpAi = true;
+            toast.error(errorMessage);
             break;
           }
         } else {
@@ -274,63 +291,65 @@ export default function SocialPostsPage() {
       }
     }
 
-    // Always auto-generate teleprompter script (knowledge base enriched)
-    setGeneratingProgress("Generating teleprompter script…");
-    try {
-      const resp = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-caption`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            prompt,
-            preset: "script",
-            language: captionLanguage,
-            ...(selectedCourseId ? { courseId: selectedCourseId } : {}),
-          }),
+    if (!shouldSkipFollowUpAi) {
+      // Always auto-generate teleprompter script (knowledge base enriched)
+      setGeneratingProgress("Generating teleprompter script…");
+      try {
+        const resp = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-caption`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              prompt,
+              preset: "script",
+              language: captionLanguage,
+              ...(selectedCourseId ? { courseId: selectedCourseId } : {}),
+            }),
+          }
+        );
+        const result = await resp.json();
+        if (!resp.ok || result?.ok === false) {
+          results.push({ preset: "script", error: getGenerationErrorMessage(result?.errorType, result?.error || "Script generation failed") });
+        } else {
+          results.push({ preset: "script", script: result.caption });
         }
-      );
-      const result = await resp.json();
-      if (!resp.ok) {
-        results.push({ preset: "script", error: result.error || "Script generation failed" });
-      } else {
-        results.push({ preset: "script", script: result.caption });
+      } catch (e: any) {
+        results.push({ preset: "script", error: e.message });
       }
-    } catch (e: any) {
-      results.push({ preset: "script", error: e.message });
-    }
 
-    // Always auto-generate caption (knowledge base enriched)
-    setGeneratingProgress("Generating caption…");
-    try {
-      const resp = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-caption`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            prompt,
-            preset: "social_post",
-            language: captionLanguage,
-            ...(selectedCourseId ? { courseId: selectedCourseId } : {}),
-          }),
+      // Always auto-generate caption (knowledge base enriched)
+      setGeneratingProgress("Generating caption…");
+      try {
+        const resp = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-caption`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              prompt,
+              preset: "social_post",
+              language: captionLanguage,
+              ...(selectedCourseId ? { courseId: selectedCourseId } : {}),
+            }),
+          }
+        );
+        const result = await resp.json();
+        if (!resp.ok || result?.ok === false) {
+          console.error("Caption generation failed:", getGenerationErrorMessage(result?.errorType, result?.error));
+        } else {
+          setAiCaption(result.caption);
+          setCaption(result.caption);
         }
-      );
-      const result = await resp.json();
-      if (!resp.ok) {
-        console.error("Caption generation failed:", result.error);
-      } else {
-        setAiCaption(result.caption);
-        setCaption(result.caption);
+      } catch (e: any) {
+        console.error("Caption generation error:", e.message);
       }
-    } catch (e: any) {
-      console.error("Caption generation error:", e.message);
     }
 
     setGeneratedResults(results);
