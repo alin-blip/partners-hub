@@ -14,11 +14,9 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    
 
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    // Auth
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("Missing authorization");
 
@@ -31,10 +29,13 @@ serve(async (req) => {
 
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { prompt, preset, includePhoto, timezone } = await req.json();
+    const { prompt, preset, includePhoto, timezone, language } = await req.json();
     if (!prompt || !preset) throw new Error("Missing prompt or preset");
 
+    const lang = language || "English";
+
     // Daily limit check — use client timezone so reset aligns with user's midnight
+    const DAILY_LIMIT = 5;
     const tz = timezone || "Europe/Bucharest";
     const now = new Date();
     const utcStr = now.toLocaleString("en-US", { timeZone: "UTC" });
@@ -50,7 +51,6 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .gte("created_at", todayUtc.toISOString());
 
-    const DAILY_LIMIT = 20;
     if ((count ?? 0) >= DAILY_LIMIT) {
       return new Response(
         JSON.stringify({ error: `Daily limit reached (${DAILY_LIMIT}/${DAILY_LIMIT}). Try again tomorrow.` }),
@@ -74,33 +74,31 @@ serve(async (req) => {
 
     const presetText = presetInstructions[preset] || presetInstructions.social_post;
 
-    // Build prompt
-    let fullPrompt = `${presetText}\n\nCreative Brief: ${prompt}\n\nCRITICAL TEXT RULES:
+    // Build prompt with explicit language enforcement
+    let fullPrompt = `${presetText}\n\nCreative Brief: ${prompt}\n\nCRITICAL TEXT & LANGUAGE RULES:
+- ALL text rendered on the image MUST be written in ${lang}. Do NOT use English unless the language IS English.
 - The user's input above is a CREATIVE BRIEF describing the theme/topic. It is NOT text to display on the image.
 - Do NOT copy, echo, or reproduce the user's prompt text on the image.
-- Instead, create your OWN short, professional, eye-catching marketing text that fits the theme.
-- If the brief is in Romanian or another language, create text in that same language but make it professional and concise (e.g. a catchy headline, not the raw brief).
-- Do NOT include any specific university names in the image text. Only use general course names or fields of study.`;
+- Instead, create your OWN short, professional, eye-catching marketing text in ${lang} that fits the theme.
+- Do NOT include any specific university names in the image text. Only use general course names or fields of study.
+- Every piece of visible text on the image (headlines, taglines, CTAs) MUST be in ${lang}.`;
 
     if (brand?.brand_prompt) {
       fullPrompt += `\n\nBrand Guidelines: ${brand.brand_prompt}`;
     }
 
-    if (includePhoto && profile?.avatar_url) {
-      fullPrompt += `\n\nInclude a professional headshot placeholder for ${profile.full_name || "the agent"} — show a friendly, professional person as a recruitment consultant.`;
-    }
+    // Collect multimodal image inputs
+    const imageInputs: Array<{ type: string; image_url: { url: string } }> = [];
 
-    // Fetch the brand icon (pen+graduation cap) to embed in the generated image
-    let iconBase64Url: string | null = null;
+    // Fetch the brand icon (pen+graduation cap)
     const iconUrl = `${SUPABASE_URL}/storage/v1/object/public/brand-assets/eduforyou-icon.jpg`;
-
     try {
       const iconRes = await fetch(iconUrl);
       if (iconRes.ok) {
         const iconBytes = new Uint8Array(await iconRes.arrayBuffer());
         const iconB64 = btoa(String.fromCharCode(...iconBytes));
         const contentType = iconRes.headers.get("content-type") || "image/jpeg";
-        iconBase64Url = `data:${contentType};base64,${iconB64}`;
+        imageInputs.push({ type: "image_url", image_url: { url: `data:${contentType};base64,${iconB64}` } });
       }
     } catch (e) {
       console.error("Failed to fetch icon:", e);
@@ -117,12 +115,37 @@ The image MUST include the EduForYou branding in the bottom-right corner or top-
 - The logo area should have a subtle background (white pill or semi-transparent) for readability
 - This is NON-NEGOTIABLE — every generated image MUST have this exact branding`;
 
-    // Build messages — multimodal if icon available, text-only otherwise
+    // Handle includePhoto — fetch actual avatar and pass as image input
+    if (includePhoto && profile?.avatar_url) {
+      try {
+        const avatarRes = await fetch(profile.avatar_url);
+        if (avatarRes.ok) {
+          const avatarBytes = new Uint8Array(await avatarRes.arrayBuffer());
+          const avatarB64 = btoa(String.fromCharCode(...avatarBytes));
+          const avatarContentType = avatarRes.headers.get("content-type") || "image/jpeg";
+          imageInputs.push({ type: "image_url", image_url: { url: `data:${avatarContentType};base64,${avatarB64}` } });
+
+          fullPrompt += `\n\n=== AGENT PHOTO EMBEDDING ===
+A real photo of the recruitment consultant "${profile.full_name || "the agent"}" is attached (the second attached image, NOT the icon).
+- You MUST embed THIS EXACT person's face/photo prominently in the design.
+- Do NOT generate, invent, or create a different person — use ONLY the provided photo.
+- Place the photo in a professional circular or rounded frame within the design.
+- The photo should be clearly visible and recognizable.`;
+        }
+      } catch (e) {
+        console.error("Failed to fetch avatar:", e);
+        fullPrompt += `\n\nInclude a professional headshot placeholder for ${profile.full_name || "the agent"} — show a friendly, professional person as a recruitment consultant.`;
+      }
+    } else if (includePhoto) {
+      fullPrompt += `\n\nInclude a professional headshot placeholder for ${profile?.full_name || "the agent"} — show a friendly, professional person as a recruitment consultant.`;
+    }
+
+    // Build messages — multimodal if we have image inputs
     let messageContent: any;
-    if (iconBase64Url) {
+    if (imageInputs.length > 0) {
       messageContent = [
         { type: "text", text: fullPrompt },
-        { type: "image_url", image_url: { url: iconBase64Url } },
+        ...imageInputs,
       ];
     } else {
       messageContent = fullPrompt;
