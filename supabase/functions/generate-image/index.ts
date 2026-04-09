@@ -30,37 +30,49 @@ serve(async (req) => {
 
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // Check user role for limit bypass
+    const { data: roleRow } = await adminClient
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+    const isOwner = roleRow?.role === "owner";
+
     const { prompt, preset, includePhoto, timezone, language, courseId } = await req.json();
     if (!prompt || !preset) throw new Error("Missing prompt or preset");
 
     const lang = language || "English";
 
-    // Daily limit check — use client timezone so reset aligns with user's midnight
+    // Daily limit check — owner is unlimited
     const DAILY_LIMIT = 5;
-    const tz = timezone || "Europe/Bucharest";
-    const now = new Date();
-    const utcStr = now.toLocaleString("en-US", { timeZone: "UTC" });
-    const tzStr = now.toLocaleString("en-US", { timeZone: tz });
-    const offsetMs = new Date(tzStr).getTime() - new Date(utcStr).getTime();
-    const todayInTz = new Date(now.getTime() + offsetMs);
-    todayInTz.setHours(0, 0, 0, 0);
-    const todayUtc = new Date(todayInTz.getTime() - offsetMs);
+    let currentCount = 0;
+    if (!isOwner) {
+      const tz = timezone || "Europe/Bucharest";
+      const now = new Date();
+      const utcStr = now.toLocaleString("en-US", { timeZone: "UTC" });
+      const tzStr = now.toLocaleString("en-US", { timeZone: tz });
+      const offsetMs = new Date(tzStr).getTime() - new Date(utcStr).getTime();
+      const todayInTz = new Date(now.getTime() + offsetMs);
+      todayInTz.setHours(0, 0, 0, 0);
+      const todayUtc = new Date(todayInTz.getTime() - offsetMs);
 
-    const { count } = await adminClient
-      .from("generated_images")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .gte("created_at", todayUtc.toISOString());
+      const { count } = await adminClient
+        .from("generated_images")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .gte("created_at", todayUtc.toISOString());
 
-    if ((count ?? 0) >= DAILY_LIMIT) {
-      return new Response(
-        JSON.stringify({
-          ok: false,
-          errorType: "daily_limit",
-          error: `Daily limit reached (${DAILY_LIMIT}/${DAILY_LIMIT}). Try again tomorrow.`,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      currentCount = count ?? 0;
+      if (currentCount >= DAILY_LIMIT) {
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            errorType: "daily_limit",
+            error: `Daily limit reached (${DAILY_LIMIT}/${DAILY_LIMIT}). Try again tomorrow.`,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // Fetch brand settings
@@ -185,7 +197,8 @@ A real photo of the recruitment consultant "${profile.full_name || "the agent"}"
     });
 
     let aiResponse: Response | null = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    const MAX_RETRIES = 5;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -195,8 +208,8 @@ A real photo of the recruitment consultant "${profile.full_name || "the agent"}"
         body: aiRequestBody,
       });
       if (aiResponse.status !== 429) break;
-      console.log(`AI rate limited (attempt ${attempt + 1}/3), retrying...`);
-      if (attempt < 2) await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt)));
+      console.log(`AI rate limited (attempt ${attempt + 1}/${MAX_RETRIES}), retrying...`);
+      if (attempt < MAX_RETRIES - 1) await new Promise(r => setTimeout(r, 3000 * Math.pow(2, attempt)));
     }
 
     if (!aiResponse!.ok) {
@@ -260,7 +273,7 @@ A real photo of the recruitment consultant "${profile.full_name || "the agent"}"
     return new Response(
       JSON.stringify({
         url: publicUrl.publicUrl,
-        remaining: DAILY_LIMIT - ((count ?? 0) + 1),
+        remaining: isOwner ? 999 : DAILY_LIMIT - (currentCount + 1),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
