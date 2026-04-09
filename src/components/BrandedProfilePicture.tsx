@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Download, Upload, UserCircle, Loader2, Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import frameAgent from "@/assets/profile-frame-transparent.png";
-import frameAdmin from "@/assets/profile-frame-admin.png";
+import profileFrame from "@/assets/profile-frame-eduforyou.png";
 
 const CANVAS_SIZE = 1080;
 
