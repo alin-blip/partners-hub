@@ -45,6 +45,13 @@ const PRESETS = [
   { id: "banner", label: "Banner", desc: "1200×628 horizontal", icon: LayoutTemplate },
 ];
 
+const getGenerationErrorMessage = (errorType?: string, error?: string) => {
+  if (errorType === "daily_limit" || error?.includes("Daily limit")) return "Daily limit reached";
+  if (errorType === "credits_exhausted") return "AI credits exhausted — please contact admin";
+  if (errorType === "rate_limit") return "AI rate limit — please wait a moment and try again";
+  return error || "Generation failed. Please try again later.";
+};
+
 function CaptionDisplay({ caption, onClose }: { caption: string; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
 
@@ -165,7 +172,9 @@ export default function CreateImagePage() {
       );
 
       const result = await resp.json();
-      if (!resp.ok) throw new Error(result.error || "Generation failed");
+      if (!resp.ok || result?.ok === false) {
+        throw new Error(getGenerationErrorMessage(result?.errorType, result?.error));
+      }
       return result;
     },
     onSuccess: (data) => {
@@ -198,7 +207,9 @@ export default function CreateImagePage() {
       );
 
       const result = await resp.json();
-      if (!resp.ok) throw new Error(result.error || "Caption generation failed");
+      if (!resp.ok || result?.ok === false) {
+        throw new Error(getGenerationErrorMessage(result?.errorType, result?.error || "Caption generation failed"));
+      }
       setCaptions((prev) => ({ ...prev, [key]: result.caption }));
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });

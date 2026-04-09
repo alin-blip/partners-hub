@@ -54,8 +54,12 @@ serve(async (req) => {
 
     if ((count ?? 0) >= DAILY_LIMIT) {
       return new Response(
-        JSON.stringify({ error: `Daily limit reached (${DAILY_LIMIT}/${DAILY_LIMIT}). Try again tomorrow.` }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          ok: false,
+          errorType: "daily_limit",
+          error: `Daily limit reached (${DAILY_LIMIT}/${DAILY_LIMIT}). Try again tomorrow.`,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -190,13 +194,21 @@ A real photo of the recruitment consultant "${profile.full_name || "the agent"}"
     if (!aiResponse.ok) {
       const status = aiResponse.status;
       if (status === 429) {
-        return new Response(JSON.stringify({ error: "AI rate limit exceeded. Please try again in a moment." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        return new Response(JSON.stringify({
+          ok: false,
+          errorType: "rate_limit",
+          error: "AI rate limit exceeded. Please try again in a moment.",
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please contact admin." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        return new Response(JSON.stringify({
+          ok: false,
+          errorType: "credits_exhausted",
+          error: "AI credits exhausted. Please contact admin.",
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const errText = await aiResponse.text();

@@ -58,6 +58,13 @@ type GeneratedResult = {
   error?: string;
 };
 
+const getGenerationErrorMessage = (errorType?: string, error?: string) => {
+  if (errorType === "daily_limit" || error?.includes("Daily limit")) return "Daily limit reached";
+  if (errorType === "credits_exhausted") return "AI credits exhausted — please contact admin";
+  if (errorType === "rate_limit") return "AI rate limit — please wait a moment and try again";
+  return error || "Generation failed. Please try again later.";
+};
+
 function CaptionDisplay({ caption }: { caption: string }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = async () => {
@@ -259,10 +266,18 @@ export default function SocialPostsPage() {
           }
         );
         const result = await resp.json();
-        if (!resp.ok) {
-          results.push({ preset, error: result.error || "Generation failed" });
-          if (resp.status === 429) {
-            toast.error(result.error?.includes("Daily limit") ? "Daily limit reached" : "AI rate limit — please wait a moment and try again");
+        const hasStructuredError = result?.ok === false;
+        if (!resp.ok || hasStructuredError) {
+          const errorMessage = getGenerationErrorMessage(result?.errorType, result?.error);
+          results.push({ preset, error: errorMessage });
+
+          if (
+            resp.status === 429 ||
+            result?.errorType === "daily_limit" ||
+            result?.errorType === "rate_limit" ||
+            result?.errorType === "credits_exhausted"
+          ) {
+            toast.error(errorMessage);
             break;
           }
         } else {
@@ -294,8 +309,8 @@ export default function SocialPostsPage() {
         }
       );
       const result = await resp.json();
-      if (!resp.ok) {
-        results.push({ preset: "script", error: result.error || "Script generation failed" });
+      if (!resp.ok || result?.ok === false) {
+        results.push({ preset: "script", error: getGenerationErrorMessage(result?.errorType, result?.error || "Script generation failed") });
       } else {
         results.push({ preset: "script", script: result.caption });
       }
@@ -323,8 +338,8 @@ export default function SocialPostsPage() {
         }
       );
       const result = await resp.json();
-      if (!resp.ok) {
-        console.error("Caption generation failed:", result.error);
+      if (!resp.ok || result?.ok === false) {
+        console.error("Caption generation failed:", getGenerationErrorMessage(result?.errorType, result?.error));
       } else {
         setAiCaption(result.caption);
         setCaption(result.caption);
