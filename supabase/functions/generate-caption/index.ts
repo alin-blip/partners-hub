@@ -146,23 +146,31 @@ Rules:
       ? `Write a teleprompter script about: ${prompt}\n\nREMINDER: The ENTIRE script must be written in ${lang}. Do NOT use English unless the language is English.`
       : `Write a caption for this image. The image shows: ${prompt}\n\nREMINDER: The ENTIRE caption and hashtags must be written in ${lang}. Do NOT use English unless the language is English.`;
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
-        ],
-      }),
+    const captionRequestBody = JSON.stringify({
+      model: "google/gemini-2.5-pro",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ],
     });
 
-    if (!aiResponse.ok) {
-      const status = aiResponse.status;
+    let aiResponse: Response | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: captionRequestBody,
+      });
+      if (aiResponse.status !== 429) break;
+      console.log(`Caption AI rate limited (attempt ${attempt + 1}/3), retrying...`);
+      if (attempt < 2) await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt)));
+    }
+
+    if (!aiResponse!.ok) {
+      const status = aiResponse!.status;
       if (status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -173,12 +181,12 @@ Rules:
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const errText = await aiResponse.text();
+      const errText = await aiResponse!.text();
       console.error("AI error:", status, errText);
       throw new Error("Caption generation failed");
     }
 
-    const aiData = await aiResponse.json();
+    const aiData = await aiResponse!.json();
     const caption = aiData.choices?.[0]?.message?.content;
 
     if (!caption) {

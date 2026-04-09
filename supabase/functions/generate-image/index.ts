@@ -177,22 +177,30 @@ A real photo of the recruitment consultant "${profile.full_name || "the agent"}"
       messageContent = fullPrompt;
     }
 
-    // Call AI
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3.1-flash-image-preview",
-        messages: [{ role: "user", content: messageContent }],
-        modalities: ["image", "text"],
-      }),
+    // Call AI with retry logic for rate limits
+    const aiRequestBody = JSON.stringify({
+      model: "google/gemini-3.1-flash-image-preview",
+      messages: [{ role: "user", content: messageContent }],
+      modalities: ["image", "text"],
     });
 
-    if (!aiResponse.ok) {
-      const status = aiResponse.status;
+    let aiResponse: Response | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: aiRequestBody,
+      });
+      if (aiResponse.status !== 429) break;
+      console.log(`AI rate limited (attempt ${attempt + 1}/3), retrying...`);
+      if (attempt < 2) await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt)));
+    }
+
+    if (!aiResponse!.ok) {
+      const status = aiResponse!.status;
       if (status === 429) {
         return new Response(JSON.stringify({
           ok: false,
@@ -211,12 +219,12 @@ A real photo of the recruitment consultant "${profile.full_name || "the agent"}"
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const errText = await aiResponse.text();
+      const errText = await aiResponse!.text();
       console.error("AI error:", status, errText);
       throw new Error("AI generation failed");
     }
 
-    const aiData = await aiResponse.json();
+    const aiData = await aiResponse!.json();
     const imageBase64 = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
     if (!imageBase64) {
