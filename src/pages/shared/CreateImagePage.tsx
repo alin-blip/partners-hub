@@ -97,6 +97,28 @@ export default function CreateImagePage() {
   const [selectedUniId, setSelectedUniId] = useState<string>("");
   const [selectedCourseId, setSelectedCourseId] = useState<string>("");
 
+  // --- Cooldown state ---
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+
+  const startCooldown = (seconds: number) => {
+    const until = Date.now() + seconds * 1000;
+    setCooldownUntil(until);
+    setCooldownSeconds(seconds);
+    const interval = setInterval(() => {
+      const left = Math.ceil((until - Date.now()) / 1000);
+      if (left <= 0) {
+        setCooldownUntil(null);
+        setCooldownSeconds(0);
+        clearInterval(interval);
+      } else {
+        setCooldownSeconds(left);
+      }
+    }, 1000);
+  };
+
+  const isCoolingDown = cooldownUntil !== null && Date.now() < cooldownUntil;
+
   const hasAvatar = !!(profile as any)?.avatar_url;
 
   // --- Course context queries ---
@@ -173,7 +195,9 @@ export default function CreateImagePage() {
 
       const result = await resp.json();
       if (!resp.ok || result?.ok === false) {
-        throw new Error(getGenerationErrorMessage(result?.errorType, result?.error));
+        const errorType = result?.errorType;
+        if (errorType === "rate_limit") startCooldown(30);
+        throw new Error(getGenerationErrorMessage(errorType, result?.error));
       }
       return result;
     },
@@ -208,6 +232,7 @@ export default function CreateImagePage() {
 
       const result = await resp.json();
       if (!resp.ok || result?.ok === false) {
+        if (result?.errorType === "rate_limit") startCooldown(30);
         throw new Error(getGenerationErrorMessage(result?.errorType, result?.error || "Caption generation failed"));
       }
       setCaptions((prev) => ({ ...prev, [key]: result.caption }));
@@ -345,10 +370,12 @@ export default function CreateImagePage() {
 
               <Button
                 onClick={() => generate.mutate()}
-                disabled={generate.isPending || !prompt.trim()}
+                disabled={generate.isPending || !prompt.trim() || isCoolingDown}
                 className="bg-accent text-accent-foreground hover:bg-accent/90"
               >
-                {generate.isPending ? (
+                {isCoolingDown ? (
+                  <>AI busy — wait {cooldownSeconds}s</>
+                ) : generate.isPending ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-1 animate-spin" />
                     Generating...

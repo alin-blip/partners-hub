@@ -133,6 +133,10 @@ export default function SocialPostsPage() {
   const [aiCaption, setAiCaption] = useState<string | null>(null);
   const hasAvatar = !!(profile as any)?.avatar_url;
 
+  // --- Cooldown state ---
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+
   // --- Course context state ---
   const [selectedUniId, setSelectedUniId] = useState<string>("");
   const [selectedCourseId, setSelectedCourseId] = useState<string>("");
@@ -222,6 +226,27 @@ export default function SocialPostsPage() {
   const [generating, setGenerating] = useState(false);
   const [generatingProgress, setGeneratingProgress] = useState("");
 
+  // Cooldown timer
+  const startCooldown = (seconds: number) => {
+    const until = Date.now() + seconds * 1000;
+    setCooldownUntil(until);
+    setCooldownSeconds(seconds);
+    const interval = setInterval(() => {
+      const left = Math.ceil((until - Date.now()) / 1000);
+      if (left <= 0) {
+        setCooldownUntil(null);
+        setCooldownSeconds(0);
+        clearInterval(interval);
+      } else {
+        setCooldownSeconds(left);
+      }
+    }, 1000);
+  };
+
+  const isCoolingDown = cooldownUntil !== null && Date.now() < cooldownUntil;
+
+  const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+
   const handleGenerate = async () => {
     if (selectedPresets.length === 0) {
       toast.error("Select at least one format");
@@ -241,11 +266,14 @@ export default function SocialPostsPage() {
     const results: GeneratedResult[] = [];
     let shouldSkipFollowUpAi = false;
 
-    // Generate images sequentially (each costs a daily slot)
+    // Generate images sequentially with stagger delay
     for (let i = 0; i < selectedPresets.length; i++) {
       const preset = selectedPresets[i];
       const presetLabel = PRESETS.find((p) => p.id === preset)?.label || preset;
       setGeneratingProgress(`Generating ${presetLabel}… (${i + 1}/${selectedPresets.length})`);
+
+      // Stagger delay between image calls (not before the first)
+      if (i > 0) await delay(3000);
 
       try {
         const resp = await fetch(
@@ -279,6 +307,7 @@ export default function SocialPostsPage() {
             result?.errorType === "credits_exhausted"
           ) {
             shouldSkipFollowUpAi = true;
+            if (result?.errorType === "rate_limit") startCooldown(30);
             toast.error(errorMessage);
             break;
           }
@@ -292,7 +321,10 @@ export default function SocialPostsPage() {
     }
 
     if (!shouldSkipFollowUpAi) {
-      // Always auto-generate teleprompter script (knowledge base enriched)
+      // Delay before script generation
+      await delay(3000);
+
+      // Generate teleprompter script
       setGeneratingProgress("Generating teleprompter script…");
       try {
         const resp = await fetch(
@@ -314,6 +346,10 @@ export default function SocialPostsPage() {
         const result = await resp.json();
         if (!resp.ok || result?.ok === false) {
           results.push({ preset: "script", error: getGenerationErrorMessage(result?.errorType, result?.error || "Script generation failed") });
+          if (result?.errorType === "rate_limit" || result?.errorType === "credits_exhausted") {
+            shouldSkipFollowUpAi = true;
+            if (result?.errorType === "rate_limit") startCooldown(30);
+          }
         } else {
           results.push({ preset: "script", script: result.caption });
         }
@@ -321,34 +357,38 @@ export default function SocialPostsPage() {
         results.push({ preset: "script", error: e.message });
       }
 
-      // Always auto-generate caption (knowledge base enriched)
-      setGeneratingProgress("Generating caption…");
-      try {
-        const resp = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-caption`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({
-              prompt,
-              preset: "social_post",
-              language: captionLanguage,
-              ...(selectedCourseId ? { courseId: selectedCourseId } : {}),
-            }),
+      // Caption generation (skip if script hit rate limit)
+      if (!shouldSkipFollowUpAi) {
+        await delay(3000);
+        setGeneratingProgress("Generating caption…");
+        try {
+          const resp = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-caption`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({
+                prompt,
+                preset: "social_post",
+                language: captionLanguage,
+                ...(selectedCourseId ? { courseId: selectedCourseId } : {}),
+              }),
+            }
+          );
+          const result = await resp.json();
+          if (!resp.ok || result?.ok === false) {
+            console.error("Caption generation failed:", getGenerationErrorMessage(result?.errorType, result?.error));
+            if (result?.errorType === "rate_limit") startCooldown(30);
+          } else {
+            setAiCaption(result.caption);
+            setCaption(result.caption);
           }
-        );
-        const result = await resp.json();
-        if (!resp.ok || result?.ok === false) {
-          console.error("Caption generation failed:", getGenerationErrorMessage(result?.errorType, result?.error));
-        } else {
-          setAiCaption(result.caption);
-          setCaption(result.caption);
+        } catch (e: any) {
+          console.error("Caption generation error:", e.message);
         }
-      } catch (e: any) {
-        console.error("Caption generation error:", e.message);
       }
     }
 
@@ -650,10 +690,12 @@ export default function SocialPostsPage() {
 
                   <Button
                     onClick={handleGenerate}
-                    disabled={generating || !prompt.trim() || selectedPresets.length === 0}
+                    disabled={generating || !prompt.trim() || selectedPresets.length === 0 || isCoolingDown}
                     className="bg-accent text-accent-foreground hover:bg-accent/90"
                   >
-                    {generating ? (
+                    {isCoolingDown ? (
+                      <>AI busy — wait {cooldownSeconds}s</>
+                    ) : generating ? (
                       <><Loader2 className="w-4 h-4 mr-1 animate-spin" />{generatingProgress || "Generating..."}</>
                     ) : (
                       <><Sparkles className="w-4 h-4 mr-1" />Generate {selectedPresets.length > 1 ? `(${selectedPresets.length})` : ""}</>

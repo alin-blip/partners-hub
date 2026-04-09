@@ -147,7 +147,7 @@ Rules:
       : `Write a caption for this image. The image shows: ${prompt}\n\nREMINDER: The ENTIRE caption and hashtags must be written in ${lang}. Do NOT use English unless the language is English.`;
 
     const captionRequestBody = JSON.stringify({
-      model: "google/gemini-2.5-pro",
+      model: "google/gemini-2.5-flash",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
@@ -155,7 +155,8 @@ Rules:
     });
 
     let aiResponse: Response | null = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    const MAX_RETRIES = 5;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -165,20 +166,28 @@ Rules:
         body: captionRequestBody,
       });
       if (aiResponse.status !== 429) break;
-      console.log(`Caption AI rate limited (attempt ${attempt + 1}/3), retrying...`);
-      if (attempt < 2) await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt)));
+      console.log(`Caption AI rate limited (attempt ${attempt + 1}/${MAX_RETRIES}), retrying...`);
+      if (attempt < MAX_RETRIES - 1) await new Promise(r => setTimeout(r, 3000 * Math.pow(2, attempt)));
     }
 
     if (!aiResponse!.ok) {
       const status = aiResponse!.status;
       if (status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        return new Response(JSON.stringify({
+          ok: false,
+          errorType: "rate_limit",
+          error: "AI rate limit exceeded. Please try again in a moment.",
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please contact admin." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        return new Response(JSON.stringify({
+          ok: false,
+          errorType: "credits_exhausted",
+          error: "AI credits exhausted. Please contact admin.",
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const errText = await aiResponse!.text();
@@ -195,13 +204,13 @@ Rules:
     }
 
     return new Response(
-      JSON.stringify({ caption }),
+      JSON.stringify({ ok: true, caption }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
     console.error("generate-caption error:", e);
     return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
+      JSON.stringify({ ok: false, error: e instanceof Error ? e.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
