@@ -262,7 +262,7 @@ export default function SocialPostsPage() {
         if (!resp.ok) {
           results.push({ preset, error: result.error || "Generation failed" });
           if (resp.status === 429) {
-            toast.error("Daily limit reached");
+            toast.error(result.error?.includes("Daily limit") ? "Daily limit reached" : "AI rate limit — please wait a moment and try again");
             break;
           }
         } else {
@@ -338,8 +338,11 @@ export default function SocialPostsPage() {
     setGenerating(false);
 
     const successCount = results.filter((r) => r.url || r.script).length;
+    const errorCount = results.filter((r) => r.error).length;
     if (successCount > 0) {
       toast.success(`${successCount} format(s) generated!`);
+    } else if (errorCount > 0) {
+      toast.error("All generations failed. Please try again in a moment.");
     }
   };
 
