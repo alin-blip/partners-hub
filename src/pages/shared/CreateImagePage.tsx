@@ -86,7 +86,30 @@ export default function CreateImagePage() {
   const [captionLoading, setCaptionLoading] = useState<Record<string, boolean>>({});
   const [captionLanguage, setCaptionLanguage] = useState("Romanian");
 
+  // --- Course context state ---
+  const [selectedUniId, setSelectedUniId] = useState<string>("");
+  const [selectedCourseId, setSelectedCourseId] = useState<string>("");
+
   const hasAvatar = !!(profile as any)?.avatar_url;
+
+  // --- Course context queries ---
+  const { data: universities = [] } = useQuery({
+    queryKey: ["universities-active"],
+    queryFn: async () => {
+      const { data } = await supabase.from("universities").select("id, name").eq("is_active", true).order("name");
+      return data || [];
+    },
+  });
+
+  const { data: courses = [] } = useQuery({
+    queryKey: ["courses-active"],
+    queryFn: async () => {
+      const { data } = await supabase.from("courses").select("id, name, level, study_mode, university_id").eq("is_active", true).order("name");
+      return data || [];
+    },
+  });
+
+  const filteredCourses = selectedUniId ? courses.filter((c: any) => c.university_id === selectedUniId) : courses;
 
   // Fetch card settings for share link
   const { data: cardSettings } = useQuery({
@@ -137,7 +160,7 @@ export default function CreateImagePage() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ prompt, preset: selectedPreset, includePhoto, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, language: captionLanguage }),
+          body: JSON.stringify({ prompt, preset: selectedPreset, includePhoto, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, language: captionLanguage, ...(selectedCourseId ? { courseId: selectedCourseId } : {}) }),
         }
       );
 
@@ -170,7 +193,7 @@ export default function CreateImagePage() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ prompt: imgPrompt, preset: imgPreset, language: captionLanguage }),
+          body: JSON.stringify({ prompt: imgPrompt, preset: imgPreset, language: captionLanguage, ...(selectedCourseId ? { courseId: selectedCourseId } : {}) }),
         }
       );
 
@@ -233,6 +256,34 @@ export default function CreateImagePage() {
         {/* Prompt & Options */}
         <Card>
           <CardContent className="pt-6 space-y-4">
+            {/* Course context selectors */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-sm">Filter by institution (optional)</Label>
+                <Select value={selectedUniId} onValueChange={(v) => { setSelectedUniId(v === "__clear__" ? "" : v); setSelectedCourseId(""); }}>
+                  <SelectTrigger><SelectValue placeholder="All institutions" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__clear__">All institutions</SelectItem>
+                    {universities.map((u: any) => (
+                      <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm">Select course (optional — enriches AI context)</Label>
+                <Select value={selectedCourseId} onValueChange={(v) => setSelectedCourseId(v === "__clear__" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="No course selected" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__clear__">No course selected</SelectItem>
+                    {filteredCourses.map((c: any) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name} ({c.level})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label>What should the image show?</Label>
               <Textarea

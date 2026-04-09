@@ -126,6 +126,10 @@ export default function SocialPostsPage() {
   const [aiCaption, setAiCaption] = useState<string | null>(null);
   const hasAvatar = !!(profile as any)?.avatar_url;
 
+  // --- Course context state ---
+  const [selectedUniId, setSelectedUniId] = useState<string>("");
+  const [selectedCourseId, setSelectedCourseId] = useState<string>("");
+
   // --- Manual upload state ---
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -159,6 +163,25 @@ export default function SocialPostsPage() {
       setSelectedPresets(PRESETS.map((p) => p.id));
     }
   };
+
+  // --- Course context queries ---
+  const { data: universities = [] } = useQuery({
+    queryKey: ["universities-active"],
+    queryFn: async () => {
+      const { data } = await supabase.from("universities").select("id, name").eq("is_active", true).order("name");
+      return data || [];
+    },
+  });
+
+  const { data: courses = [] } = useQuery({
+    queryKey: ["courses-active"],
+    queryFn: async () => {
+      const { data } = await supabase.from("courses").select("id, name, level, study_mode, university_id").eq("is_active", true).order("name");
+      return data || [];
+    },
+  });
+
+  const filteredCourses = selectedUniId ? courses.filter((c: any) => c.university_id === selectedUniId) : courses;
 
   // --- Queries ---
   const { data: agents = [] } = useQuery({
@@ -231,6 +254,7 @@ export default function SocialPostsPage() {
               includePhoto,
               timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
               language: captionLanguage,
+              ...(selectedCourseId ? { courseId: selectedCourseId } : {}),
             }),
           }
         );
@@ -265,6 +289,7 @@ export default function SocialPostsPage() {
             prompt,
             preset: "script",
             language: captionLanguage,
+            ...(selectedCourseId ? { courseId: selectedCourseId } : {}),
           }),
         }
       );
@@ -293,6 +318,7 @@ export default function SocialPostsPage() {
             prompt,
             preset: "social_post",
             language: captionLanguage,
+            ...(selectedCourseId ? { courseId: selectedCourseId } : {}),
           }),
         }
       );
@@ -476,6 +502,34 @@ export default function SocialPostsPage() {
 
               {/* AI Tab */}
               <TabsContent value="ai" className="space-y-4 mt-4">
+                {/* Course context selectors */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Filter by institution (optional)</Label>
+                    <Select value={selectedUniId} onValueChange={(v) => { setSelectedUniId(v === "__clear__" ? "" : v); setSelectedCourseId(""); }}>
+                      <SelectTrigger><SelectValue placeholder="All institutions" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__clear__">All institutions</SelectItem>
+                        {universities.map((u: any) => (
+                          <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Select course (optional — enriches AI context)</Label>
+                    <Select value={selectedCourseId} onValueChange={(v) => setSelectedCourseId(v === "__clear__" ? "" : v)}>
+                      <SelectTrigger><SelectValue placeholder="No course selected" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__clear__">No course selected</SelectItem>
+                        {filteredCourses.map((c: any) => (
+                          <SelectItem key={c.id} value={c.id}>{c.name} ({c.level})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
                 {/* Preset multi-selector */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
