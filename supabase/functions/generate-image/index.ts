@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -96,7 +97,7 @@ serve(async (req) => {
       const iconRes = await fetch(iconUrl);
       if (iconRes.ok) {
         const iconBytes = new Uint8Array(await iconRes.arrayBuffer());
-        const iconB64 = btoa(String.fromCharCode(...iconBytes));
+        const iconB64 = base64Encode(iconBytes);
         const contentType = iconRes.headers.get("content-type") || "image/jpeg";
         imageInputs.push({ type: "image_url", image_url: { url: `data:${contentType};base64,${iconB64}` } });
       }
@@ -121,7 +122,7 @@ The image MUST include the EduForYou branding in the bottom-right corner or top-
         const avatarRes = await fetch(profile.avatar_url);
         if (avatarRes.ok) {
           const avatarBytes = new Uint8Array(await avatarRes.arrayBuffer());
-          const avatarB64 = btoa(String.fromCharCode(...avatarBytes));
+          const avatarB64 = base64Encode(avatarBytes);
           const avatarContentType = avatarRes.headers.get("content-type") || "image/jpeg";
           imageInputs.push({ type: "image_url", image_url: { url: `data:${avatarContentType};base64,${avatarB64}` } });
 
