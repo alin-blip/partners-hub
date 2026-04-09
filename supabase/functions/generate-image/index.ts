@@ -30,7 +30,7 @@ serve(async (req) => {
 
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { prompt, preset, includePhoto, timezone, language } = await req.json();
+    const { prompt, preset, includePhoto, timezone, language, courseId } = await req.json();
     if (!prompt || !preset) throw new Error("Missing prompt or preset");
 
     const lang = language || "English";
@@ -83,6 +83,27 @@ serve(async (req) => {
 - Instead, create your OWN short, professional, eye-catching marketing text in ${lang} that fits the theme.
 - Do NOT include any specific university names in the image text. Only use general course names or fields of study.
 - Every piece of visible text on the image (headlines, taglines, CTAs) MUST be in ${lang}.`;
+
+    // Strict content rules
+    fullPrompt += `\n\nSTRICT CONTENT RULES (MUST follow):
+- NEVER use university names on the image — refer only to the course name or field of study
+- NEVER say "our courses", "our programs", "we offer" — use "the course", "this program", "the BSc in..."
+- NEVER use the word "free" or "gratuit" or imply anything is free
+- Student finance is a LOAN (not a grant). Repaid after graduation at 9% of earnings above £25,000/year
+- Do NOT invent course names or details — only use real data from the context provided`;
+
+    // Selected course context
+    if (courseId) {
+      const { data: courseRow } = await adminClient.from("courses").select("name, level, study_mode, duration, fees").eq("id", courseId).single();
+      const { data: detailsRow } = await adminClient.from("course_details").select("entry_requirements, documents_required, interview_info, admission_test_info, personal_statement_guidelines, additional_info").eq("course_id", courseId).single();
+      if (courseRow) {
+        fullPrompt += `\n\nSELECTED COURSE CONTEXT (use these real details in image text):\n- Course: ${courseRow.name}\n- Level: ${courseRow.level}\n- Study Mode: ${courseRow.study_mode}\n- Duration: ${courseRow.duration || "N/A"}\n- Fees: ${courseRow.fees || "N/A"}`;
+        if (detailsRow) {
+          if (detailsRow.entry_requirements) fullPrompt += `\n- Entry Requirements: ${detailsRow.entry_requirements}`;
+          if (detailsRow.documents_required) fullPrompt += `\n- Documents Required: ${detailsRow.documents_required}`;
+        }
+      }
+    }
 
     if (brand?.brand_prompt) {
       fullPrompt += `\n\nBrand Guidelines: ${brand.brand_prompt}`;
