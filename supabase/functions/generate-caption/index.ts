@@ -25,7 +25,7 @@ serve(async (req) => {
     const { data: { user }, error: authErr } = await adminClient.auth.getUser(token);
     if (authErr || !user) throw new Error("Unauthorized");
 
-    const { prompt, preset, language } = await req.json();
+    const { prompt, preset, language, courseId } = await req.json();
     if (!prompt) throw new Error("Missing prompt");
     const lang = language || "English";
 
@@ -54,6 +54,24 @@ serve(async (req) => {
       }
     }
 
+    // Build selected course context
+    let selectedCourseContext = "";
+    if (courseId) {
+      const { data: courseRow } = await adminClient.from("courses").select("name, level, study_mode, duration, fees").eq("id", courseId).single();
+      const { data: detailsRow } = await adminClient.from("course_details").select("entry_requirements, documents_required, interview_info, admission_test_info, personal_statement_guidelines, additional_info").eq("course_id", courseId).single();
+      if (courseRow) {
+        selectedCourseContext = `\n\nSELECTED COURSE CONTEXT (use these real details):\n- Course: ${courseRow.name}\n- Level: ${courseRow.level}\n- Study Mode: ${courseRow.study_mode}\n- Duration: ${courseRow.duration || "N/A"}\n- Fees: ${courseRow.fees || "N/A"}`;
+        if (detailsRow) {
+          if (detailsRow.entry_requirements) selectedCourseContext += `\n- Entry Requirements: ${detailsRow.entry_requirements}`;
+          if (detailsRow.documents_required) selectedCourseContext += `\n- Documents Required: ${detailsRow.documents_required}`;
+          if (detailsRow.interview_info) selectedCourseContext += `\n- Interview Info: ${detailsRow.interview_info}`;
+          if (detailsRow.admission_test_info) selectedCourseContext += `\n- Admission Test: ${detailsRow.admission_test_info}`;
+          if (detailsRow.personal_statement_guidelines) selectedCourseContext += `\n- Personal Statement: ${detailsRow.personal_statement_guidelines}`;
+          if (detailsRow.additional_info) selectedCourseContext += `\n- Additional Info: ${detailsRow.additional_info}`;
+        }
+      }
+    }
+
     // Build courses context — only course names, NO university names
     let coursesContext = "";
     if (courses && courses.length > 0) {
@@ -62,6 +80,14 @@ serve(async (req) => {
         .slice(0, 50);
       coursesContext = `\n\nAVAILABLE COURSES:\n${courseLines.join("\n")}\n`;
     }
+
+    const strictRules = `\n\nSTRICT CONTENT RULES (MUST follow):
+- NEVER use university names — refer only to the course name or field of study
+- NEVER say "our courses", "our programs", "we offer" — use "the course", "this program", "the BSc in..."
+- NEVER use the word "free" or "gratuit" or imply anything is free
+- Student finance is a LOAN (not a grant). It is repaid after graduation at 9% of earnings above £25,000/year. Always frame it accurately: "student finance available", "funding support", "government-backed student loan"
+- Do NOT invent course names or details — only use real data from the context provided`;
+
 
     const isScript = preset === "script";
 
@@ -81,7 +107,7 @@ serve(async (req) => {
     if (isScript) {
       systemPrompt = `You are the social media manager and video content creator for EduForYou UK, an education recruitment agency that helps students find the right university courses in the UK.
 
-${brandSection}${knowledgeContext}${coursesContext}
+${brandSection}${knowledgeContext}${coursesContext}${selectedCourseContext}${strictRules}
 Write a teleprompter-ready video script for a short-form video (30-60 seconds) about the given topic.
 IMPORTANT: Write the ENTIRE script in ${lang}.
 
@@ -100,7 +126,7 @@ Rules:
     } else {
       systemPrompt = `You are the social media manager for EduForYou UK, an education recruitment agency that helps students find the right university courses in the UK.
 
-${brandSection}${knowledgeContext}${coursesContext}
+${brandSection}${knowledgeContext}${coursesContext}${selectedCourseContext}${strictRules}
 Write an engaging social media post caption for a ${presetLabel} image.
 IMPORTANT: Write the ENTIRE caption in ${lang}.
 
