@@ -61,7 +61,7 @@ export function BrandedProfilePicture() {
         const safePhotoSrc = photoSrc.startsWith("data:") ? photoSrc : await fetchImageAsBase64(photoSrc);
         const [avatarImg, frameImg] = await Promise.all([
           loadImage(safePhotoSrc),
-          loadImage(role === "admin" || role === "owner" ? frameAdmin : frameAgent),
+          loadImage(profileFrame),
         ]);
 
         ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
