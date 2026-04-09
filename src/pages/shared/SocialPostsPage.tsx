@@ -230,6 +230,7 @@ export default function SocialPostsPage() {
               preset,
               includePhoto,
               timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              language: captionLanguage,
             }),
           }
         );
@@ -557,7 +558,7 @@ export default function SocialPostsPage() {
                     </Tooltip>
 
                     <div className="flex items-center gap-2">
-                      <Label className="text-sm whitespace-nowrap">Language:</Label>
+                      <Label className="text-sm whitespace-nowrap">Content Language:</Label>
                       <Select value={captionLanguage} onValueChange={setCaptionLanguage}>
                         <SelectTrigger className="w-[140px] h-9">
                           <SelectValue />

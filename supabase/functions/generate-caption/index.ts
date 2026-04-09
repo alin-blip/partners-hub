@@ -117,8 +117,8 @@ Rules:
     }
 
     const userMessage = isScript
-      ? `Write a teleprompter script about: ${prompt}`
-      : `Write a caption for this image. The image shows: ${prompt}`;
+      ? `Write a teleprompter script about: ${prompt}\n\nREMINDER: The ENTIRE script must be written in ${lang}. Do NOT use English unless the language is English.`
+      : `Write a caption for this image. The image shows: ${prompt}\n\nREMINDER: The ENTIRE caption and hashtags must be written in ${lang}. Do NOT use English unless the language is English.`;
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -127,7 +127,7 @@ Rules:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-pro",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userMessage },
