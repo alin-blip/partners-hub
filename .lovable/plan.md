@@ -1,61 +1,48 @@
 
 
-# Social Posts & Image Generation — Full Audit
+# Implement: Course Context for Content Creation
 
-## Issues Found
+This plan was approved previously but never implemented. Here is the full implementation.
 
-### 1. Language not passed to image generation
-**Bug**: `captionLanguage` is sent to `generate-caption` but NOT to `generate-image`. The image edge function has no `language` parameter at all — so even if you select Romanian, the image text is always generated in English. The prompt only says "if the brief is in Romanian, create text in that same language" which is unreliable.
+## Overview
+Add university→course cascading dropdowns to both content creation pages, pass course details to AI, and enforce strict content rules (no university names, no "free", correct finance framing).
 
-**Fix**: Pass `language` from frontend to `generate-image`. Add explicit language instruction to the image prompt: "All text on the image MUST be written in ${language}."
+## Changes
 
-### 2. "Include my photo" doesn't embed actual photo
-**Bug**: When `includePhoto` is true, the edge function only adds a text instruction: "Include a professional headshot placeholder..." — it does NOT send the actual `avatar_url` as an image input. The AI model invents a generic person instead of using the real profile photo.
+### 1. Frontend — `src/pages/shared/SocialPostsPage.tsx`
+- Add state: `selectedUniId`, `selectedCourseId`
+- Add React Query: fetch `universities` (active), `courses` (active)
+- Add two `<Select>` dropdowns in Step 1 (above prompt): "Filter by Institution" (filters course list only) and "Select Course" (optional)
+- Pass `courseId: selectedCourseId` in both `generate-image` and `generate-caption` fetch bodies
 
-**Fix**: When `includePhoto && profile.avatar_url`, fetch the avatar image, convert to base64, and pass it as a second image input to the AI model alongside the icon, with explicit instructions to embed THIS exact photo.
+### 2. Frontend — `src/pages/shared/CreateImagePage.tsx`
+- Same pattern: add state + queries + two dropdowns + pass `courseId` to `generate-image` and `generate-caption` calls
 
-### 3. Daily limit mismatch: Backend=20, Frontend says "/5"
-**Bug**: Backend `DAILY_LIMIT = 20` but both `CreateImagePage.tsx` and `SocialPostsPage.tsx` display `{remaining}/5`. The plan says 5 per day with no rollover.
+### 3. Backend — `supabase/functions/generate-image/index.ts`
+- Accept optional `courseId` from request body
+- If provided, fetch `courses` row (name, level, study_mode, duration, fees) and `course_details` row (entry_requirements, documents_required, interview_info, admission_test_info, personal_statement_guidelines, additional_info)
+- Append a `SELECTED COURSE CONTEXT` block to the prompt with all course data (NO university name)
+- Append strict content rules block to the prompt
 
-**Fix**: Change backend `DAILY_LIMIT` to 5. Frontend display is already correct. No rollover is already enforced (counts from midnight in user's timezone).
+### 4. Backend — `supabase/functions/generate-caption/index.ts`
+- Same: accept `courseId`, fetch course + details, append course context and strict rules to system prompt
 
-### 4. Caption model should be upgraded
-Currently `generate-caption` uses `google/gemini-3-flash-preview`. For better language adherence and quality, upgrade to `google/gemini-2.5-pro`.
+### 5. Strict Rules (injected into both functions' prompts)
+```text
+STRICT CONTENT RULES:
+- NEVER use university names — refer only to the course name or field of study
+- NEVER say "our courses", "our programs" — use "the course", "this program", "the BSc in..."
+- NEVER use "free" or "gratuit" or imply anything is free
+- Student finance is a LOAN repaid after graduation at 9% of earnings above £25,000/year
+  Frame as: "student finance available", "funding support", "government-backed student loan"
+```
 
-### 5. Image model is already good but prompt needs strengthening
-Currently uses `google/gemini-3.1-flash-image-preview` which is correct for image gen. But the language and photo instructions need fixing (items 1 & 2).
+### 6. Deploy
+- Redeploy `generate-image` and `generate-caption` edge functions
 
-### 6. Language selector position on SocialPostsPage
-The language selector only appears in Step 1 but it's labeled just "Language" — it controls caption, script AND should control image text. Needs to be clearer.
-
-## Implementation Plan
-
-### File 1: `supabase/functions/generate-image/index.ts`
-- Change `DAILY_LIMIT` from 20 to 5
-- Accept `language` parameter from request body
-- Add language instruction to prompt: "ALL text rendered on the image MUST be in ${language}. Do NOT use English unless the language is English."
-- When `includePhoto && profile.avatar_url`: fetch avatar image as base64, add it as a second `image_url` in the multimodal message array with instruction "Embed THIS EXACT person's face/photo in the design — do NOT generate a different person"
-
-### File 2: `supabase/functions/generate-caption/index.ts`
-- Upgrade model from `google/gemini-3-flash-preview` to `google/gemini-2.5-pro` for better language adherence
-- Add stronger language enforcement: repeat the language instruction in the user message too, not just system prompt
-
-### File 3: `src/pages/shared/SocialPostsPage.tsx`
-- Pass `language: captionLanguage` in the `generate-image` fetch body (line 228-233)
-- Rename label from "Language:" to "Content Language:" for clarity
-
-### File 4: `src/pages/shared/CreateImagePage.tsx`
-- Pass `language: captionLanguage` in the `generate-image` fetch body (line 140)
-
-### Deploy
-- Redeploy both edge functions: `generate-image` and `generate-caption`
-
-## Summary of Fixes
-
-| Issue | Root Cause | Fix |
-|-------|-----------|-----|
-| Romanian selected, English generated | `language` not sent to image function | Pass language + add prompt rule |
-| "Include photo" shows generic person | Only text hint, no actual image | Fetch avatar, send as base64 input |
-| Daily limit says /5 but allows 20 | Backend DAILY_LIMIT=20 | Change to 5 |
-| Captions sometimes ignore language | Weaker model + single instruction | Upgrade model + reinforce in user msg |
+## Files Modified
+1. `src/pages/shared/SocialPostsPage.tsx` — dropdowns + pass courseId
+2. `src/pages/shared/CreateImagePage.tsx` — dropdowns + pass courseId
+3. `supabase/functions/generate-image/index.ts` — accept courseId, fetch details, strict rules
+4. `supabase/functions/generate-caption/index.ts` — accept courseId, fetch details, strict rules
 
