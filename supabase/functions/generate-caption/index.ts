@@ -181,12 +181,12 @@ Rules:
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const errText = await aiResponse.text();
+      const errText = await aiResponse!.text();
       console.error("AI error:", status, errText);
       throw new Error("Caption generation failed");
     }
 
-    const aiData = await aiResponse.json();
+    const aiData = await aiResponse!.json();
     const caption = aiData.choices?.[0]?.message?.content;
 
     if (!caption) {

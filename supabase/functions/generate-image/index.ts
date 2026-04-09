@@ -219,12 +219,12 @@ A real photo of the recruitment consultant "${profile.full_name || "the agent"}"
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const errText = await aiResponse.text();
+      const errText = await aiResponse!.text();
       console.error("AI error:", status, errText);
       throw new Error("AI generation failed");
     }
 
-    const aiData = await aiResponse.json();
+    const aiData = await aiResponse!.json();
     const imageBase64 = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
     if (!imageBase64) {
