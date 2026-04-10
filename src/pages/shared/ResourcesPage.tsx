@@ -199,6 +199,32 @@ export default function ResourcesPage() {
           </TabsList>
 
           <TabsContent value={activeTab} className="mt-4 space-y-6">
+            {/* Facebook Cover Banner - show on Social Media or All tab */}
+            {(activeTab === "social-media" || activeTab === "all") && (
+              <Card className="overflow-hidden border-2 border-[hsl(var(--primary))]">
+                <div className="flex flex-col">
+                  <img
+                    src={facebookCoverImg}
+                    alt="EduForYou Certified Agent - Facebook Cover"
+                    className="w-full object-contain"
+                  />
+                  <div className="p-4 flex items-center justify-between gap-3">
+                    <div>
+                      <Badge className="w-fit bg-pink-100 text-pink-700 hover:bg-pink-100 mb-1">
+                        <Image className="h-3 w-3 mr-1" /> Social Media Templates
+                      </Badge>
+                      <h3 className="text-sm font-bold">EduForYou Facebook Cover — Certified Agent</h3>
+                    </div>
+                    <a href={facebookCoverImg} download="eduforyou-facebook-cover.png">
+                      <Button size="sm" variant="outline">
+                        <Download className="h-3 w-3 mr-1" /> Download
+                      </Button>
+                    </a>
+                  </div>
+                </div>
+              </Card>
+            )}
+
             {/* British Council Banner - show on Training or All tab */}
             {(activeTab === "training" || activeTab === "all") && (
               <Card className="overflow-hidden border-2 border-[hsl(170,80%,45%)]">
