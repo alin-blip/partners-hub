@@ -60,7 +60,7 @@ serve(async (req) => {
       const { data: courseRow } = await adminClient.from("courses").select("name, level, study_mode, duration, fees").eq("id", courseId).single();
       const { data: detailsRow } = await adminClient.from("course_details").select("entry_requirements, documents_required, interview_info, admission_test_info, personal_statement_guidelines, additional_info").eq("course_id", courseId).single();
       if (courseRow) {
-        selectedCourseContext = `\n\nSELECTED COURSE CONTEXT (use these real details):\n- Course: ${courseRow.name}\n- Level: ${courseRow.level}\n- Study Mode: ${courseRow.study_mode}\n- Duration: ${courseRow.duration || "N/A"}\n- Fees: ${courseRow.fees || "N/A"}`;
+        selectedCourseContext = `\n\nSELECTED COURSE CONTEXT (use these real details — DO NOT mention the university name, only the course):\n- Course: ${courseRow.name}\n- Level: ${courseRow.level}\n- Study Mode: ${courseRow.study_mode}\n- Duration: ${courseRow.duration || "N/A"}\n- Fees: ${courseRow.fees || "N/A"}`;
         if (detailsRow) {
           if (detailsRow.entry_requirements) selectedCourseContext += `\n- Entry Requirements: ${detailsRow.entry_requirements}`;
           if (detailsRow.documents_required) selectedCourseContext += `\n- Documents Required: ${detailsRow.documents_required}`;
