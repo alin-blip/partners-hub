@@ -27,6 +27,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import britishCouncilImg from "@/assets/british-council-cert.png";
+import facebookCoverImg from "@/assets/eduforyou-facebook-cover.png";
 
 const CATEGORIES = [
   { value: "social-media", label: "Social Media Templates", icon: Image, color: "bg-pink-100 text-pink-700" },
