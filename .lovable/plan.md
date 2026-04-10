@@ -1,91 +1,64 @@
 
 
-# Fix AI Rate Limits — All Roles (Owner, Admin, Agent)
+# Fix AI Image Generation — Photo, Logo, and University Name Rules
 
-## What is happening
+## Problems identified
 
-The app uses Lovable AI for image and caption generation. There are two separate limits:
-1. **App-level daily limit**: 5 images/day/user (in `generate-image` edge function)
-2. **Lovable AI gateway rate limit**: per-minute throttle shared across the workspace (429 errors)
+1. **"Include my photo" uses a different face**: The edge function fetches `avatar_url` and passes it as base64, but the AI model sometimes ignores the attached photo and generates a different person. The prompt instructions need to be much more forceful.
 
-The 429 errors persist because: the retry logic (3 attempts) is not enough during bursts, the caption model is too heavy (`gemini-2.5-pro`), and both pages fire multiple AI calls back-to-back.
+2. **Logo is wrong**: Currently fetches `eduforyou-icon.jpg` from storage. The user wants the full gold logo (graduation cap + pen + "EduForYou" text). The uploaded logo needs to replace the current icon in storage, and the prompt needs stronger instructions to reproduce it exactly.
 
-## What changes
+3. **University names still appear**: The prompt already says "NEVER use university names" but the SELECTED COURSE CONTEXT section includes the university name indirectly. The rules need to be reinforced and the course context must explicitly exclude university references.
 
-### 1. Owner gets unlimited daily image limit
+## Changes
 
-In `supabase/functions/generate-image/index.ts`:
-- Check the user's role via `user_roles` table before applying the daily limit
-- If role is `owner`: skip the daily limit check entirely
-- Admin and agent: keep the 5/day cap
+### 1. Upload correct logo to storage
 
-### 2. Lighter model for captions
+Replace `brand-assets/eduforyou-icon.jpg` with the new logo image (`03_logo_with_text_800x300.png`) as `brand-assets/eduforyou-logo.png`. Update the edge function to reference the new file.
 
-In `supabase/functions/generate-caption/index.ts`:
-- Switch from `google/gemini-2.5-pro` to `google/gemini-2.5-flash`
-- Same quality for short captions/scripts, much less gateway pressure
+### 2. Strengthen avatar photo instructions (generate-image/index.ts)
 
-### 3. Structured error responses from generate-caption
+Current prompt says "embed THIS EXACT person's face" but AI models need more aggressive instructions:
+- Add "DO NOT GENERATE A NEW FACE — the photo is attached as the second image input"
+- Add "The person in the photo has specific features — reproduce them exactly, do not approximate"
+- Label the image inputs explicitly: "Image 1 = brand logo, Image 2 = agent photo"
 
-In `supabase/functions/generate-caption/index.ts`:
-- On 429: return `{ ok: false, errorType: "rate_limit", error: "..." }` with HTTP 200 (matching generate-image pattern)
-- On 402: return `{ ok: false, errorType: "credits_exhausted", error: "..." }` with HTTP 200
-- Wrap successful responses: `{ ok: true, caption: "..." }`
+### 3. Strengthen logo instructions (generate-image/index.ts)
 
-### 4. Stagger AI calls and add delay between them
+- Change prompt to reference "the FIRST attached image is the complete EduForYou logo with the gold graduation cap, pen icon, and the text 'EduForYou'"
+- Add "Place this EXACT logo as-is in the corner — do not recreate, redraw, or modify it"
 
-In `src/pages/shared/SocialPostsPage.tsx`:
-- Add 3-second delay between each image generation call
-- Add 3-second delay before script and caption calls
-- If script call hits rate limit, skip caption call too
+### 4. Strengthen university name prohibition (generate-image/index.ts)
 
-In `src/pages/shared/CreateImagePage.tsx`:
-- Add 2-second delay before caption generation after image success
+- In the SELECTED COURSE CONTEXT section, explicitly note "DO NOT mention the university name"
+- Move the "no university names" rule to the very top of the prompt (primacy effect)
+- Add it again at the very end (recency effect)
+- Make it a separate, prominent section with caps and emphasis
 
-### 5. Increase retry attempts and backoff
+### 5. Same fixes in generate-caption/index.ts
 
-In both edge functions:
-- Increase retry from 3 to 5 attempts
-- Increase backoff: 3s, 6s, 12s, 24s (longer waits between retries)
-
-### 6. UI cooldown after rate limit
-
-In both `SocialPostsPage.tsx` and `CreateImagePage.tsx`:
-- After a rate_limit error, disable the generate button for 30 seconds with a visible countdown
-- Show a clear message: "AI is temporarily busy. Please wait..."
+Ensure caption generation also has the strengthened university name rule.
 
 ## Files modified
 
 | File | Change |
 |------|--------|
-| `supabase/functions/generate-image/index.ts` | Owner unlimited, 5 retries with longer backoff |
-| `supabase/functions/generate-caption/index.ts` | Switch to flash model, structured errors, 5 retries |
-| `src/pages/shared/SocialPostsPage.tsx` | Delays between calls, cooldown UI, structured error handling |
-| `src/pages/shared/CreateImagePage.tsx` | Delay before caption, cooldown UI, structured error handling |
+| `supabase/functions/generate-image/index.ts` | Stronger photo/logo/university prompts, new logo path |
+| `supabase/functions/generate-caption/index.ts` | Reinforce university name rule |
+| Brand storage | Upload new logo to `brand-assets/eduforyou-logo.png` |
 
-## Technical detail: Owner role check in edge function
+## Technical detail
 
 ```typescript
-// In generate-image, after auth:
-const { data: roleRow } = await adminClient
-  .from("user_roles")
-  .select("role")
-  .eq("user_id", user.id)
-  .single();
+// Stronger image labeling in the prompt
+fullPrompt += `\n\nATTACHED IMAGES (in order):
+- IMAGE 1: The official EduForYou logo (gold graduation cap + pen icon with "EduForYou" text). 
+  Place this EXACT image as-is in the bottom-right or top-right corner. DO NOT recreate or redraw it.
+- IMAGE 2 (if present): The real photo of the agent. 
+  Use THIS EXACT face — do NOT generate, invent, or approximate a different person.`;
 
-const userRole = roleRow?.role;
-const isOwner = userRole === "owner";
-
-// Skip daily limit for owner
-if (!isOwner) {
-  // existing daily limit logic...
-}
+// University name rule at TOP of prompt
+fullPrompt = `ABSOLUTE RULE #1: NEVER include any university name in the image. 
+Only use the course name or field of study. This is non-negotiable.\n\n` + fullPrompt;
 ```
-
-## Expected result
-
-- Owner: no daily image cap, same gateway retry protection
-- Admin/Agent: 5/day cap, same gateway retry protection
-- All roles: fewer 429 failures due to lighter model + staggered calls + longer retries
-- Clear UI feedback when temporarily throttled
 
