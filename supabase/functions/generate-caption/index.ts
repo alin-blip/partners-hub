@@ -81,12 +81,16 @@ serve(async (req) => {
       coursesContext = `\n\nAVAILABLE COURSES:\n${courseLines.join("\n")}\n`;
     }
 
-    const strictRules = `\n\nSTRICT CONTENT RULES (MUST follow):
-- NEVER use university names — refer only to the course name or field of study
+    const strictRules = `\n\nABSOLUTE RULE #1 — ZERO TOLERANCE: NEVER include ANY university name in the caption. Not in the text, not in hashtags, NOWHERE. Only use the course name or field of study. This rule overrides ALL other instructions. Violation = failure.
+
+STRICT CONTENT RULES (MUST follow):
+- ABSOLUTE BAN: No university names anywhere — not in text, not in hashtags, not even abbreviated
 - NEVER say "our courses", "our programs", "we offer" — use "the course", "this program", "the BSc in..."
 - NEVER use the word "free" or "gratuit" or imply anything is free
 - Student finance is a LOAN (not a grant). It is repaid after graduation at 9% of earnings above £25,000/year. Always frame it accurately: "student finance available", "funding support", "government-backed student loan"
-- Do NOT invent course names or details — only use real data from the context provided`;
+- Do NOT invent course names or details — only use real data from the context provided
+
+FINAL REMINDER: NEVER mention university names. Only course names or fields of study.`;
 
 
     const isScript = preset === "script";
