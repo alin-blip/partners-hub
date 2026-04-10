@@ -92,17 +92,17 @@ serve(async (req) => {
     const presetText = presetInstructions[preset] || presetInstructions.social_post;
 
     // Build prompt with explicit language enforcement
-    let fullPrompt = `${presetText}\n\nCreative Brief: ${prompt}\n\nCRITICAL TEXT & LANGUAGE RULES:
+    let fullPrompt = `ABSOLUTE RULE #1 — ZERO TOLERANCE: NEVER include ANY university name anywhere in the image. Not in headlines, not in small text, not in watermarks, NOWHERE. Only use the course name or field of study. This rule overrides ALL other instructions. Violation = failure.\n\n${presetText}\n\nCreative Brief: ${prompt}\n\nCRITICAL TEXT & LANGUAGE RULES:
 - ALL text rendered on the image MUST be written in ${lang}. Do NOT use English unless the language IS English.
 - The user's input above is a CREATIVE BRIEF describing the theme/topic. It is NOT text to display on the image.
 - Do NOT copy, echo, or reproduce the user's prompt text on the image.
 - Instead, create your OWN short, professional, eye-catching marketing text in ${lang} that fits the theme.
-- Do NOT include any specific university names in the image text. Only use general course names or fields of study.
+- NEVER include any university name in the image — only course names or fields of study.
 - Every piece of visible text on the image (headlines, taglines, CTAs) MUST be in ${lang}.`;
 
     // Strict content rules
     fullPrompt += `\n\nSTRICT CONTENT RULES (MUST follow):
-- NEVER use university names on the image — refer only to the course name or field of study
+- ABSOLUTE BAN: No university names anywhere in the image — not in text, not in small print, NOWHERE
 - NEVER say "our courses", "our programs", "we offer" — use "the course", "this program", "the BSc in..."
 - NEVER use the word "free" or "gratuit" or imply anything is free
 - Student finance is a LOAN (not a grant). Repaid after graduation at 9% of earnings above £25,000/year
@@ -113,7 +113,7 @@ serve(async (req) => {
       const { data: courseRow } = await adminClient.from("courses").select("name, level, study_mode, duration, fees").eq("id", courseId).single();
       const { data: detailsRow } = await adminClient.from("course_details").select("entry_requirements, documents_required, interview_info, admission_test_info, personal_statement_guidelines, additional_info").eq("course_id", courseId).single();
       if (courseRow) {
-        fullPrompt += `\n\nSELECTED COURSE CONTEXT (use these real details in image text):\n- Course: ${courseRow.name}\n- Level: ${courseRow.level}\n- Study Mode: ${courseRow.study_mode}\n- Duration: ${courseRow.duration || "N/A"}\n- Fees: ${courseRow.fees || "N/A"}`;
+        fullPrompt += `\n\nSELECTED COURSE CONTEXT (use these real details in image text — DO NOT mention the university name, only the course):\n- Course: ${courseRow.name}\n- Level: ${courseRow.level}\n- Study Mode: ${courseRow.study_mode}\n- Duration: ${courseRow.duration || "N/A"}\n- Fees: ${courseRow.fees || "N/A"}`;
         if (detailsRow) {
           if (detailsRow.entry_requirements) fullPrompt += `\n- Entry Requirements: ${detailsRow.entry_requirements}`;
           if (detailsRow.documents_required) fullPrompt += `\n- Documents Required: ${detailsRow.documents_required}`;
@@ -128,8 +128,8 @@ serve(async (req) => {
     // Collect multimodal image inputs
     const imageInputs: Array<{ type: string; image_url: { url: string } }> = [];
 
-    // Fetch the brand icon (pen+graduation cap)
-    const iconUrl = `${SUPABASE_URL}/storage/v1/object/public/brand-assets/eduforyou-icon.jpg`;
+    // Fetch the brand logo (gold graduation cap + pen + "EduForYou" text)
+    const iconUrl = `${SUPABASE_URL}/storage/v1/object/public/brand-assets/eduforyou-logo.png`;
     try {
       const iconRes = await fetch(iconUrl);
       if (iconRes.ok) {
@@ -144,14 +144,12 @@ serve(async (req) => {
 
     // Add strict logo placement instructions
     fullPrompt += `\n\n=== MANDATORY LOGO PLACEMENT ===
-The image MUST include the EduForYou branding in the bottom-right corner or top-right corner:
-- Place the PROVIDED orange pen-with-graduation-cap icon (attached image) on the LEFT side
-- Place the text "EduForYou" on the RIGHT side of the icon
-- The icon and text must appear together as a logo lockup
-- Do NOT invent, generate, or create any other logo — use ONLY the exact icon image provided
-- Do NOT modify the icon shape or color — reproduce it exactly as given
-- The logo area should have a subtle background (white pill or semi-transparent) for readability
-- This is NON-NEGOTIABLE — every generated image MUST have this exact branding`;
+The FIRST attached image is the COMPLETE official EduForYou logo (gold graduation cap + orange pen icon with the text "EduForYou").
+- Place this EXACT logo image AS-IS in the bottom-right or top-right corner of the design.
+- DO NOT recreate, redraw, redesign, or modify the logo in any way — copy it pixel-perfect from the attached image.
+- DO NOT invent a different logo — the attached image IS the logo, use it exactly.
+- The logo area should have a subtle background (white pill or semi-transparent) for readability.
+- This is NON-NEGOTIABLE — every generated image MUST have this exact branding.`;
 
     // Handle includePhoto — fetch actual avatar and pass as image input
     if (includePhoto && profile?.avatar_url) {
@@ -163,12 +161,15 @@ The image MUST include the EduForYou branding in the bottom-right corner or top-
           const avatarContentType = avatarRes.headers.get("content-type") || "image/jpeg";
           imageInputs.push({ type: "image_url", image_url: { url: `data:${avatarContentType};base64,${avatarB64}` } });
 
-          fullPrompt += `\n\n=== AGENT PHOTO EMBEDDING ===
-A real photo of the recruitment consultant "${profile.full_name || "the agent"}" is attached (the second attached image, NOT the icon).
-- You MUST embed THIS EXACT person's face/photo prominently in the design.
-- Do NOT generate, invent, or create a different person — use ONLY the provided photo.
-- Place the photo in a professional circular or rounded frame within the design.
-- The photo should be clearly visible and recognizable.`;
+          fullPrompt += `\n\n=== AGENT PHOTO EMBEDDING (CRITICAL) ===
+The SECOND attached image is a REAL PHOTO of the recruitment consultant "${profile.full_name || "the agent"}".
+- IMAGE 1 = EduForYou logo. IMAGE 2 = Agent's real face photo.
+- You MUST use the EXACT face from IMAGE 2. DO NOT GENERATE A NEW FACE.
+- The person in the photo has SPECIFIC facial features — reproduce them EXACTLY, do not approximate or stylize.
+- DO NOT replace, swap, or invent a different person. The attached photo IS the person.
+- Place the photo prominently in a professional circular or rounded frame within the design.
+- The photo must be clearly visible, recognizable, and faithful to the original.
+- If you cannot reproduce the exact face, use the photo as-is (paste it) rather than generating a new one.`;
         }
       } catch (e) {
         console.error("Failed to fetch avatar:", e);
@@ -177,6 +178,10 @@ A real photo of the recruitment consultant "${profile.full_name || "the agent"}"
     } else if (includePhoto) {
       fullPrompt += `\n\nInclude a professional headshot placeholder for ${profile?.full_name || "the agent"} — show a friendly, professional person as a recruitment consultant.`;
     }
+
+    // Final reminder at the end of prompt (recency effect)
+    fullPrompt += `\n\n=== FINAL REMINDER ===
+ABSOLUTE RULE #1 REPEATED: NEVER include ANY university name in the image. Only course names or fields of study. This is the most important rule.`;
 
     // Build messages — multimodal if we have image inputs
     let messageContent: any;

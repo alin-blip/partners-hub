@@ -53,7 +53,7 @@ serve(async (req) => {
     }
 
     // Fetch the brand icon to send as reference
-    const iconUrl = `${SUPABASE_URL}/storage/v1/object/public/brand-assets/eduforyou-icon.jpg`;
+    const iconUrl = `${SUPABASE_URL}/storage/v1/object/public/brand-assets/eduforyou-logo.png`;
     let iconBase64Url: string | null = null;
 
     try {
