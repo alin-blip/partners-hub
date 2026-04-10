@@ -108,6 +108,19 @@ serve(async (req) => {
 - Student finance is a LOAN (not a grant). Repaid after graduation at 9% of earnings above £25,000/year
 - Do NOT invent course names or details — only use real data from the context provided`;
 
+    // Mandatory text structure (EduForYou Brand Style)
+    fullPrompt += `\n\n=== MANDATORY TEXT STRUCTURE (EduForYou Brand Style) ===
+The image must be clean, visually clear, and instantly understandable.
+Text on the image MUST follow this EXACT structure — no more, no less:
+1. ONE headline (max 8 words) — bold, attention-grabbing
+2. ONE subheadline (max 15 words) — supporting context
+3. OPTIONAL: Up to 5 short bullet points (max 6 words each) — only if relevant
+- DO NOT write paragraphs or long sentences on the image
+- DO NOT overcrowd the image with text — whitespace is essential
+- The image should be 70% visual, 30% text maximum
+- Text must be large, readable, and well-spaced
+- Every text element must serve a purpose — if in doubt, leave it out`;
+
     // Selected course context
     if (courseId) {
       const { data: courseRow } = await adminClient.from("courses").select("name, level, study_mode, duration, fees").eq("id", courseId).single();

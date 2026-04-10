@@ -93,6 +93,16 @@ STRICT CONTENT RULES (MUST follow):
 FINAL REMINDER: NEVER mention university names. Only course names or fields of study.`;
 
 
+    const textStructureRules = `\n\n=== MANDATORY TEXT STRUCTURE (EduForYou Brand Style) ===
+The caption must be clean, scannable, and instantly understandable.
+Follow this EXACT structure:
+1. ONE headline/hook sentence (max 8 words) — bold, attention-grabbing
+2. ONE supporting sentence (max 15 words) — context or benefit
+3. OPTIONAL: Up to 5 short bullet points (max 6 words each) — only if relevant
+- DO NOT write long paragraphs — keep it punchy and scannable
+- Every line must serve a purpose — if in doubt, leave it out
+- End with a clear CTA + 3-5 hashtags`;
+
     const isScript = preset === "script";
 
     const presetLabels: Record<string, string> = {
