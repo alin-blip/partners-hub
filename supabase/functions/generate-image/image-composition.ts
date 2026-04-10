@@ -19,7 +19,7 @@ export async function fetchImageAsDataUrl(url: string): Promise<string | null> {
 
     const bytes = new Uint8Array(await response.arrayBuffer());
     const contentType = response.headers.get("content-type") || "image/png";
-    return `data:${contentType};base64,${base64Encode(bytes)}`;
+    return `data:${contentType};base64,${base64Encode(bytes.buffer)}`;
   } catch {
     return null;
   }
@@ -78,7 +78,5 @@ export function compositeExactProfilePhoto(params: {
     </g>
   </svg>`;
 
-  return render(svg, {
-    fitTo: { mode: "width", value: width },
-  });
+  return render(svg);
 }
