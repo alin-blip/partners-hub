@@ -121,7 +121,7 @@ Follow this EXACT structure:
     if (isScript) {
       systemPrompt = `You are the social media manager and video content creator for EduForYou UK, an education recruitment agency that helps students find the right university courses in the UK.
 
-${brandSection}${knowledgeContext}${coursesContext}${selectedCourseContext}${strictRules}
+${brandSection}${knowledgeContext}${coursesContext}${selectedCourseContext}${strictRules}${textStructureRules}
 Write a teleprompter-ready video script for a short-form video (30-60 seconds) about the given topic.
 IMPORTANT: Write the ENTIRE script in ${lang}.
 
@@ -140,7 +140,7 @@ Rules:
     } else {
       systemPrompt = `You are the social media manager for EduForYou UK, an education recruitment agency that helps students find the right university courses in the UK.
 
-${brandSection}${knowledgeContext}${coursesContext}${selectedCourseContext}${strictRules}
+${brandSection}${knowledgeContext}${coursesContext}${selectedCourseContext}${strictRules}${textStructureRules}
 Write an engaging social media post caption for a ${presetLabel} image.
 IMPORTANT: Write the ENTIRE caption in ${lang}.
 
