@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
-import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
+import { compositeExactProfilePhoto, dataUrlToBytes, fetchImageAsDataUrl } from "./image-composition.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -140,17 +140,13 @@ Text on the image MUST follow this EXACT structure — no more, no less:
 
     // Collect multimodal image inputs
     const imageInputs: Array<{ type: string; image_url: { url: string } }> = [];
+    let avatarDataUrl: string | null = null;
 
     // Fetch the brand logo (gold graduation cap + pen + "EduForYou" text)
     const iconUrl = `${SUPABASE_URL}/storage/v1/object/public/brand-assets/eduforyou-logo.png`;
     try {
-      const iconRes = await fetch(iconUrl);
-      if (iconRes.ok) {
-        const iconBytes = new Uint8Array(await iconRes.arrayBuffer());
-        const iconB64 = base64Encode(iconBytes);
-        const contentType = iconRes.headers.get("content-type") || "image/jpeg";
-        imageInputs.push({ type: "image_url", image_url: { url: `data:${contentType};base64,${iconB64}` } });
-      }
+      const logoDataUrl = await fetchImageAsDataUrl(iconUrl);
+      if (logoDataUrl) imageInputs.push({ type: "image_url", image_url: { url: logoDataUrl } });
     } catch (e) {
       console.error("Failed to fetch icon:", e);
     }
@@ -164,32 +160,24 @@ The FIRST attached image is the COMPLETE official EduForYou logo (gold graduatio
 - The logo area should have a subtle background (white pill or semi-transparent) for readability.
 - This is NON-NEGOTIABLE — every generated image MUST have this exact branding.`;
 
-    // Handle includePhoto — fetch actual avatar and pass as image input
-    if (includePhoto && profile?.avatar_url) {
-      try {
-        const avatarRes = await fetch(profile.avatar_url);
-        if (avatarRes.ok) {
-          const avatarBytes = new Uint8Array(await avatarRes.arrayBuffer());
-          const avatarB64 = base64Encode(avatarBytes);
-          const avatarContentType = avatarRes.headers.get("content-type") || "image/jpeg";
-          imageInputs.push({ type: "image_url", image_url: { url: `data:${avatarContentType};base64,${avatarB64}` } });
-
-          fullPrompt += `\n\n=== AGENT PHOTO EMBEDDING (CRITICAL) ===
-The SECOND attached image is a REAL PHOTO of the recruitment consultant "${profile.full_name || "the agent"}".
-- IMAGE 1 = EduForYou logo. IMAGE 2 = Agent's real face photo.
-- You MUST use the EXACT face from IMAGE 2. DO NOT GENERATE A NEW FACE.
-- The person in the photo has SPECIFIC facial features — reproduce them EXACTLY, do not approximate or stylize.
-- DO NOT replace, swap, or invent a different person. The attached photo IS the person.
-- Place the photo prominently in a professional circular or rounded frame within the design.
-- The photo must be clearly visible, recognizable, and faithful to the original.
-- If you cannot reproduce the exact face, use the photo as-is (paste it) rather than generating a new one.`;
-        }
-      } catch (e) {
-        console.error("Failed to fetch avatar:", e);
-        fullPrompt += `\n\nInclude a professional headshot placeholder for ${profile.full_name || "the agent"} — show a friendly, professional person as a recruitment consultant.`;
+    // Handle includePhoto — use the exact profile photo as a post-generation overlay
+    if (includePhoto) {
+      if (!profile?.avatar_url) {
+        throw new Error("Profile photo missing. Please upload one in Profile and try again.");
       }
-    } else if (includePhoto) {
-      fullPrompt += `\n\nInclude a professional headshot placeholder for ${profile?.full_name || "the agent"} — show a friendly, professional person as a recruitment consultant.`;
+
+      avatarDataUrl = await fetchImageAsDataUrl(profile.avatar_url);
+      if (!avatarDataUrl) {
+        throw new Error("Failed to load your profile photo. Please re-save it in Profile and try again.");
+      }
+
+      fullPrompt += `\n\n=== PROFILE PHOTO HANDOFF (CRITICAL) ===
+The final design will include the EXACT profile photo of the consultant "${profile.full_name || "the agent"}" as a real overlay added AFTER image generation.
+- IMAGE 1 = EduForYou logo. There is NO second reference image for the AI to redraw.
+- DO NOT generate any people, faces, portraits, heads, models, or human silhouettes anywhere in the design.
+- Leave a clean, unobstructed circular area in the bottom-left corner for the real profile photo overlay.
+- Keep headlines, bullets, CTAs, and key design elements away from that reserved bottom-left photo area.
+- The ONLY human photo allowed in the final result is the exact profile photo that will be composited afterward.`;
     }
 
     // Final reminder at the end of prompt (recency effect)
@@ -263,9 +251,14 @@ ABSOLUTE RULE #1 REPEATED: NEVER include ANY university name in the image. Only 
       throw new Error("No image generated");
     }
 
-    // Extract base64 data
-    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-    const binaryData = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
+    // Extract base64 data and composite the exact profile photo when requested
+    const binaryData = includePhoto && avatarDataUrl
+      ? compositeExactProfilePhoto({
+          avatarDataUrl,
+          imageDataUrl: imageBase64,
+          preset,
+        })
+      : dataUrlToBytes(imageBase64);
 
     // Upload to storage
     const fileName = `${user.id}/${Date.now()}_${preset}.png`;
