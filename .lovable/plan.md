@@ -1,48 +1,42 @@
 
 
-# Enforce EduForYou Brand Text Style in AI Image Generation
+# Add FSB September Courses, Course Details, and Knowledge Base Entries
 
-## What's changing
+## Current State
+- **FSB (Fairfield School of Business)** exists with university ID `e7182c37-...`
+- **3 existing courses**: BA Business Management (BSU), BSc Business Management (RUL), BSc Health & Social Care (BSU)
+- **1 intake**: May Intake only
+- **4 campuses**: Digbeth (Birmingham), Sheffield, Croydon, Leicester
+- **1 course_details** record exists (for the BSU Business Management course)
+- **No timetable options** mapped
+- **No knowledge base entries** for FSB
 
-### 1. Strict text structure rules in image generation prompt
-The AI currently generates images with too much or unstructured text. We'll add explicit rules enforcing the EduForYou brand style:
-- **1 Headline** (short, impactful)
-- **1 Subheadline** (supporting context)
-- **Maximum 5 bullet points** (concise, scannable)
-- Emphasis on visual clarity — the image must be easily understood at a glance
-- No walls of text, no paragraphs, no long sentences
+## What We Need To Do
 
-### 2. Same rules in caption generation
-Ensure generated captions also follow a clean, structured format.
+### Step 1: Parse the uploaded files
+- Parse `FSB_May_and_June_26_and_September_26_1.xlsx` using Python/pandas to extract September course data, timetables, and details
+- Parse `RUL.pdf` to extract RUL-specific course details and requirements
 
-### 3. Visibility — already correct
-- Each user's gallery in "Create Image" already shows only their own images (`user_id` filter)
-- Only Owner and Admin have access to "Social Posts" (publish to agents)
-- Agents see only the feed (`AgentSocialFeedPage`) — no changes needed here
+### Step 2: Add September intake
+- Insert a new intake record for September 2026 under FSB
 
-## Files modified
+### Step 3: Add new September courses
+- Only add courses that appear in the September section of the spreadsheet and don't already exist in the database
+- Map them to the correct campuses and study modes
 
-| File | Change |
-|------|--------|
-| `supabase/functions/generate-image/index.ts` | Add text structure rules to prompt |
-| `supabase/functions/generate-caption/index.ts` | Add structure rules to caption prompt |
+### Step 4: Add/update course details
+- Upsert `course_details` records for all FSB courses with entry requirements, documents required, admission test info, interview info, etc. extracted from both files
 
-## Technical detail
+### Step 5: Map timetable options
+- If the spreadsheet contains timetable/schedule data, create `timetable_options` and `course_timetable_groups` mappings
 
-Added to the prompt in `generate-image/index.ts`:
+### Step 6: Add to Knowledge Base
+- Create `ai_knowledge_base` entries for FSB covering:
+  - University overview and campuses
+  - Per-course admission details
+  - Entry requirements (Standard vs Non-Standard routes)
+  - September intake specifics
 
-```text
-=== MANDATORY TEXT STRUCTURE (EduForYou Brand Style) ===
-The image must be clean, visually clear, and instantly understandable.
-Text on the image MUST follow this EXACT structure — no more, no less:
-1. ONE headline (max 8 words) — bold, attention-grabbing
-2. ONE subheadline (max 15 words) — supporting context
-3. OPTIONAL: Up to 5 short bullet points (max 6 words each)
-- DO NOT write paragraphs or long sentences on the image
-- DO NOT overcrowd the image with text — whitespace is essential
-- The image should be 70% visual, 30% text maximum
-- Text must be large, readable, and well-spaced
-```
-
-This will be placed right after the preset instructions and before the creative brief, ensuring maximum compliance.
+## Technical approach
+All data operations will use the Supabase insert tool (for data) and migration tool (only if schema changes are needed, which is unlikely). The files will be parsed with Python pandas/openpyxl (xlsx) and a PDF parser (pdf) in exec mode.
 
