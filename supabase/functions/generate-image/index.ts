@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
-import { compositeExactProfilePhoto, dataUrlToBytes, fetchImageAsDataUrl } from "./image-composition.ts";
+import { fetchImageAsDataUrl, dataUrlToBytes } from "./image-composition.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,45 +11,10 @@ const corsHeaders = {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-
-  // --- GET handler: poll for job status ---
-  if (req.method === "GET") {
-    try {
-      const url = new URL(req.url);
-      const jobId = url.searchParams.get("jobId");
-      if (!jobId) return new Response(JSON.stringify({ error: "Missing jobId" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
-      const authHeader = req.headers.get("Authorization");
-      if (!authHeader) return new Response(JSON.stringify({ error: "Missing authorization" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
-      const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        global: { headers: { Authorization: authHeader } },
-      });
-      const { data: { user }, error: authErr } = await anonClient.auth.getUser();
-      if (authErr || !user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
-      const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-      const { data: job } = await adminClient
-        .from("image_generation_jobs")
-        .select("*")
-        .eq("id", jobId)
-        .eq("user_id", user.id)
-        .single();
-
-      if (!job) return new Response(JSON.stringify({ error: "Job not found" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
-      return new Response(JSON.stringify(job), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    } catch (e) {
-      console.error("GET error:", e);
-      return new Response(JSON.stringify({ error: "Internal error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-  }
-
-  // --- POST handler: create job and process in background ---
   try {
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
@@ -109,78 +74,11 @@ serve(async (req) => {
 
     const remainingCount = isOwner ? 999 : DAILY_LIMIT - (currentCount + 1);
 
-    // Insert job record
-    const { data: job, error: jobErr } = await adminClient
-      .from("image_generation_jobs")
-      .insert({
-        user_id: user.id,
-        prompt,
-        preset,
-        status: "queued",
-        remaining: remainingCount,
-      })
-      .select("id")
-      .single();
-
-    if (jobErr || !job) {
-      console.error("Job insert error:", jobErr);
-      throw new Error("Failed to create job");
-    }
-
-    // Start background processing
-    // @ts-ignore - EdgeRuntime is available in Deno edge functions
-    EdgeRuntime.waitUntil(processInBackground({
-      jobId: job.id,
-      userId: user.id,
-      prompt,
-      preset,
-      includePhoto,
-      language: language || "English",
-      courseId,
-      isOwner,
-      currentCount,
-      adminClient,
-      LOVABLE_API_KEY,
-      SUPABASE_URL,
-    }));
-
-    return new Response(
-      JSON.stringify({ jobId: job.id, remaining: remainingCount }),
-      { status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  } catch (e) {
-    console.error("generate-image error:", e);
-    return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-});
-
-async function processInBackground(params: {
-  jobId: string;
-  userId: string;
-  prompt: string;
-  preset: string;
-  includePhoto: boolean;
-  language: string;
-  courseId?: string;
-  isOwner: boolean;
-  currentCount: number;
-  adminClient: any;
-  LOVABLE_API_KEY: string;
-  SUPABASE_URL: string;
-}) {
-  const { jobId, userId, prompt, preset, includePhoto, language, courseId, adminClient, LOVABLE_API_KEY, SUPABASE_URL } = params;
-
-  try {
-    await adminClient.from("image_generation_jobs").update({ status: "processing" }).eq("id", jobId);
-
     // Fetch brand settings
     const { data: brand } = await adminClient.from("brand_settings").select("*").limit(1).single();
 
     // Fetch user profile for avatar
-    const { data: profile } = await adminClient.from("profiles").select("avatar_url, full_name").eq("id", userId).single();
+    const { data: profile } = await adminClient.from("profiles").select("avatar_url, full_name").eq("id", user.id).single();
 
     // Preset definitions
     const presetInstructions: Record<string, string> = {
@@ -191,7 +89,7 @@ async function processInBackground(params: {
     };
 
     const presetText = presetInstructions[preset] || presetInstructions.social_post;
-    const lang = language;
+    const lang = language || "English";
 
     // Build prompt
     let fullPrompt = `ABSOLUTE RULE #1 — ZERO TOLERANCE: NEVER include ANY university name anywhere in the image. Not in headlines, not in small text, not in watermarks, NOWHERE. Only use the course name or field of study. This rule overrides ALL other instructions. Violation = failure.\n\n${presetText}\n\nCreative Brief: ${prompt}\n\nCRITICAL TEXT & LANGUAGE RULES:
@@ -240,7 +138,6 @@ Text on the image MUST follow this EXACT structure — no more, no less:
 
     // Collect multimodal image inputs
     const imageInputs: Array<{ type: string; image_url: { url: string } }> = [];
-    let avatarDataUrl: string | null = null;
 
     // Fetch the brand logo
     const iconUrl = `${SUPABASE_URL}/storage/v1/object/public/brand-assets/eduforyou-logo.png`;
@@ -259,28 +156,19 @@ The FIRST attached image is the COMPLETE official EduForYou logo (gold graduatio
 - The logo area should have a subtle background (white pill or semi-transparent) for readability.
 - This is NON-NEGOTIABLE — every generated image MUST have this exact branding.`;
 
-    // Handle includePhoto
+    // Handle includePhoto — tell AI to leave space, client will composite
+    let avatarUrl: string | null = null;
     if (includePhoto) {
       if (!profile?.avatar_url) {
-        await adminClient.from("image_generation_jobs").update({
-          status: "failed",
-          error_message: "Profile photo missing. Please upload one in Profile and try again.",
-        }).eq("id", jobId);
-        return;
+        return new Response(
+          JSON.stringify({ ok: false, error: "Profile photo missing. Please upload one in Profile and try again." }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
-
-      avatarDataUrl = await fetchImageAsDataUrl(profile.avatar_url);
-      if (!avatarDataUrl) {
-        await adminClient.from("image_generation_jobs").update({
-          status: "failed",
-          error_message: "Failed to load your profile photo. Please re-save it in Profile and try again.",
-        }).eq("id", jobId);
-        return;
-      }
+      avatarUrl = profile.avatar_url;
 
       fullPrompt += `\n\n=== PROFILE PHOTO HANDOFF (CRITICAL) ===
 The final design will include the EXACT profile photo of the consultant "${profile.full_name || "the agent"}" as a real overlay added AFTER image generation.
-- IMAGE 1 = EduForYou logo. There is NO second reference image for the AI to redraw.
 - DO NOT generate any people, faces, portraits, heads, models, or human silhouettes anywhere in the design.
 - Leave a clean, unobstructed circular area in the bottom-left corner for the real profile photo overlay.
 - Keep headlines, bullets, CTAs, and key design elements away from that reserved bottom-left photo area.
@@ -309,7 +197,7 @@ ABSOLUTE RULE #1 REPEATED: NEVER include ANY university name in the image. Only 
     });
 
     let aiResponse: Response | null = null;
-    const MAX_RETRIES = 5;
+    const MAX_RETRIES = 3;
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -321,7 +209,7 @@ ABSOLUTE RULE #1 REPEATED: NEVER include ANY university name in the image. Only 
       });
       if (aiResponse.status !== 429) break;
       console.log(`AI rate limited (attempt ${attempt + 1}/${MAX_RETRIES}), retrying...`);
-      if (attempt < MAX_RETRIES - 1) await new Promise(r => setTimeout(r, 3000 * Math.pow(2, attempt)));
+      if (attempt < MAX_RETRIES - 1) await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt)));
     }
 
     if (!aiResponse!.ok) {
@@ -330,12 +218,10 @@ ABSOLUTE RULE #1 REPEATED: NEVER include ANY university name in the image. Only 
       let errorMsg = "AI generation failed";
       if (status === 429) { errorType = "rate_limit"; errorMsg = "AI rate limit exceeded. Please try again in a moment."; }
       if (status === 402) { errorType = "credits_exhausted"; errorMsg = "AI credits exhausted. Please contact admin."; }
-      
-      await adminClient.from("image_generation_jobs").update({
-        status: "failed",
-        error_message: errorMsg,
-      }).eq("id", jobId);
-      return;
+      return new Response(
+        JSON.stringify({ ok: false, errorType, error: errorMsg }),
+        { status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const aiData = await aiResponse!.json();
@@ -343,60 +229,52 @@ ABSOLUTE RULE #1 REPEATED: NEVER include ANY university name in the image. Only 
 
     if (!imageBase64) {
       console.error("No image in AI response:", JSON.stringify(aiData).slice(0, 500));
-      await adminClient.from("image_generation_jobs").update({
-        status: "failed",
-        error_message: "No image generated",
-      }).eq("id", jobId);
-      return;
+      return new Response(
+        JSON.stringify({ ok: false, error: "No image generated" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    // Composite profile photo if requested, otherwise just decode
-    const binaryData = includePhoto && avatarDataUrl
-      ? compositeExactProfilePhoto({
-          avatarDataUrl,
-          imageDataUrl: imageBase64,
-          preset,
-        })
-      : dataUrlToBytes(imageBase64);
+    // Decode and upload (no server-side composition)
+    const binaryData = dataUrlToBytes(imageBase64);
 
-    // Upload to storage
-    const fileName = `${userId}/${Date.now()}_${preset}.png`;
+    const fileName = `${user.id}/${Date.now()}_${preset}.png`;
     const { error: uploadErr } = await adminClient.storage
       .from("generated-images")
       .upload(fileName, binaryData, { contentType: "image/png", upsert: false });
 
     if (uploadErr) {
       console.error("Upload error:", uploadErr);
-      await adminClient.from("image_generation_jobs").update({
-        status: "failed",
-        error_message: "Failed to save image",
-      }).eq("id", jobId);
-      return;
+      return new Response(
+        JSON.stringify({ ok: false, error: "Failed to save image" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const { data: publicUrl } = adminClient.storage.from("generated-images").getPublicUrl(fileName);
 
-    // Save record in generated_images table
+    // Save record
     await adminClient.from("generated_images").insert({
-      user_id: userId,
+      user_id: user.id,
       prompt,
       preset,
       image_path: fileName,
     });
 
-    // Update job as completed
-    await adminClient.from("image_generation_jobs").update({
-      status: "completed",
-      result_url: publicUrl.publicUrl,
-      avatar_url: includePhoto ? profile?.avatar_url : null,
-    }).eq("id", jobId);
-
-    console.log(`Job ${jobId} completed successfully`);
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        url: publicUrl.publicUrl,
+        avatarUrl: includePhoto ? avatarUrl : null,
+        remaining: remainingCount,
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   } catch (e) {
-    console.error(`Job ${jobId} failed:`, e);
-    await adminClient.from("image_generation_jobs").update({
-      status: "failed",
-      error_message: e instanceof Error ? e.message : "Unknown error",
-    }).eq("id", jobId);
+    console.error("generate-image error:", e);
+    return new Response(
+      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
-}
+});
