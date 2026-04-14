@@ -8,15 +8,44 @@ const corsHeaders = {
 };
 
 async function callAI(apiKey: string, messages: any[], model = "google/gemini-3-flash-preview") {
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  return await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model, messages }),
   });
-  return response;
+}
+
+function handleAIError(response: Response) {
+  if (response.status === 429) {
+    return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
+      status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  if (response.status === 402) {
+    return new Response(JSON.stringify({ error: "AI credits exhausted. Please contact the owner." }), {
+      status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  return null;
+}
+
+function buildCVPromptFromQuestionnaire(
+  cvQ: any,
+  studentProfile: string,
+  courseField: string,
+) {
+  const workSection = (cvQ.work_experience || []).map((w: any, i: number) => {
+    const period = w.is_present ? `${w.start_date} – Present` : `${w.start_date} – ${w.end_date || "N/A"}`;
+    return `Position ${i + 1}: ${w.job_title} at ${w.company}${w.company_address ? ` (${w.company_address})` : ""}, ${period}\nResponsibilities: ${w.responsibilities || "Not specified"}`;
+  }).join("\n\n");
+
+  const eduSection = (cvQ.education || []).map((e: any, i: number) => {
+    return `Education ${i + 1}: ${e.course} at ${e.school}, ${e.start_date} – ${e.end_date || "N/A"}, Status: ${e.status}, Diploma: ${e.diploma}`;
+  }).join("\n\n");
+
+  const skillsSection = cvQ.skills || "Not specified";
+
+  return `STUDENT PROFILE (for personal details only):\n${studentProfile}\n\nWORK EXPERIENCE:\n${workSection || "None provided"}\n\nEDUCATION:\n${eduSection || "None provided"}\n\nSKILLS:\n${skillsSection}\n\nCOURSE FIELD FOR SKILLS MATCHING (do NOT mention this in the CV): ${courseField}`;
 }
 
 serve(async (req) => {
@@ -42,7 +71,7 @@ serve(async (req) => {
       });
     }
 
-    const { student_id, document_type, use_guidelines = true } = await req.json();
+    const { student_id, document_type, use_guidelines = true, cv_questionnaire } = await req.json();
     if (!student_id || !document_type) {
       return new Response(JSON.stringify({ error: "student_id and document_type are required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -53,18 +82,14 @@ serve(async (req) => {
 
     // Fetch student data
     const { data: student, error: studentError } = await adminClient
-      .from("students")
-      .select("*")
-      .eq("id", student_id)
-      .single();
-
+      .from("students").select("*").eq("id", student_id).single();
     if (studentError || !student) {
       return new Response(JSON.stringify({ error: "Student not found" }), {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Fetch enrollments with university/course info (including duration)
+    // Fetch enrollments
     const { data: enrollments } = await adminClient
       .from("enrollments")
       .select("status, notes, course_id, universities(name), courses(name, level, study_mode, duration)")
@@ -74,34 +99,14 @@ serve(async (req) => {
       `${e.courses?.name || "Unknown course"} (${e.courses?.level || ""}, ${e.courses?.duration || "duration unknown"}) at ${e.universities?.name || "Unknown"} — Status: ${e.status}, Study mode: ${e.courses?.study_mode || "unknown"}`
     ).join("\n");
 
-    // Build course/university context for personal statement opening
     const primaryEnrollment = (enrollments || [])[0];
     const courseName = primaryEnrollment?.courses?.name || "the course";
     const universityName = primaryEnrollment?.universities?.name || "the university";
     const courseDuration = primaryEnrollment?.courses?.duration || "";
     const courseLevel = primaryEnrollment?.courses?.level || "";
+    const courseField = `${courseName} (${courseLevel})`;
 
-    // Fetch course details for personal statement guidelines
-    let courseDetailsInfo = "";
-    if (document_type === "personal_statement" && use_guidelines && enrollments && enrollments.length > 0) {
-      const courseIds = enrollments.map((e: any) => e.course_id).filter(Boolean);
-      if (courseIds.length > 0) {
-        const { data: courseDetails } = await adminClient
-          .from("course_details")
-          .select("personal_statement_guidelines, entry_requirements, courses(name)")
-          .in("course_id", courseIds);
-        if (courseDetails && courseDetails.length > 0) {
-          courseDetailsInfo = courseDetails.map((cd: any) => {
-            const parts = [`Course: ${cd.courses?.name || "Unknown"}`];
-            if (cd.personal_statement_guidelines) parts.push(`Guidelines: ${cd.personal_statement_guidelines}`);
-            if (cd.entry_requirements) parts.push(`Entry Requirements: ${cd.entry_requirements}`);
-            return parts.join("\n");
-          }).join("\n\n");
-        }
-      }
-    }
-
-    // Build student profile summary
+    // Student profile summary (personal details)
     const profileSummary = [
       `Name: ${student.title ? student.title + " " : ""}${student.first_name} ${student.last_name}`,
       student.email ? `Email: ${student.email}` : null,
@@ -121,7 +126,48 @@ serve(async (req) => {
     let systemPrompt: string;
 
     if (document_type === "cv") {
-      systemPrompt = `You are an expert CV writer for UK university students. Generate a professional, well-structured CV in Markdown format based on the student profile provided.
+      if (cv_questionnaire) {
+        // Questionnaire-based CV
+        systemPrompt = `You are an expert CV writer for UK employment. Generate a professional, well-structured CV in Markdown format.
+
+CRITICAL RULES:
+- Use the WORK EXPERIENCE, EDUCATION, and SKILLS data provided by the user as the PRIMARY source
+- Use the student profile ONLY for personal details (name, contact info, address)
+- NEVER mention the university the student is applying to — this CV is independent
+- Match and enhance the responsibilities and skills to be relevant to the student's field of interest (provided separately) WITHOUT naming the course or university
+- Structure: Personal Details → Personal Profile/Objective → Work Experience → Education → Skills
+- For work experience, present each role with company name, address, dates, and bullet-pointed responsibilities
+- For education, show each entry with institution, course, dates, status, and diploma availability
+- Make responsibilities sound professional and achievement-oriented
+- Be professional but personable
+- Output ONLY the CV content in Markdown, no explanations`;
+
+        const userContent = buildCVPromptFromQuestionnaire(cv_questionnaire, profileSummary, courseField);
+
+        const response1 = await callAI(LOVABLE_API_KEY, [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ]);
+
+        if (!response1.ok) {
+          const errResp = handleAIError(response1);
+          if (errResp) return errResp;
+          const t = await response1.text();
+          console.error("AI gateway error:", response1.status, t);
+          return new Response(JSON.stringify({ error: "AI service error" }), {
+            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const result1 = await response1.json();
+        const content = result1.choices?.[0]?.message?.content || "";
+
+        return new Response(JSON.stringify({ content, document_type }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } else {
+        // Legacy CV generation (no questionnaire)
+        systemPrompt = `You are an expert CV writer for UK university students. Generate a professional, well-structured CV in Markdown format based on the student profile provided.
 
 Guidelines:
 - Use a clean, professional format with clear sections
@@ -132,7 +178,29 @@ Guidelines:
 - Use the enrollment/course information to fill the Education section
 - If information is missing, skip that section rather than adding placeholders
 - Output ONLY the CV content in Markdown, no explanations`;
+      }
     } else {
+      // Personal statement — unchanged logic
+      // Fetch course details for guidelines
+      let courseDetailsInfo = "";
+      if (use_guidelines && enrollments && enrollments.length > 0) {
+        const courseIds = enrollments.map((e: any) => e.course_id).filter(Boolean);
+        if (courseIds.length > 0) {
+          const { data: courseDetails } = await adminClient
+            .from("course_details")
+            .select("personal_statement_guidelines, entry_requirements, courses(name)")
+            .in("course_id", courseIds);
+          if (courseDetails && courseDetails.length > 0) {
+            courseDetailsInfo = courseDetails.map((cd: any) => {
+              const parts = [`Course: ${cd.courses?.name || "Unknown"}`];
+              if (cd.personal_statement_guidelines) parts.push(`Guidelines: ${cd.personal_statement_guidelines}`);
+              if (cd.entry_requirements) parts.push(`Entry Requirements: ${cd.entry_requirements}`);
+              return parts.join("\n");
+            }).join("\n\n");
+          }
+        }
+      }
+
       systemPrompt = `You are ghostwriting a personal statement for a real student applying to a UK university. Your goal is to produce text that reads exactly like a genuine 18-22 year old student wrote it by hand — not an AI.
 
 MANDATORY OPENING — the personal statement MUST begin with a sentence like:
@@ -187,16 +255,8 @@ OUTPUT: ONLY the personal statement text in Markdown, no explanations or meta-co
     ]);
 
     if (!response1.ok) {
-      if (response1.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response1.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please contact the owner." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      const errResp = handleAIError(response1);
+      if (errResp) return errResp;
       const t = await response1.text();
       console.error("AI gateway error:", response1.status, t);
       return new Response(JSON.stringify({ error: "AI service error" }), {
