@@ -1,65 +1,62 @@
 
 
-# Fix: generate-image CPU Time Exceeded
+# Fix: Image Generation Stuck on "Generating..."
 
-## Problem
-The `generate-image` edge function is failing with **"CPU Time exceeded"** errors on every call. The logs show this pattern repeatedly — boot, then CPU timeout, then shutdown. Users cannot generate any images.
+## Root Cause
 
-**Root cause**: The function does too much synchronous/blocking work within the edge function's CPU time limit:
-1. The AI image generation call to Gemini takes 15-30+ seconds of wall time
-2. When "Include my photo" is on, the `resvg` SVG render composites two full base64 images onto a 1080x1080+ canvas — extremely CPU-intensive
-3. The retry loop with exponential backoff (up to 5 retries) compounds the time
+`EdgeRuntime.waitUntil()` does not work reliably on Supabase Edge Functions. The background process gets killed when the function instance shuts down. The logs confirm this — rapid boot/shutdown cycles from polling, but zero processing logs (no "Job completed", no errors). Jobs get stuck in `processing` status permanently.
 
-## Solution: Use `EdgeRuntime.waitUntil()` async pattern
+The original CPU timeout was caused by `resvg` SVG rendering (compositing profile photo onto a 1080x1080 canvas server-side). The AI call itself is I/O wait, not CPU — it should work fine synchronously.
 
-Convert the function to return a `202 Accepted` immediately with a job record ID, then process the image in the background. The client polls for completion.
+## Solution: Go back to synchronous + move photo composition to client
 
-### Changes
+### 1. Revert `generate-image/index.ts` to synchronous
 
-**1. Database migration** — Add a `image_generation_jobs` table:
-- `id` (uuid, PK), `user_id`, `prompt`, `preset`, `status` (queued/processing/completed/failed), `result_url`, `error_message`, `remaining`, `created_at`
+- Remove the job-based async pattern entirely (no `EdgeRuntime.waitUntil`, no `processInBackground`, no GET polling handler)
+- Process the AI call synchronously and return the result directly
+- **Remove `resvg` composition entirely** — this was the CPU bottleneck
+- When `includePhoto` is true, just return the AI-generated image URL + the avatar URL separately
+- Keep retry logic but reduce to 3 retries with shorter backoff
 
-**2. Edge function `generate-image/index.ts`**:
-- After auth + daily limit check, insert a job row with `status = 'queued'`
-- Call `EdgeRuntime.waitUntil(processInBackground(jobId, ...))` with all the heavy work (AI call, composition, upload)
-- Return `202` immediately with `{ jobId }`
-- The background function updates the job row to `completed` (with URL) or `failed` (with error)
+### 2. Move profile photo overlay to client-side (Canvas API)
 
-**3. Remove `resvg` composition** — replace with a simpler approach:
-- Skip the SVG render entirely. Instead, just upload the AI-generated image as-is
-- For "Include my photo", store the avatar URL in the job result and let the **client** render the circular photo overlay using a CSS/canvas approach (much lighter)
-- OR keep server composition but use a lighter method (just upload both images and let the client composite)
+- In `CreateImagePage.tsx` and `SocialPostsPage.tsx`, when `includePhoto` is true and an image is returned:
+  - Use HTML Canvas to draw the generated image
+  - Overlay the profile photo as a circular cutout with gold ring in the bottom-left corner
+  - Export the composited canvas as the final image
+- This eliminates all server-side CPU-intensive rendering
 
-**4. Client-side polling** — Update `CreateImagePage.tsx` and `SocialPostsPage.tsx`:
-- On mutation call, receive `{ jobId }` with 202 status
-- Poll `generate-image?jobId=...` (GET) every 2 seconds until status is `completed` or `failed`
-- Show a progress indicator during polling
-- On completion, display the image as before
+### 3. Simplify `CreateImagePage.tsx`
 
-### Files to modify
+- Remove `pollForJob` function
+- Go back to a simple `await supabase.functions.invoke()` pattern
+- Add client-side `compositeProfilePhoto(generatedImageUrl, avatarUrl)` utility using Canvas
+- Same changes in `SocialPostsPage.tsx`
+
+### 4. Clean up
+
+- The `image_generation_jobs` table can remain (no harm) but won't be used
+- `image-composition.ts` server file becomes unused — can be kept or removed
+- Create a new `src/lib/image-composite.ts` for the client-side Canvas compositing
+
+## Files to modify
 
 | File | Change |
 |------|--------|
-| `supabase/functions/generate-image/index.ts` | Async pattern with `EdgeRuntime.waitUntil()`, add GET handler for polling |
-| `supabase/functions/generate-image/image-composition.ts` | Keep but only used in background worker |
-| `src/pages/shared/CreateImagePage.tsx` | Poll for job completion instead of waiting for response |
-| `src/pages/shared/SocialPostsPage.tsx` | Same polling pattern |
-| DB migration | Create `image_generation_jobs` table with RLS |
+| `supabase/functions/generate-image/index.ts` | Revert to synchronous, remove resvg, return image + avatar separately |
+| `src/lib/image-composite.ts` | New — client-side Canvas compositing (circular photo + gold ring) |
+| `src/pages/shared/CreateImagePage.tsx` | Remove polling, add client-side composition |
+| `src/pages/shared/SocialPostsPage.tsx` | Same changes |
 
-### Key technical details
+## Key technical detail
 
 ```text
-Client                    Edge Function              Background Worker
-  |                           |                           |
-  |-- POST /generate-image -->|                           |
-  |                           |-- INSERT job (queued) ---> |
-  |                           |-- waitUntil(process()) --->|
-  |<-- 202 { jobId } --------|                           |
-  |                           |                           |-- AI call
-  |-- GET ?jobId=xxx -------->|                           |-- compose
-  |<-- { status: processing } |                           |-- upload
-  |                           |                           |-- UPDATE job (completed)
-  |-- GET ?jobId=xxx -------->|                           |
-  |<-- { status: completed, url } |                       |
+Before (broken):
+  Client → POST → 202 + jobId → poll GET every 2s → stuck forever
+
+After (fixed):
+  Client → POST → wait ~20s → { url, avatarUrl } → Canvas composite → done
 ```
+
+The Canvas compositing replicates the same visual effect (circular photo, gold ring, shadow) but runs instantly in the browser with zero server CPU cost.
 
