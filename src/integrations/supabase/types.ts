@@ -1268,6 +1268,45 @@ export type Database = {
         }
         Relationships: []
       }
+      image_generation_jobs: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          preset: string
+          prompt: string
+          remaining: number | null
+          result_url: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          preset?: string
+          prompt: string
+          remaining?: number | null
+          result_url?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          preset?: string
+          prompt?: string
+          remaining?: number | null
+          result_url?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       intakes: {
         Row: {
           application_deadline: string | null
