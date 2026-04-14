@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { FileText, Download, Loader2, ScrollText, ShieldCheck, ShieldAlert, ShieldX } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { CVQuestionnaireDialog, type CVQuestionnaireData } from "./CVQuestionnaireDialog";
 
 interface Props {
   studentId: string;
@@ -21,25 +22,38 @@ export function StudentAIDocumentsTab({ studentId, studentName }: Props) {
   const [psContent, setPsContent] = useState<string | null>(null);
   const [psAiScore, setPsAiScore] = useState<number | null>(null);
   const [useGuidelines, setUseGuidelines] = useState(true);
+  const [cvDialogOpen, setCvDialogOpen] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
-  const generate = async (type: "cv" | "personal_statement") => {
-    setGenerating(type);
+  const generateCV = async (questionnaire: CVQuestionnaireData) => {
+    setGenerating("cv");
     try {
       const { data, error } = await supabase.functions.invoke("generate-student-document", {
-        body: { student_id: studentId, document_type: type, use_guidelines: type === "personal_statement" ? useGuidelines : true },
+        body: { student_id: studentId, document_type: "cv", cv_questionnaire: questionnaire },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
+      setCvContent(data.content);
+      setCvDialogOpen(false);
+      toast({ title: "CV generated successfully" });
+    } catch (e: any) {
+      toast({ title: "Generation failed", description: e.message, variant: "destructive" });
+    } finally {
+      setGenerating(null);
+    }
+  };
 
-      if (type === "cv") {
-        setCvContent(data.content);
-      } else {
-        setPsContent(data.content);
-        setPsAiScore(data.ai_score ?? null);
-      }
-
-      toast({ title: `${type === "cv" ? "CV" : "Personal Statement"} generated successfully` });
+  const generatePS = async () => {
+    setGenerating("personal_statement");
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-student-document", {
+        body: { student_id: studentId, document_type: "personal_statement", use_guidelines: useGuidelines },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setPsContent(data.content);
+      setPsAiScore(data.ai_score ?? null);
+      toast({ title: "Personal Statement generated successfully" });
     } catch (e: any) {
       toast({ title: "Generation failed", description: e.message, variant: "destructive" });
     } finally {
@@ -82,94 +96,96 @@ export function StudentAIDocumentsTab({ studentId, studentName }: Props) {
     if (score < 15) {
       return (
         <Badge className="bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700 gap-1">
-          <ShieldCheck className="w-3.5 h-3.5" />
-          AI Score: {score}% ✓
+          <ShieldCheck className="w-3.5 h-3.5" /> AI Score: {score}% ✓
         </Badge>
       );
     }
     if (score <= 25) {
       return (
         <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-700 gap-1">
-          <ShieldAlert className="w-3.5 h-3.5" />
-          AI Score: {score}% ⚠
+          <ShieldAlert className="w-3.5 h-3.5" /> AI Score: {score}% ⚠
         </Badge>
       );
     }
     return (
       <Badge className="bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700 gap-1">
-        <ShieldX className="w-3.5 h-3.5" />
-        AI Score: {score}% ✗
+        <ShieldX className="w-3.5 h-3.5" /> AI Score: {score}% ✗
       </Badge>
     );
   };
-
-  const DocumentCard = ({
-    title,
-    icon: Icon,
-    type,
-    content,
-    aiScore,
-  }: {
-    title: string;
-    icon: any;
-    type: "cv" | "personal_statement";
-    content: string | null;
-    aiScore?: number | null;
-  }) => (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Icon className="w-4 h-4" /> {title}
-          {aiScore !== null && aiScore !== undefined && <AiScoreBadge score={aiScore} />}
-        </CardTitle>
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            onClick={() => generate(type)}
-            disabled={generating !== null}
-          >
-            {generating === type ? (
-              <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> Generating…</>
-            ) : content ? (
-              "Regenerate"
-            ) : (
-              "Generate"
-            )}
-          </Button>
-          {content && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handlePrint(content, title)}
-            >
-              <Download className="w-3.5 h-3.5 mr-1" /> PDF
-            </Button>
-          )}
-        </div>
-      </CardHeader>
-      {content && (
-        <CardContent>
-          <div className="prose prose-sm max-w-none dark:prose-invert border rounded-md p-4 bg-muted/30 max-h-[500px] overflow-y-auto">
-            <ReactMarkdown>{content}</ReactMarkdown>
-          </div>
-        </CardContent>
-      )}
-    </Card>
-  );
 
   return (
     <div className="space-y-4 pt-4" ref={printRef}>
       <p className="text-sm text-muted-foreground">
         Generate AI-powered documents based on this student's profile and enrollment data.
       </p>
-      <DocumentCard title="Curriculum Vitae (CV)" icon={FileText} type="cv" content={cvContent} />
+
+      {/* CV Card */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <FileText className="w-4 h-4" /> Curriculum Vitae (CV)
+          </CardTitle>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={() => setCvDialogOpen(true)} disabled={generating !== null}>
+              {generating === "cv" ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> Generating…</> : cvContent ? "Regenerate" : "Generate"}
+            </Button>
+            {cvContent && (
+              <Button size="sm" variant="outline" onClick={() => handlePrint(cvContent, "Curriculum Vitae")}>
+                <Download className="w-3.5 h-3.5 mr-1" /> PDF
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        {cvContent && (
+          <CardContent>
+            <div className="prose prose-sm max-w-none dark:prose-invert border rounded-md p-4 bg-muted/30 max-h-[500px] overflow-y-auto">
+              <ReactMarkdown>{cvContent}</ReactMarkdown>
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Personal Statement Card */}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <Switch id="use-guidelines" checked={useGuidelines} onCheckedChange={setUseGuidelines} />
           <Label htmlFor="use-guidelines" className="text-sm cursor-pointer">Use course-specific guidelines</Label>
         </div>
-        <DocumentCard title="Personal Statement" icon={ScrollText} type="personal_statement" content={psContent} aiScore={psAiScore} />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <ScrollText className="w-4 h-4" /> Personal Statement
+              {psAiScore !== null && psAiScore !== undefined && <AiScoreBadge score={psAiScore} />}
+            </CardTitle>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={generatePS} disabled={generating !== null}>
+                {generating === "personal_statement" ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> Generating…</> : psContent ? "Regenerate" : "Generate"}
+              </Button>
+              {psContent && (
+                <Button size="sm" variant="outline" onClick={() => handlePrint(psContent, "Personal Statement")}>
+                  <Download className="w-3.5 h-3.5 mr-1" /> PDF
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          {psContent && (
+            <CardContent>
+              <div className="prose prose-sm max-w-none dark:prose-invert border rounded-md p-4 bg-muted/30 max-h-[500px] overflow-y-auto">
+                <ReactMarkdown>{psContent}</ReactMarkdown>
+              </div>
+            </CardContent>
+          )}
+        </Card>
       </div>
+
+      {/* CV Questionnaire Dialog */}
+      <CVQuestionnaireDialog
+        open={cvDialogOpen}
+        onOpenChange={setCvDialogOpen}
+        onSubmit={generateCV}
+        generating={generating === "cv"}
+      />
     </div>
   );
 }
