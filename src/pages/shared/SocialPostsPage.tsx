@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { compositeProfilePhoto } from "@/lib/image-composite";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -247,19 +248,41 @@ export default function SocialPostsPage() {
 
   const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-  const pollForJob = async (jobId: string, session: any): Promise<any> => {
-    const maxAttempts = 120;
-    for (let i = 0; i < maxAttempts; i++) {
-      await new Promise(r => setTimeout(r, 2000));
-      const resp = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image?jobId=${jobId}`,
-        { method: "GET", headers: { Authorization: `Bearer ${session.access_token}` } }
-      );
-      const job = await resp.json();
-      if (job.status === "completed") return job;
-      if (job.status === "failed") throw new Error(job.error_message || "Generation failed");
+  const handleGenerateSingle = async (preset: string, session: any): Promise<GeneratedResult> => {
+    const resp = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          prompt,
+          preset,
+          includePhoto,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          language: captionLanguage,
+          ...(selectedCourseId ? { courseId: selectedCourseId } : {}),
+        }),
+      }
+    );
+    const result = await resp.json();
+
+    if (result?.ok === false || !resp.ok) {
+      const errorMessage = getGenerationErrorMessage(result?.errorType, result?.error);
+      if (result?.errorType === "rate_limit") startCooldown(30);
+      return { preset, error: errorMessage };
     }
-    throw new Error("Generation timed out");
+
+    // Client-side profile photo composition
+    let finalUrl = result.url;
+    if (result.avatarUrl && result.url) {
+      finalUrl = await compositeProfilePhoto(result.url, result.avatarUrl, preset);
+    }
+
+    if (result.remaining !== undefined) setRemaining(result.remaining);
+    return { preset, url: finalUrl };
   };
 
   const handleGenerate = async () => {
@@ -290,56 +313,19 @@ export default function SocialPostsPage() {
       if (i > 0) await delay(3000);
 
       try {
-        const resp = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({
-              prompt,
-              preset,
-              includePhoto,
-              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-              language: captionLanguage,
-              ...(selectedCourseId ? { courseId: selectedCourseId } : {}),
-            }),
-          }
-        );
-        const result = await resp.json();
-        
-        // Handle immediate errors (daily limit, etc.)
-        if (result?.ok === false || (!resp.ok && resp.status !== 202)) {
-          const errorMessage = getGenerationErrorMessage(result?.errorType, result?.error);
-          results.push({ preset, error: errorMessage });
+        const result = await handleGenerateSingle(preset, session);
+        results.push(result);
 
-          if (
-            resp.status === 429 ||
-            result?.errorType === "daily_limit" ||
-            result?.errorType === "rate_limit" ||
-            result?.errorType === "credits_exhausted"
-          ) {
+        if (result.error) {
+          // Check if it's a terminal error that should stop the batch
+          const isTerminal = result.error.includes("Daily limit") ||
+            result.error.includes("credits exhausted") ||
+            result.error.includes("rate limit");
+          if (isTerminal) {
             shouldSkipFollowUpAi = true;
-            if (result?.errorType === "rate_limit") startCooldown(30);
-            toast.error(errorMessage);
+            toast.error(result.error);
             break;
           }
-        } else if (result.jobId) {
-          // Poll for job completion
-          if (result.remaining !== undefined) setRemaining(result.remaining);
-          setGeneratingProgress(`Processing ${presetLabel}… (${i + 1}/${selectedPresets.length})`);
-          try {
-            const job = await pollForJob(result.jobId, session);
-            results.push({ preset, url: job.result_url });
-            if (job.remaining !== undefined) setRemaining(job.remaining);
-          } catch (pollErr: any) {
-            results.push({ preset, error: pollErr.message });
-          }
-        } else {
-          results.push({ preset, url: result.url });
-          setRemaining(result.remaining);
         }
       } catch (e: any) {
         results.push({ preset, error: e.message });

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { compositeProfilePhoto } from "@/lib/image-composite";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -176,24 +177,6 @@ export default function CreateImagePage() {
     enabled: !!user,
   });
 
-  const pollForJob = async (jobId: string, session: any): Promise<any> => {
-    const maxAttempts = 120; // 4 minutes max
-    for (let i = 0; i < maxAttempts; i++) {
-      await new Promise(r => setTimeout(r, 2000));
-      const resp = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image?jobId=${jobId}`,
-        {
-          method: "GET",
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        }
-      );
-      const job = await resp.json();
-      if (job.status === "completed") return job;
-      if (job.status === "failed") throw new Error(job.error_message || "Generation failed");
-    }
-    throw new Error("Generation timed out. Please try again.");
-  };
-
   const generate = useMutation({
     mutationFn: async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -212,25 +195,19 @@ export default function CreateImagePage() {
       );
 
       const result = await resp.json();
-      // Handle immediate errors (daily limit, etc.)
-      if (!resp.ok && resp.status !== 202) {
-        const errorType = result?.errorType;
-        if (errorType === "rate_limit") startCooldown(30);
-        throw new Error(getGenerationErrorMessage(errorType, result?.error));
-      }
-      if (result?.ok === false) {
+      if (!resp.ok || result?.ok === false) {
         const errorType = result?.errorType;
         if (errorType === "rate_limit") startCooldown(30);
         throw new Error(getGenerationErrorMessage(errorType, result?.error));
       }
 
-      // Poll for completion
-      if (result.jobId) {
-        if (result.remaining !== undefined) setRemaining(result.remaining);
-        const job = await pollForJob(result.jobId, session);
-        return { url: job.result_url, remaining: job.remaining };
+      // Client-side profile photo composition
+      let finalUrl = result.url;
+      if (result.avatarUrl && result.url) {
+        finalUrl = await compositeProfilePhoto(result.url, result.avatarUrl, selectedPreset);
       }
-      return result;
+
+      return { url: finalUrl, remaining: result.remaining };
     },
     onSuccess: (data) => {
       setGeneratedUrl(data.url);
