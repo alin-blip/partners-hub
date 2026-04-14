@@ -313,56 +313,19 @@ export default function SocialPostsPage() {
       if (i > 0) await delay(3000);
 
       try {
-        const resp = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({
-              prompt,
-              preset,
-              includePhoto,
-              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-              language: captionLanguage,
-              ...(selectedCourseId ? { courseId: selectedCourseId } : {}),
-            }),
-          }
-        );
-        const result = await resp.json();
-        
-        // Handle immediate errors (daily limit, etc.)
-        if (result?.ok === false || (!resp.ok && resp.status !== 202)) {
-          const errorMessage = getGenerationErrorMessage(result?.errorType, result?.error);
-          results.push({ preset, error: errorMessage });
+        const result = await handleGenerateSingle(preset, session);
+        results.push(result);
 
-          if (
-            resp.status === 429 ||
-            result?.errorType === "daily_limit" ||
-            result?.errorType === "rate_limit" ||
-            result?.errorType === "credits_exhausted"
-          ) {
+        if (result.error) {
+          // Check if it's a terminal error that should stop the batch
+          const isTerminal = result.error.includes("Daily limit") ||
+            result.error.includes("credits exhausted") ||
+            result.error.includes("rate limit");
+          if (isTerminal) {
             shouldSkipFollowUpAi = true;
-            if (result?.errorType === "rate_limit") startCooldown(30);
-            toast.error(errorMessage);
+            toast.error(result.error);
             break;
           }
-        } else if (result.jobId) {
-          // Poll for job completion
-          if (result.remaining !== undefined) setRemaining(result.remaining);
-          setGeneratingProgress(`Processing ${presetLabel}… (${i + 1}/${selectedPresets.length})`);
-          try {
-            const job = await pollForJob(result.jobId, session);
-            results.push({ preset, url: job.result_url });
-            if (job.remaining !== undefined) setRemaining(job.remaining);
-          } catch (pollErr: any) {
-            results.push({ preset, error: pollErr.message });
-          }
-        } else {
-          results.push({ preset, url: result.url });
-          setRemaining(result.remaining);
         }
       } catch (e: any) {
         results.push({ preset, error: e.message });
