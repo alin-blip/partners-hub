@@ -1,42 +1,60 @@
 
 
-# Add FSB September Courses, Course Details, and Knowledge Base Entries
+# CV Generation with Questionnaire Flow
 
-## Current State
-- **FSB (Fairfield School of Business)** exists with university ID `e7182c37-...`
-- **3 existing courses**: BA Business Management (BSU), BSc Business Management (RUL), BSc Health & Social Care (BSU)
-- **1 intake**: May Intake only
-- **4 campuses**: Digbeth (Birmingham), Sheffield, Croydon, Leicester
-- **1 course_details** record exists (for the BSU Business Management course)
-- **No timetable options** mapped
-- **No knowledge base entries** for FSB
+## Overview
+Replace the current "click to generate" CV button with a multi-step questionnaire dialog. The user fills in work experience, education, and skills — then the AI generates a personalized CV from those answers. The course the student is applying to is used only to match relevant skills, never mentioned in the CV.
 
-## What We Need To Do
+## UI Changes — `StudentAIDocumentsTab.tsx`
 
-### Step 1: Parse the uploaded files
-- Parse `FSB_May_and_June_26_and_September_26_1.xlsx` using Python/pandas to extract September course data, timetables, and details
-- Parse `RUL.pdf` to extract RUL-specific course details and requirements
+When "Generate" is clicked for CV, open a **Dialog** with 3 sections (accordion or stepper):
 
-### Step 2: Add September intake
-- Insert a new intake record for September 2026 under FSB
+### Section 1: Work Experience (last 3 years)
+- Repeatable form group (Add / Remove buttons)
+- Fields per entry:
+  - Job Title (text input)
+  - Company Name (text input)
+  - Company Address (text input)
+  - Start Date (date picker)
+  - End Date (date picker) OR checkbox "Present" (disables end date)
+  - Responsibilities & Activities (textarea — AI will later match these to the course)
 
-### Step 3: Add new September courses
-- Only add courses that appear in the September section of the spreadsheet and don't already exist in the database
-- Map them to the correct campuses and study modes
+### Section 2: Education
+- Repeatable form group
+- Fields per entry:
+  - Course / Programme studied (text input)
+  - School / Institution name (text input)
+  - Start Date — End Date
+  - Status: Complete / Incomplete (radio or select)
+  - Diploma: Available / Lost (radio or select)
 
-### Step 4: Add/update course details
-- Upsert `course_details` records for all FSB courses with entry requirements, documents required, admission test info, interview info, etc. extracted from both files
+### Section 3: Skills
+- Textarea for the user to list skills freely
+- A note: "AI will automatically match and enhance skills relevant to the student's course"
 
-### Step 5: Map timetable options
-- If the spreadsheet contains timetable/schedule data, create `timetable_options` and `course_timetable_groups` mappings
+**Bottom of dialog**: "Generate CV" button that sends all questionnaire data to the edge function.
 
-### Step 6: Add to Knowledge Base
-- Create `ai_knowledge_base` entries for FSB covering:
-  - University overview and campuses
-  - Per-course admission details
-  - Entry requirements (Standard vs Non-Standard routes)
-  - September intake specifics
+## Backend Changes — `generate-student-document/index.ts`
 
-## Technical approach
-All data operations will use the Supabase insert tool (for data) and migration tool (only if schema changes are needed, which is unlikely). The files will be parsed with Python pandas/openpyxl (xlsx) and a PDF parser (pdf) in exec mode.
+- Accept a new optional field `cv_questionnaire` in the request body containing `{ work_experience: [...], education: [...], skills: string }`
+- When `cv_questionnaire` is provided, build the CV prompt from questionnaire data instead of the student profile
+- Fetch the student's enrollment/course info only to do skills matching — instruct the AI to NEVER mention the university name
+- Update the system prompt to:
+  - Structure the CV from the provided work/education/skills data
+  - Match responsibilities and skills to be relevant to the course field (without naming it)
+  - Keep the student's personal details (name, contact) from the DB profile
+
+## Files to modify
+
+| File | Change |
+|------|--------|
+| `src/components/student-detail/StudentAIDocumentsTab.tsx` | Add CV questionnaire dialog with work/education/skills forms |
+| `supabase/functions/generate-student-document/index.ts` | Accept `cv_questionnaire` data and build CV from it |
+
+## Key rules enforced
+- CV never includes the university being applied to
+- Skills are AI-matched to be relevant to the course field without naming it
+- All labels and questions in English
+- Multiple work entries to cover 3 years
+- Multiple education entries supported
 
