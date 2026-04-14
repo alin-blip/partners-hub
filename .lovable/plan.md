@@ -1,60 +1,65 @@
 
 
-# CV Generation with Questionnaire Flow
+# Fix: generate-image CPU Time Exceeded
 
-## Overview
-Replace the current "click to generate" CV button with a multi-step questionnaire dialog. The user fills in work experience, education, and skills — then the AI generates a personalized CV from those answers. The course the student is applying to is used only to match relevant skills, never mentioned in the CV.
+## Problem
+The `generate-image` edge function is failing with **"CPU Time exceeded"** errors on every call. The logs show this pattern repeatedly — boot, then CPU timeout, then shutdown. Users cannot generate any images.
 
-## UI Changes — `StudentAIDocumentsTab.tsx`
+**Root cause**: The function does too much synchronous/blocking work within the edge function's CPU time limit:
+1. The AI image generation call to Gemini takes 15-30+ seconds of wall time
+2. When "Include my photo" is on, the `resvg` SVG render composites two full base64 images onto a 1080x1080+ canvas — extremely CPU-intensive
+3. The retry loop with exponential backoff (up to 5 retries) compounds the time
 
-When "Generate" is clicked for CV, open a **Dialog** with 3 sections (accordion or stepper):
+## Solution: Use `EdgeRuntime.waitUntil()` async pattern
 
-### Section 1: Work Experience (last 3 years)
-- Repeatable form group (Add / Remove buttons)
-- Fields per entry:
-  - Job Title (text input)
-  - Company Name (text input)
-  - Company Address (text input)
-  - Start Date (date picker)
-  - End Date (date picker) OR checkbox "Present" (disables end date)
-  - Responsibilities & Activities (textarea — AI will later match these to the course)
+Convert the function to return a `202 Accepted` immediately with a job record ID, then process the image in the background. The client polls for completion.
 
-### Section 2: Education
-- Repeatable form group
-- Fields per entry:
-  - Course / Programme studied (text input)
-  - School / Institution name (text input)
-  - Start Date — End Date
-  - Status: Complete / Incomplete (radio or select)
-  - Diploma: Available / Lost (radio or select)
+### Changes
 
-### Section 3: Skills
-- Textarea for the user to list skills freely
-- A note: "AI will automatically match and enhance skills relevant to the student's course"
+**1. Database migration** — Add a `image_generation_jobs` table:
+- `id` (uuid, PK), `user_id`, `prompt`, `preset`, `status` (queued/processing/completed/failed), `result_url`, `error_message`, `remaining`, `created_at`
 
-**Bottom of dialog**: "Generate CV" button that sends all questionnaire data to the edge function.
+**2. Edge function `generate-image/index.ts`**:
+- After auth + daily limit check, insert a job row with `status = 'queued'`
+- Call `EdgeRuntime.waitUntil(processInBackground(jobId, ...))` with all the heavy work (AI call, composition, upload)
+- Return `202` immediately with `{ jobId }`
+- The background function updates the job row to `completed` (with URL) or `failed` (with error)
 
-## Backend Changes — `generate-student-document/index.ts`
+**3. Remove `resvg` composition** — replace with a simpler approach:
+- Skip the SVG render entirely. Instead, just upload the AI-generated image as-is
+- For "Include my photo", store the avatar URL in the job result and let the **client** render the circular photo overlay using a CSS/canvas approach (much lighter)
+- OR keep server composition but use a lighter method (just upload both images and let the client composite)
 
-- Accept a new optional field `cv_questionnaire` in the request body containing `{ work_experience: [...], education: [...], skills: string }`
-- When `cv_questionnaire` is provided, build the CV prompt from questionnaire data instead of the student profile
-- Fetch the student's enrollment/course info only to do skills matching — instruct the AI to NEVER mention the university name
-- Update the system prompt to:
-  - Structure the CV from the provided work/education/skills data
-  - Match responsibilities and skills to be relevant to the course field (without naming it)
-  - Keep the student's personal details (name, contact) from the DB profile
+**4. Client-side polling** — Update `CreateImagePage.tsx` and `SocialPostsPage.tsx`:
+- On mutation call, receive `{ jobId }` with 202 status
+- Poll `generate-image?jobId=...` (GET) every 2 seconds until status is `completed` or `failed`
+- Show a progress indicator during polling
+- On completion, display the image as before
 
-## Files to modify
+### Files to modify
 
 | File | Change |
 |------|--------|
-| `src/components/student-detail/StudentAIDocumentsTab.tsx` | Add CV questionnaire dialog with work/education/skills forms |
-| `supabase/functions/generate-student-document/index.ts` | Accept `cv_questionnaire` data and build CV from it |
+| `supabase/functions/generate-image/index.ts` | Async pattern with `EdgeRuntime.waitUntil()`, add GET handler for polling |
+| `supabase/functions/generate-image/image-composition.ts` | Keep but only used in background worker |
+| `src/pages/shared/CreateImagePage.tsx` | Poll for job completion instead of waiting for response |
+| `src/pages/shared/SocialPostsPage.tsx` | Same polling pattern |
+| DB migration | Create `image_generation_jobs` table with RLS |
 
-## Key rules enforced
-- CV never includes the university being applied to
-- Skills are AI-matched to be relevant to the course field without naming it
-- All labels and questions in English
-- Multiple work entries to cover 3 years
-- Multiple education entries supported
+### Key technical details
+
+```text
+Client                    Edge Function              Background Worker
+  |                           |                           |
+  |-- POST /generate-image -->|                           |
+  |                           |-- INSERT job (queued) ---> |
+  |                           |-- waitUntil(process()) --->|
+  |<-- 202 { jobId } --------|                           |
+  |                           |                           |-- AI call
+  |-- GET ?jobId=xxx -------->|                           |-- compose
+  |<-- { status: processing } |                           |-- upload
+  |                           |                           |-- UPDATE job (completed)
+  |-- GET ?jobId=xxx -------->|                           |
+  |<-- { status: completed, url } |                       |
+```
 
