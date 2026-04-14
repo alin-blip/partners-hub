@@ -247,6 +247,21 @@ export default function SocialPostsPage() {
 
   const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
+  const pollForJob = async (jobId: string, session: any): Promise<any> => {
+    const maxAttempts = 120;
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(r => setTimeout(r, 2000));
+      const resp = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image?jobId=${jobId}`,
+        { method: "GET", headers: { Authorization: `Bearer ${session.access_token}` } }
+      );
+      const job = await resp.json();
+      if (job.status === "completed") return job;
+      if (job.status === "failed") throw new Error(job.error_message || "Generation failed");
+    }
+    throw new Error("Generation timed out");
+  };
+
   const handleGenerate = async () => {
     if (selectedPresets.length === 0) {
       toast.error("Select at least one format");
@@ -272,7 +287,6 @@ export default function SocialPostsPage() {
       const presetLabel = PRESETS.find((p) => p.id === preset)?.label || preset;
       setGeneratingProgress(`Generating ${presetLabel}… (${i + 1}/${selectedPresets.length})`);
 
-      // Stagger delay between image calls (not before the first)
       if (i > 0) await delay(3000);
 
       try {
@@ -295,8 +309,9 @@ export default function SocialPostsPage() {
           }
         );
         const result = await resp.json();
-        const hasStructuredError = result?.ok === false;
-        if (!resp.ok || hasStructuredError) {
+        
+        // Handle immediate errors (daily limit, etc.)
+        if (result?.ok === false || (!resp.ok && resp.status !== 202)) {
           const errorMessage = getGenerationErrorMessage(result?.errorType, result?.error);
           results.push({ preset, error: errorMessage });
 
@@ -310,6 +325,17 @@ export default function SocialPostsPage() {
             if (result?.errorType === "rate_limit") startCooldown(30);
             toast.error(errorMessage);
             break;
+          }
+        } else if (result.jobId) {
+          // Poll for job completion
+          if (result.remaining !== undefined) setRemaining(result.remaining);
+          setGeneratingProgress(`Processing ${presetLabel}… (${i + 1}/${selectedPresets.length})`);
+          try {
+            const job = await pollForJob(result.jobId, session);
+            results.push({ preset, url: job.result_url });
+            if (job.remaining !== undefined) setRemaining(job.remaining);
+          } catch (pollErr: any) {
+            results.push({ preset, error: pollErr.message });
           }
         } else {
           results.push({ preset, url: result.url });
