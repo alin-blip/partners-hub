@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { compositeProfilePhoto } from "@/lib/image-composite";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -247,19 +248,41 @@ export default function SocialPostsPage() {
 
   const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-  const pollForJob = async (jobId: string, session: any): Promise<any> => {
-    const maxAttempts = 120;
-    for (let i = 0; i < maxAttempts; i++) {
-      await new Promise(r => setTimeout(r, 2000));
-      const resp = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image?jobId=${jobId}`,
-        { method: "GET", headers: { Authorization: `Bearer ${session.access_token}` } }
-      );
-      const job = await resp.json();
-      if (job.status === "completed") return job;
-      if (job.status === "failed") throw new Error(job.error_message || "Generation failed");
+  const handleGenerateSingle = async (preset: string, session: any): Promise<GeneratedResult> => {
+    const resp = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          prompt,
+          preset,
+          includePhoto,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          language: captionLanguage,
+          ...(selectedCourseId ? { courseId: selectedCourseId } : {}),
+        }),
+      }
+    );
+    const result = await resp.json();
+
+    if (result?.ok === false || !resp.ok) {
+      const errorMessage = getGenerationErrorMessage(result?.errorType, result?.error);
+      if (result?.errorType === "rate_limit") startCooldown(30);
+      return { preset, error: errorMessage };
     }
-    throw new Error("Generation timed out");
+
+    // Client-side profile photo composition
+    let finalUrl = result.url;
+    if (result.avatarUrl && result.url) {
+      finalUrl = await compositeProfilePhoto(result.url, result.avatarUrl, preset);
+    }
+
+    if (result.remaining !== undefined) setRemaining(result.remaining);
+    return { preset, url: finalUrl };
   };
 
   const handleGenerate = async () => {
