@@ -9,6 +9,12 @@ interface PresenceEntry {
 export type PresenceMap = Record<string, PresenceEntry>;
 
 const HEARTBEAT_INTERVAL = 60_000; // 60s
+const ONLINE_THRESHOLD = 2 * 60_000; // 2 minutes
+
+function deriveOnline(lastSeen: string | null): boolean {
+  if (!lastSeen) return false;
+  return Date.now() - new Date(lastSeen).getTime() < ONLINE_THRESHOLD;
+}
 
 export function usePresence(userId: string | undefined) {
   const [presenceMap, setPresenceMap] = useState<PresenceMap>({});
@@ -25,13 +31,15 @@ export function usePresence(userId: string | undefined) {
     [userId]
   );
 
-  // Fetch all presence rows the user can see
   const fetchPresence = useCallback(async () => {
     const { data } = await supabase.from("user_presence" as any).select("user_id, is_online, last_seen_at");
     if (data) {
       const map: PresenceMap = {};
       for (const row of data as any[]) {
-        map[row.user_id] = { is_online: row.is_online, last_seen_at: row.last_seen_at };
+        map[row.user_id] = {
+          is_online: deriveOnline(row.last_seen_at),
+          last_seen_at: row.last_seen_at,
+        };
       }
       setPresenceMap(map);
     }
@@ -40,13 +48,23 @@ export function usePresence(userId: string | undefined) {
   useEffect(() => {
     if (!userId) return;
 
-    // Go online
     upsertPresence(true);
     fetchPresence();
 
-    // Heartbeat
+    // Heartbeat + re-derive online status
     intervalRef.current = setInterval(() => {
       upsertPresence(true);
+      // Re-derive all statuses based on time
+      setPresenceMap((prev) => {
+        const updated: PresenceMap = {};
+        for (const [uid, entry] of Object.entries(prev)) {
+          updated[uid] = {
+            ...entry,
+            is_online: uid === userId ? true : deriveOnline(entry.last_seen_at),
+          };
+        }
+        return updated;
+      });
     }, HEARTBEAT_INTERVAL);
 
     // Realtime subscription
@@ -60,22 +78,39 @@ export function usePresence(userId: string | undefined) {
           if (row?.user_id) {
             setPresenceMap((prev) => ({
               ...prev,
-              [row.user_id]: { is_online: row.is_online, last_seen_at: row.last_seen_at },
+              [row.user_id]: {
+                is_online: deriveOnline(row.last_seen_at),
+                last_seen_at: row.last_seen_at,
+              },
             }));
           }
         }
       )
       .subscribe();
 
-    // Go offline on tab close
+    // Go offline on tab close using sendBeacon with proper headers
     const handleUnload = () => {
-      // Use sendBeacon for reliability
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/user_presence?user_id=eq.${userId}`;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const url = `${supabaseUrl}/rest/v1/user_presence?user_id=eq.${userId}`;
       const body = JSON.stringify({ is_online: false, last_seen_at: new Date().toISOString() });
-      navigator.sendBeacon(
-        url,
-        new Blob([body], { type: "application/json" })
-      );
+
+      // sendBeacon doesn't support custom headers, so we use fetch with keepalive instead
+      try {
+        fetch(url, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: anonKey,
+            Authorization: `Bearer ${anonKey}`,
+            Prefer: "return=minimal",
+          },
+          body,
+          keepalive: true,
+        });
+      } catch {
+        // Best-effort
+      }
     };
 
     window.addEventListener("beforeunload", handleUnload);
