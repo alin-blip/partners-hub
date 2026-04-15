@@ -65,9 +65,8 @@ VISUAL DESCRIPTION:
 - Describe the image style: colors, mood, layout, background elements
 - The image should be 70% visual, 30% text
 - Format: ${presetDesc}
-${includePhoto ? `- IMPORTANT: The bottom-left corner must be clean and unobstructed — a real profile photo of "${agentName || "the agent"}" will be overlaid there after generation.
-- CRITICAL: The visual description must NOT include any people, faces, human figures, or silhouettes. The agent's real photo will be added — any AI-generated person would look wrong next to it.` : "- Do NOT include people, faces, or human figures in the visual description."}
-- The bottom-right corner should have space for a logo overlay.
+- CRITICAL RULE — NO PEOPLE: The visual description must NEVER include any people, faces, human figures, silhouettes, or portraits. The image must be purely graphic/abstract with text overlay.
+${includePhoto ? `- The bottom-left corner must be clean and unobstructed — a real photo will be composited there afterward.` : ""}
 ${brandPrompt ? `\nBrand guidelines: ${brandPrompt}` : ""}
 ${courseContext ? `\nCourse context (use real details): ${courseContext}` : ""}
 

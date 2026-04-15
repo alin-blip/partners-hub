@@ -132,15 +132,16 @@ serve(async (req) => {
     let aiRequestBody: string;
 
     if (isEditMode) {
-      const editPrompt = `Edit this marketing image according to these instructions: ${editInstruction}
+      const editPrompt = `ABSOLUTE RULE: Do NOT draw any people, faces, human figures, silhouettes, or portraits anywhere in the image.
+
+Edit this marketing image according to these instructions: ${editInstruction}
 
 RULES:
 - Keep the overall layout and style consistent
 - Apply ONLY the requested changes
 - Text must be in ${lang} with perfect spelling and diacritics
-- DO NOT add any logo, watermark, or branding
-${includePhoto ? "- Keep bottom-left corner clean (profile photo area)\n- Do NOT add any people, faces, or human figures" : "- Do NOT add any people, faces, or human figures"}
-- Keep bottom-right corner clear (logo area)`;
+${includePhoto ? "- Keep bottom-left corner clean and empty" : ""}
+- Do NOT add any people, faces, or human figures`;
 
       aiRequestBody = JSON.stringify({
         model: "google/gemini-3.1-flash-image-preview",
@@ -158,7 +159,9 @@ ${includePhoto ? "- Keep bottom-left corner clean (profile photo area)\n- Do NOT
         ? `\nBullet points (render these on the image):\n${agentOutput!.bullets.map((b: string) => `• ${b}`).join("\n")}`
         : "";
 
-      const imagePrompt = `Create a ${presetDimensions[preset] || "1080x1080 square"} marketing image.
+      const imagePrompt = `ABSOLUTE RULE: Do NOT draw any people, faces, human figures, silhouettes, or portraits anywhere in the image. The image must contain ZERO humans.
+
+Create a ${presetDimensions[preset] || "1080x1080 square"} marketing image.
 
 VISUAL STYLE: ${agentOutput!.visual_description}
 
@@ -168,10 +171,7 @@ Subheadline: ${agentOutput!.subheadline}${bulletsText}
 
 LAYOUT:
 ${agentOutput!.layout_notes}
-- Keep bottom-right corner clear (logo will be added afterward).
-${includePhoto ? `- Keep bottom-left corner clean and unobstructed (profile photo will be overlaid afterward).
-- CRITICAL: Do NOT generate any people, faces, human figures, or silhouettes anywhere in the image. The agent's REAL photo will be composited afterward — any AI-generated person would clash with it.` : "- DO NOT generate any people, faces, or human figures."}
-- DO NOT include any logo, watermark, or branding — those are added separately.
+${includePhoto ? `- Keep bottom-left corner clean and empty.` : ""}
 - The image should be ~70% visual, ~30% text. Clean, modern, professional.`;
 
       aiRequestBody = JSON.stringify({
