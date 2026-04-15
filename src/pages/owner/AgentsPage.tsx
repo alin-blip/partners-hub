@@ -289,16 +289,23 @@ export default function AgentsPage() {
                     )}
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
-                    <div className="flex items-center gap-2">
-                      <span className={`inline-block w-2.5 h-2.5 rounded-full ${presenceMap[p.id]?.is_online ? "bg-green-500" : "bg-muted-foreground/30"}`} />
-                      <span className="text-xs text-muted-foreground">
-                        {presenceMap[p.id]?.is_online
-                          ? "Online"
-                          : presenceMap[p.id]?.last_seen_at
-                            ? formatDistanceToNow(new Date(presenceMap[p.id].last_seen_at), { addSuffix: true })
-                            : "Never"}
-                      </span>
-                    </div>
+                    {(() => {
+                      const presence = presenceMap[p.id];
+                      const isOnline = presence?.is_online;
+                      const lastSeen = presence?.last_seen_at;
+                      return (
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-block w-2.5 h-2.5 rounded-full ${isOnline ? "bg-green-500 animate-pulse" : "bg-muted-foreground/30"}`} />
+                          <span className="text-xs text-muted-foreground">
+                            {isOnline
+                              ? "Online"
+                              : lastSeen
+                                ? formatDistanceToNow(new Date(lastSeen), { addSuffix: true })
+                                : "Never"}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell>
                     <Badge variant={p.is_active ? "default" : "destructive"} className="text-xs">
