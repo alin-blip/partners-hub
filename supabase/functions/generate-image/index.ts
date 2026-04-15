@@ -185,7 +185,7 @@ ${includePhoto ? `- Keep bottom-left corner clean and unobstructed (profile phot
 
     // Add delay between Step 1 and Step 2 to avoid rate limits
     if (!isEditMode) {
-      await new Promise(r => setTimeout(r, 3000));
+      await new Promise(r => setTimeout(r, 5000));
     }
 
     let aiResponse: Response | null = null;
@@ -209,10 +209,11 @@ ${includePhoto ? `- Keep bottom-left corner clean and unobstructed (profile phot
       const status = aiResponse!.status;
       let errorType = "generation_failed";
       let errorMsg = "AI generation failed";
-      if (status === 429) { errorType = "rate_limit"; errorMsg = "AI rate limit exceeded. Please try again in a moment."; }
+      let retryAfter = 0;
+      if (status === 429) { errorType = "rate_limit"; errorMsg = "AI is busy right now. I'll retry automatically..."; retryAfter = 15; }
       if (status === 402) { errorType = "credits_exhausted"; errorMsg = "AI credits exhausted. Please contact admin."; }
       return new Response(
-        JSON.stringify({ ok: false, errorType, error: errorMsg }),
+        JSON.stringify({ ok: false, errorType, error: errorMsg, retryAfter }),
         { status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

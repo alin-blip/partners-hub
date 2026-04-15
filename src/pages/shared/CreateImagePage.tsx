@@ -55,9 +55,15 @@ const PRESETS = [
 const getGenerationErrorMessage = (errorType?: string, error?: string) => {
   if (errorType === "daily_limit" || error?.includes("Daily limit")) return "Daily limit reached";
   if (errorType === "credits_exhausted") return "AI credits exhausted — please contact admin";
-  if (errorType === "rate_limit") return "AI rate limit — please wait a moment and try again";
+  if (errorType === "rate_limit") return "AI is busy right now. Retrying automatically...";
   return error || "Generation failed. Please try again later.";
 };
+
+const PROGRESS_STEPS = [
+  "✍️ Writing marketing copy...",
+  "🎨 Generating image...",
+  "🖼️ Applying branding...",
+];
 
 type ChatMessage = {
   id: string;
@@ -66,6 +72,7 @@ type ChatMessage = {
   imageUrl?: string;
   generatedText?: { headline: string; subheadline: string; bullets: string[] };
   timestamp: Date;
+  saved?: boolean;
 };
 
 export default function CreateImagePage() {
