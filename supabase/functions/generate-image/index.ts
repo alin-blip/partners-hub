@@ -132,7 +132,8 @@ serve(async (req) => {
     let aiRequestBody: string;
 
     if (isEditMode) {
-      const editPrompt = `ABSOLUTE RULE: Do NOT draw any people, faces, human figures, silhouettes, or portraits anywhere in the image.
+      const editPrompt = `ABSOLUTE RULE: Do NOT draw any people, faces, human figures, silhouettes, or portraits anywhere in the image. The image must contain ZERO humans.
+ABSOLUTE RULE: Do NOT render any text that reads "LOGO", "WATERMARK", or any placeholder text.
 
 Edit this marketing image according to these instructions: ${editInstruction}
 
@@ -141,7 +142,8 @@ RULES:
 - Apply ONLY the requested changes
 - Text must be in ${lang} with perfect spelling and diacritics
 ${includePhoto ? "- Keep bottom-left corner clean and empty" : ""}
-- Do NOT add any people, faces, or human figures`;
+- Do NOT add any people, faces, or human figures
+- Do NOT write the word "LOGO" or any placeholder/watermark text`;
 
       aiRequestBody = JSON.stringify({
         model: "google/gemini-3.1-flash-image-preview",
@@ -160,6 +162,7 @@ ${includePhoto ? "- Keep bottom-left corner clean and empty" : ""}
         : "";
 
       const imagePrompt = `ABSOLUTE RULE: Do NOT draw any people, faces, human figures, silhouettes, or portraits anywhere in the image. The image must contain ZERO humans.
+ABSOLUTE RULE: Do NOT render any text that reads "LOGO", "WATERMARK", or any placeholder text. No branding placeholders.
 
 Create a ${presetDimensions[preset] || "1080x1080 square"} marketing image.
 
@@ -172,7 +175,8 @@ Subheadline: ${agentOutput!.subheadline}${bulletsText}
 LAYOUT:
 ${agentOutput!.layout_notes}
 ${includePhoto ? `- Keep bottom-left corner clean and empty.` : ""}
-- The image should be ~70% visual, ~30% text. Clean, modern, professional.`;
+- The image should be ~70% visual, ~30% text. Clean, modern, professional.
+- Do NOT draw any placeholder text like "LOGO" or "YOUR BRAND HERE".`;
 
       aiRequestBody = JSON.stringify({
         model: "google/gemini-3.1-flash-image-preview",

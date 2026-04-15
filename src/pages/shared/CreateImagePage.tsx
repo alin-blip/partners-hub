@@ -70,6 +70,7 @@ type ChatMessage = {
   role: "user" | "assistant";
   content: string;
   imageUrl?: string;
+  rawImageUrl?: string;
   generatedText?: { headline: string; subheadline: string; bullets: string[] };
   timestamp: Date;
   saved?: boolean;
@@ -172,8 +173,8 @@ export default function CreateImagePage() {
   // Get the last generated image URL for edit mode
   const getLastImageUrl = (): string | null => {
     for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === "assistant" && messages[i].imageUrl) {
-        return messages[i].imageUrl!;
+      if (messages[i].role === "assistant" && messages[i].rawImageUrl) {
+        return messages[i].rawImageUrl!;
       }
     }
     return null;
@@ -269,6 +270,7 @@ export default function CreateImagePage() {
             ? "Here's the updated image! Would you like to **save it** or tell me what else to change?"
             : "Here's your image! Would you like to **save it** or tell me what to change?",
           imageUrl: finalUrl,
+          rawImageUrl: result.url,
           generatedText: result.generatedText,
           timestamp: new Date(),
           saved: false,
