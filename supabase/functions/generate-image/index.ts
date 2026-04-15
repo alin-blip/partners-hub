@@ -293,11 +293,12 @@ ${includePhoto ? `- Keep bottom-left corner clean and unobstructed (profile phot
         url: publicUrl.publicUrl,
         avatarUrl,
         remaining: remainingCount,
-        generatedText: {
+        isEdit: isEditMode,
+        generatedText: agentOutput ? {
           headline: agentOutput.headline,
           subheadline: agentOutput.subheadline,
           bullets: agentOutput.bullets,
-        },
+        } : undefined,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
