@@ -348,8 +348,10 @@ export default function MessagesPage() {
               </div>
             ) : (
               <div className="p-1">
-                {conversations.map((convo: any) => {
-                  const other = getOtherParticipant(convo);
+                    {conversations.map((convo: any) => {
+                  const isMine = isMyConversation(convo);
+                  const other = isMine ? getOtherParticipant(convo) : null;
+                  const displayName = getConvoDisplayName(convo);
                   const isActive = activeConvo === convo.id;
                   const unread = getUnreadForConvo(convo.id);
                   return (
@@ -362,9 +364,9 @@ export default function MessagesPage() {
                     >
                       <div className="relative shrink-0">
                         <Avatar className="h-9 w-9">
-                          <AvatarFallback className="text-xs bg-accent/20 text-accent">{getInitials(other?.full_name)}</AvatarFallback>
+                          <AvatarFallback className="text-xs bg-accent/20 text-accent">{isMine ? getInitials(other?.full_name) : "↔"}</AvatarFallback>
                         </Avatar>
-                        {presenceMap[other?.id]?.is_online ? (
+                        {isMine && presenceMap[other?.id]?.is_online ? (
                           <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-card" />
                         ) : unread > 0 ? (
                           <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1">
@@ -373,11 +375,11 @@ export default function MessagesPage() {
                         ) : null}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className={`text-sm truncate ${unread > 0 ? "font-semibold" : "font-medium"}`}>{other?.full_name || "Unknown"}</p>
+                        <p className={`text-sm truncate ${unread > 0 ? "font-semibold" : "font-medium"}`}>{displayName}</p>
                         <p className="text-xs text-muted-foreground">
-                          {presenceMap[other?.id]?.is_online
+                          {isMine && presenceMap[other?.id]?.is_online
                             ? "Online"
-                            : presenceMap[other?.id]?.last_seen_at
+                            : isMine && presenceMap[other?.id]?.last_seen_at
                               ? `Active ${formatDistanceToNow(new Date(presenceMap[other?.id].last_seen_at), { addSuffix: true })}`
                               : format(new Date(convo.updated_at), "dd MMM, HH:mm")}
                         </p>
@@ -404,7 +406,10 @@ export default function MessagesPage() {
               {/* Header */}
               {(() => {
                 const convo = conversations.find((c: any) => c.id === activeConvo);
-                const other = convo ? getOtherParticipant(convo) : null;
+                if (!convo) return null;
+                const isMine = isMyConversation(convo);
+                const other = isMine ? getOtherParticipant(convo) : null;
+                const headerName = getConvoDisplayName(convo);
                 return (
                   <div className="p-3 border-b flex items-center gap-3">
                     {isMobile && (
@@ -414,20 +419,20 @@ export default function MessagesPage() {
                     )}
                     <div className="relative">
                       <Avatar className="h-8 w-8">
-                        <AvatarFallback className="text-xs bg-accent/20 text-accent">{getInitials(other?.full_name)}</AvatarFallback>
+                        <AvatarFallback className="text-xs bg-accent/20 text-accent">{isMine ? getInitials(other?.full_name) : "↔"}</AvatarFallback>
                       </Avatar>
-                      {presenceMap[other?.id]?.is_online && (
+                      {isMine && presenceMap[other?.id]?.is_online && (
                         <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-card" />
                       )}
                     </div>
                     <div>
-                      <p className="font-medium text-sm">{other?.full_name || "Unknown"}</p>
+                      <p className="font-medium text-sm">{headerName}</p>
                       <p className="text-[11px] text-muted-foreground">
-                        {presenceMap[other?.id]?.is_online
+                        {isMine && presenceMap[other?.id]?.is_online
                           ? "Online"
-                          : presenceMap[other?.id]?.last_seen_at
+                          : isMine && presenceMap[other?.id]?.last_seen_at
                             ? `Active ${formatDistanceToNow(new Date(presenceMap[other?.id].last_seen_at), { addSuffix: true })}`
-                            : "Offline"}
+                            : isMine ? "Offline" : format(new Date(convo.updated_at), "dd MMM, HH:mm")}
                       </p>
                     </div>
                   </div>
