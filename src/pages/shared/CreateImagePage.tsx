@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { compositeProfilePhoto } from "@/lib/image-composite";
+import { compositeFullBranding } from "@/lib/image-composite";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
