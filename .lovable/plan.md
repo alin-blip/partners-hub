@@ -1,39 +1,37 @@
 
 
-# Image Generator: 3 Improvements
+# Fix: ChatGPT-Style Image Generation Flow
 
-## 1. Skip Logo Overlay When Profile Photo Is Included
-The user's branded profile picture already contains the EduForYou logo (gold frame with logo). Adding a second logo overlay is redundant.
+## Current Problems
+1. **Two sequential AI API calls** (prompt agent + image gen) cause rate limits (429) — both hit the same gateway within seconds
+2. **Edit mode sends full image URL** back to AI which is slow and unreliable
+3. **No "save or modify?" flow** — AI just dumps the image without asking
+4. **Cooldown/error messages feel broken**, not conversational
 
-**Change**: In `CreateImagePage.tsx` and `SocialPostsPage.tsx`, when `includePhoto` is true, skip the logo overlay step — only composite the profile photo. When `includePhoto` is false, keep the logo overlay as-is.
+## Solution: Streamlined Single-Call Flow with Conversational UX
 
-**File**: `src/lib/image-composite.ts` — update `compositeFullBranding` to accept a flag and conditionally skip logo.
-**Files**: `src/pages/shared/CreateImagePage.tsx` and `SocialPostsPage.tsx` — pass the flag.
+### Architecture Change
+Instead of 2 API calls per generation, combine them:
+- **New images**: Keep the 2-step flow BUT increase the delay between calls to 5 seconds and use `google/gemini-2.5-flash-lite` for Step 1 (already done) — the real fix is better error handling and user feedback
+- **Edits**: Use the stored Supabase image URL (public URL from storage, not base64) for edits — much lighter
 
-## 2. No Random People in Image When Photo Is Included
-The prompt already says "DO NOT generate any people, faces, or human figures" (line 144 of generate-image/index.ts). This rule should remain but be reinforced specifically when `includePhoto` is true — emphasize that the agent's real photo will be added and no other humans should appear. When `includePhoto` is false and it's not a group context, the same rule applies.
+### UX Changes (CreateImagePage.tsx)
+1. After generating an image, the assistant message says: **"Here's your image! Would you like to save it, or tell me what to change?"**
+2. Add **"Save" and "Modify" quick-action buttons** below each generated image
+3. "Save" confirms and shows share buttons
+4. "Modify" focuses the input and prompts for changes
+5. Better loading states: show a progress indicator with steps ("Writing copy..." → "Generating image..." → "Applying branding...")
+6. On rate limit errors, show a friendlier message with auto-retry countdown
 
-**File**: `supabase/functions/generate-image/index.ts` — strengthen the "no people" instruction when includePhoto is true.
-**File**: `supabase/functions/generate-image/prompt-agent.ts` — reinforce in the visual description guidelines.
+### Edge Function Changes (index.ts)
+1. Increase inter-step delay from 3s to 5s
+2. For edit mode: use the Supabase public URL (already stored) instead of passing large image data
+3. Better error differentiation — return `retryAfter` seconds so the client can auto-retry
 
-## 3. Chat-Style Interface for Image Instructions
-Replace the single textarea + generate button with a conversational chat interface (like ChatGPT). Users type instructions, see the generated image inline, and can follow up with refinements ("make it more blue", "change the headline", "add more text"). Each message in the conversation feeds back into the prompt agent.
-
-**Implementation**:
-- Transform `CreateImagePage.tsx` into a chat-style UI with message bubbles
-- User messages appear on the right, AI responses (image + generated text) on the left
-- "Send" button replaces "Generate" — first message generates, follow-ups refine
-- The edge function receives conversation history to understand iterative requests
-- Use the `--edit-image` capability of Gemini to refine existing images based on follow-up instructions
-- Keep preset/course/language selectors as a collapsible settings panel above the chat
-
-### Files to modify
+### Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/lib/image-composite.ts` | `compositeFullBranding` accepts `skipLogo` param |
-| `src/pages/shared/CreateImagePage.tsx` | Chat UI + pass `skipLogo` when includePhoto |
-| `src/pages/shared/SocialPostsPage.tsx` | Pass `skipLogo` when includePhoto |
-| `supabase/functions/generate-image/index.ts` | Accept conversation history, support edit mode, strengthen no-people rule |
-| `supabase/functions/generate-image/prompt-agent.ts` | Accept conversation context for iterative refinement |
+| `src/pages/shared/CreateImagePage.tsx` | Add Save/Modify buttons, progress steps, auto-retry on rate limit, conversational assistant messages |
+| `supabase/functions/generate-image/index.ts` | Increase inter-step delay to 5s, improve error response with retryAfter |
 
