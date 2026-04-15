@@ -569,7 +569,7 @@ export default function CreateImagePage() {
                             }`}
                           >
                             {i < progressStep ? (
-                              <Check className="w-3.5 h-3.5 text-green-500" />
+                              <Check className="w-3.5 h-3.5 text-accent" />
                             ) : i === progressStep ? (
                               <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
                             ) : (
