@@ -9,6 +9,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Login from "./pages/Login";
+import ResetPassword from "./pages/ResetPassword";
 import OwnerDashboard from "./pages/owner/OwnerDashboard";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AgentDashboard from "./pages/agent/AgentDashboard";
@@ -55,6 +56,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/card/:slug" element={<AgentCardPage />} />
             <Route path="/apply/:slug" element={<PublicApplicationPage />} />
             <Route path="/unsubscribe" element={<UnsubscribePage />} />
