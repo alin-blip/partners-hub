@@ -139,9 +139,9 @@ Subheadline: ${agentOutput.subheadline}${bulletsText}
 LAYOUT:
 ${agentOutput.layout_notes}
 - Keep bottom-right corner clear (logo will be added afterward).
-${includePhoto ? "- Keep bottom-left corner clean and unobstructed (profile photo will be overlaid afterward)." : ""}
+${includePhoto ? `- Keep bottom-left corner clean and unobstructed (profile photo will be overlaid afterward).
+- CRITICAL: Do NOT generate any people, faces, human figures, or silhouettes anywhere in the image. The agent's REAL photo will be composited afterward — any AI-generated person would clash with it.` : "- DO NOT generate any people, faces, or human figures."}
 - DO NOT include any logo, watermark, or branding — those are added separately.
-- DO NOT generate any people, faces, or human figures.
 - The image should be ~70% visual, ~30% text. Clean, modern, professional.`;
 
     console.log("Step 2: Generating image...");
