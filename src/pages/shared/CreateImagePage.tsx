@@ -88,6 +88,7 @@ export default function CreateImagePage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [copiedCaption, setCopiedCaption] = useState<string | null>(null);
+  const [progressStep, setProgressStep] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -178,8 +179,8 @@ export default function CreateImagePage() {
     return null;
   };
 
-  const handleSend = async () => {
-    const text = inputValue.trim();
+  const handleSend = async (overrideText?: string) => {
+    const text = (overrideText || inputValue).trim();
     if (!text || isGenerating) return;
 
     const userMsg: ChatMessage = {
@@ -192,72 +193,117 @@ export default function CreateImagePage() {
     setInputValue("");
     setIsGenerating(true);
     setSettingsOpen(false);
+    setProgressStep(0);
+
+    // Progress step animation
+    const progressInterval = setInterval(() => {
+      setProgressStep((prev) => Math.min(prev + 1, PROGRESS_STEPS.length - 1));
+    }, 8000);
+
+    const attemptGeneration = async (retryCount = 0): Promise<void> => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error("Not authenticated");
+
+        const lastImageUrl = getLastImageUrl();
+        const isEdit = !!lastImageUrl;
+
+        if (isEdit) setProgressStep(1); // skip copy step for edits
+
+        const resp = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              prompt: isEdit ? messages[0]?.content || text : text,
+              preset: selectedPreset,
+              includePhoto,
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              language: captionLanguage,
+              ...(selectedCourseId ? { courseId: selectedCourseId } : {}),
+              ...(isEdit ? { previousImageUrl: lastImageUrl, editInstruction: text } : {}),
+            }),
+          }
+        );
+
+        const result = await resp.json();
+        if (!resp.ok || result?.ok === false) {
+          const errorType = result?.errorType;
+          // Auto-retry on rate limit
+          if (errorType === "rate_limit" && retryCount < 2) {
+            const retryAfter = result?.retryAfter || 15;
+            startCooldown(retryAfter);
+            // Show retry message
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "assistant",
+                content: `⏳ AI is busy. Retrying automatically in ${retryAfter}s...`,
+                timestamp: new Date(),
+              },
+            ]);
+            await new Promise((r) => setTimeout(r, retryAfter * 1000));
+            return attemptGeneration(retryCount + 1);
+          }
+          throw new Error(getGenerationErrorMessage(errorType, result?.error));
+        }
+
+        // Client-side branding
+        setProgressStep(2);
+        let finalUrl = result.url;
+        const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/brand-assets/eduforyou-logo.png`;
+        finalUrl = await compositeFullBranding(result.url, logoUrl, result.avatarUrl || null, selectedPreset, !!includePhoto);
+
+        if (result.remaining !== undefined) setRemaining(result.remaining);
+        qc.invalidateQueries({ queryKey: ["my-generated-images"] });
+
+        const assistantMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: isEdit
+            ? "Here's the updated image! Would you like to **save it** or tell me what else to change?"
+            : "Here's your image! Would you like to **save it** or tell me what to change?",
+          imageUrl: finalUrl,
+          generatedText: result.generatedText,
+          timestamp: new Date(),
+          saved: false,
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+      } catch (e: any) {
+        const errorMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: `❌ ${e.message}`,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, errorMsg]);
+      }
+    };
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-
-      const lastImageUrl = getLastImageUrl();
-      const isEdit = !!lastImageUrl;
-
-      const resp = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            prompt: isEdit ? messages[0]?.content || text : text,
-            preset: selectedPreset,
-            includePhoto,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            language: captionLanguage,
-            ...(selectedCourseId ? { courseId: selectedCourseId } : {}),
-            ...(isEdit ? { previousImageUrl: lastImageUrl, editInstruction: text } : {}),
-          }),
-        }
-      );
-
-      const result = await resp.json();
-      if (!resp.ok || result?.ok === false) {
-        const errorType = result?.errorType;
-        if (errorType === "rate_limit") startCooldown(30);
-        throw new Error(getGenerationErrorMessage(errorType, result?.error));
-      }
-
-      // Client-side branding
-      let finalUrl = result.url;
-      const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/brand-assets/eduforyou-logo.png`;
-      finalUrl = await compositeFullBranding(result.url, logoUrl, result.avatarUrl || null, selectedPreset, !!includePhoto);
-
-      if (result.remaining !== undefined) setRemaining(result.remaining);
-      qc.invalidateQueries({ queryKey: ["my-generated-images"] });
-
-      const assistantMsg: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: isEdit
-          ? "✅ Image updated! Want to change anything else?"
-          : "✅ Here's your image! You can ask me to change colors, text, layout, or anything else.",
-        imageUrl: finalUrl,
-        generatedText: result.generatedText,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
-    } catch (e: any) {
-      const errorMsg: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: `❌ ${e.message}`,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMsg]);
+      await attemptGeneration();
     } finally {
+      clearInterval(progressInterval);
       setIsGenerating(false);
+      setProgressStep(0);
       inputRef.current?.focus();
     }
+  };
+
+  const handleSaveImage = (msgId: string) => {
+    setMessages((prev) =>
+      prev.map((m) => (m.id === msgId ? { ...m, saved: true } : m))
+    );
+    toast({ title: "✅ Image saved!", description: "You can find it in your gallery below." });
+  };
+
+  const handleModifyImage = () => {
+    inputRef.current?.focus();
   };
 
   const handleCopyCaption = async (text: string) => {
