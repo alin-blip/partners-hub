@@ -560,9 +560,26 @@ export default function CreateImagePage() {
                 {isGenerating && (
                   <div className="flex justify-start">
                     <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        {getLastImageUrl() ? "Editing image..." : "Creating your image..."}
+                      <div className="space-y-1.5">
+                        {PROGRESS_STEPS.map((step, i) => (
+                          <div
+                            key={i}
+                            className={`flex items-center gap-2 text-sm transition-opacity ${
+                              i <= progressStep ? "opacity-100" : "opacity-30"
+                            }`}
+                          >
+                            {i < progressStep ? (
+                              <Check className="w-3.5 h-3.5 text-green-500" />
+                            ) : i === progressStep ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
+                            ) : (
+                              <div className="w-3.5 h-3.5 rounded-full border border-muted-foreground/30" />
+                            )}
+                            <span className={i === progressStep ? "text-foreground" : "text-muted-foreground"}>
+                              {step}
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
