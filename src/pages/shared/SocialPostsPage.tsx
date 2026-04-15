@@ -278,7 +278,7 @@ export default function SocialPostsPage() {
     // Client-side branding composition (logo + profile photo)
     let finalUrl = result.url;
     const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/brand-assets/eduforyou-logo.png`;
-    finalUrl = await compositeFullBranding(result.url, logoUrl, result.avatarUrl || null, preset);
+    finalUrl = await compositeFullBranding(result.url, logoUrl, result.avatarUrl || null, preset, !!includePhoto);
 
     if (result.remaining !== undefined) setRemaining(result.remaining);
     return { preset, url: finalUrl };

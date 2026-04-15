@@ -169,10 +169,15 @@ export async function compositeFullBranding(
   generatedImageUrl: string,
   logoUrl: string,
   avatarUrl: string | null,
-  preset: string
+  preset: string,
+  skipLogo = false
 ): Promise<string> {
-  // Step 1: Add logo
-  let result = await compositeLogoOverlay(generatedImageUrl, logoUrl, preset);
+  let result = generatedImageUrl;
+
+  // Step 1: Add logo (skip when profile photo is included — logo is already in branded avatar)
+  if (!skipLogo) {
+    result = await compositeLogoOverlay(result, logoUrl, preset);
+  }
 
   // Step 2: Add profile photo if provided
   if (avatarUrl) {

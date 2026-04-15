@@ -204,7 +204,7 @@ export default function CreateImagePage() {
       // Client-side branding composition (logo + profile photo)
       let finalUrl = result.url;
       const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/brand-assets/eduforyou-logo.png`;
-      finalUrl = await compositeFullBranding(result.url, logoUrl, result.avatarUrl || null, selectedPreset);
+      finalUrl = await compositeFullBranding(result.url, logoUrl, result.avatarUrl || null, selectedPreset, !!includePhoto);
 
       return { url: finalUrl, remaining: result.remaining, generatedText: result.generatedText };
     },
