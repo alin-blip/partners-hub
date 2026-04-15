@@ -95,3 +95,89 @@ export async function compositeProfilePhoto(
     }, "image/png");
   });
 }
+
+/**
+ * Overlays the EduForYou logo in the bottom-right corner of the image.
+ * Logo is loaded from the brand-assets storage bucket.
+ */
+export async function compositeLogoOverlay(
+  imageUrl: string,
+  logoUrl: string,
+  preset: string
+): Promise<string> {
+  const dims = PRESET_DIMENSIONS[preset] || PRESET_DIMENSIONS.social_post;
+  const [bgImg, logoImg] = await Promise.all([
+    loadImage(imageUrl),
+    loadImage(logoUrl),
+  ]);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = dims.width;
+  canvas.height = dims.height;
+  const ctx = canvas.getContext("2d")!;
+
+  // Draw background
+  ctx.drawImage(bgImg, 0, 0, dims.width, dims.height);
+
+  // Calculate logo size — fit within ~18% of image width, maintain aspect ratio
+  const maxLogoWidth = Math.round(dims.width * 0.22);
+  const maxLogoHeight = Math.round(dims.height * 0.08);
+  const logoAspect = logoImg.naturalWidth / logoImg.naturalHeight;
+  let logoW = maxLogoWidth;
+  let logoH = logoW / logoAspect;
+  if (logoH > maxLogoHeight) {
+    logoH = maxLogoHeight;
+    logoW = logoH * logoAspect;
+  }
+
+  const paddingX = Math.round(dims.width * 0.03);
+  const paddingY = Math.round(dims.height * 0.03);
+  const logoX = dims.width - logoW - paddingX;
+  const logoY = dims.height - logoH - paddingY;
+
+  // Semi-transparent white pill background for readability
+  const pillPadX = Math.round(logoW * 0.12);
+  const pillPadY = Math.round(logoH * 0.2);
+  const pillRadius = Math.round(Math.min(pillPadX, pillPadY) * 1.5);
+
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  ctx.fillStyle = "#ffffff";
+  const rx = logoX - pillPadX;
+  const ry = logoY - pillPadY;
+  const rw = logoW + pillPadX * 2;
+  const rh = logoH + pillPadY * 2;
+  ctx.beginPath();
+  ctx.roundRect(rx, ry, rw, rh, pillRadius);
+  ctx.fill();
+  ctx.restore();
+
+  // Draw logo
+  ctx.drawImage(logoImg, logoX, logoY, logoW, logoH);
+
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => {
+      resolve(URL.createObjectURL(blob!));
+    }, "image/png");
+  });
+}
+
+/**
+ * Full compositing pipeline: logo overlay → profile photo overlay (if applicable).
+ */
+export async function compositeFullBranding(
+  generatedImageUrl: string,
+  logoUrl: string,
+  avatarUrl: string | null,
+  preset: string
+): Promise<string> {
+  // Step 1: Add logo
+  let result = await compositeLogoOverlay(generatedImageUrl, logoUrl, preset);
+
+  // Step 2: Add profile photo if provided
+  if (avatarUrl) {
+    result = await compositeProfilePhoto(result, avatarUrl, preset);
+  }
+
+  return result;
+}

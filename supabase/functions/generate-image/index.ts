@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
-import { fetchImageAsDataUrl, dataUrlToBytes } from "./image-composition.ts";
+import { dataUrlToBytes } from "./image-composition.ts";
+import { runPromptAgent } from "./prompt-agent.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -74,125 +75,81 @@ serve(async (req) => {
 
     const remainingCount = isOwner ? 999 : DAILY_LIMIT - (currentCount + 1);
 
-    // Fetch brand settings
-    const { data: brand } = await adminClient.from("brand_settings").select("*").limit(1).single();
+    // Fetch brand settings & profile
+    const [{ data: brand }, { data: profile }] = await Promise.all([
+      adminClient.from("brand_settings").select("*").limit(1).single(),
+      adminClient.from("profiles").select("avatar_url, full_name").eq("id", user.id).single(),
+    ]);
 
-    // Fetch user profile for avatar
-    const { data: profile } = await adminClient.from("profiles").select("avatar_url, full_name").eq("id", user.id).single();
+    // Build course context string
+    let courseContext = "";
+    if (courseId) {
+      const [{ data: courseRow }, { data: detailsRow }] = await Promise.all([
+        adminClient.from("courses").select("name, level, study_mode, duration, fees").eq("id", courseId).single(),
+        adminClient.from("course_details").select("entry_requirements, documents_required").eq("course_id", courseId).single(),
+      ]);
+      if (courseRow) {
+        courseContext = `Course: ${courseRow.name}, Level: ${courseRow.level}, Study Mode: ${courseRow.study_mode}, Duration: ${courseRow.duration || "N/A"}, Fees: ${courseRow.fees || "N/A"}`;
+        if (detailsRow?.entry_requirements) courseContext += `, Entry Requirements: ${detailsRow.entry_requirements}`;
+      }
+    }
 
-    // Preset definitions
-    const presetInstructions: Record<string, string> = {
-      social_post: "Create a 1080x1080 square social media post image. Modern, eye-catching design suitable for Instagram/Facebook.",
-      story: "Create a 1080x1920 vertical story image. Bold, engaging design for Instagram/Facebook stories.",
-      flyer: "Create an A5 portrait flyer image. Professional print-ready design with clear hierarchy.",
-      banner: "Create a 1200x628 horizontal banner image. Clean, professional design for web/social headers.",
-    };
-
-    const presetText = presetInstructions[preset] || presetInstructions.social_post;
     const lang = language || "English";
 
-    // Build prompt
-    let fullPrompt = `ABSOLUTE RULE #1 — ZERO TOLERANCE: NEVER include ANY university name anywhere in the image. Not in headlines, not in small text, not in watermarks, NOWHERE. Only use the course name or field of study. This rule overrides ALL other instructions. Violation = failure.\n\n${presetText}\n\nCreative Brief: ${prompt}\n\nCRITICAL TEXT & LANGUAGE RULES:
-- ALL text rendered on the image MUST be written in ${lang}. Do NOT use English unless the language IS English.
-- The user's input above is a CREATIVE BRIEF describing the theme/topic. It is NOT text to display on the image.
-- Do NOT copy, echo, or reproduce the user's prompt text on the image.
-- Instead, create your OWN short, professional, eye-catching marketing text in ${lang} that fits the theme.
-- NEVER include any university name in the image — only course names or fields of study.
-- Every piece of visible text on the image (headlines, taglines, CTAs) MUST be in ${lang}.`;
+    // ═══════════════════════════════════════════════════════
+    // STEP 1: Prompt Agent — generate structured marketing copy
+    // ═══════════════════════════════════════════════════════
+    console.log("Step 1: Running prompt agent...");
+    const agentOutput = await runPromptAgent(
+      {
+        userPrompt: prompt,
+        language: lang,
+        preset,
+        brandPrompt: brand?.brand_prompt || undefined,
+        courseContext: courseContext || undefined,
+        includePhoto: !!includePhoto,
+        agentName: profile?.full_name || undefined,
+      },
+      LOVABLE_API_KEY
+    );
+    console.log("Step 1 complete:", JSON.stringify(agentOutput).slice(0, 300));
 
-    fullPrompt += `\n\nSTRICT CONTENT RULES (MUST follow):
-- ABSOLUTE BAN: No university names anywhere in the image — not in text, not in small print, NOWHERE
-- NEVER say "our courses", "our programs", "we offer" — use "the course", "this program", "the BSc in..."
-- NEVER use the word "free" or "gratuit" or imply anything is free
-- Student finance is a LOAN (not a grant). Repaid after graduation at 9% of earnings above £25,000/year
-- Do NOT invent course names or details — only use real data from the context provided`;
+    // ═══════════════════════════════════════════════════════
+    // STEP 2: Image Generation — simplified prompt with exact text
+    // ═══════════════════════════════════════════════════════
+    const presetDimensions: Record<string, string> = {
+      social_post: "1080x1080 square",
+      story: "1080x1920 vertical",
+      flyer: "A5 portrait (1240x1754)",
+      banner: "1200x628 horizontal",
+    };
 
-    fullPrompt += `\n\n=== MANDATORY TEXT STRUCTURE (EduForYou Brand Style) ===
-The image must be clean, visually clear, and instantly understandable.
-Text on the image MUST follow this EXACT structure — no more, no less:
-1. ONE headline (max 8 words) — bold, attention-grabbing
-2. ONE subheadline (max 15 words) — supporting context
-3. OPTIONAL: Up to 5 short bullet points (max 6 words each) — only if relevant
-- DO NOT write paragraphs or long sentences on the image
-- DO NOT overcrowd the image with text — whitespace is essential
-- The image should be 70% visual, 30% text maximum
-- Text must be large, readable, and well-spaced
-- Every text element must serve a purpose — if in doubt, leave it out`;
+    const bulletsText = agentOutput.bullets.length > 0
+      ? `\nBullet points (render these on the image):\n${agentOutput.bullets.map(b => `• ${b}`).join("\n")}`
+      : "";
 
-    // Selected course context
-    if (courseId) {
-      const { data: courseRow } = await adminClient.from("courses").select("name, level, study_mode, duration, fees").eq("id", courseId).single();
-      const { data: detailsRow } = await adminClient.from("course_details").select("entry_requirements, documents_required, interview_info, admission_test_info, personal_statement_guidelines, additional_info").eq("course_id", courseId).single();
-      if (courseRow) {
-        fullPrompt += `\n\nSELECTED COURSE CONTEXT (use these real details in image text — DO NOT mention the university name, only the course):\n- Course: ${courseRow.name}\n- Level: ${courseRow.level}\n- Study Mode: ${courseRow.study_mode}\n- Duration: ${courseRow.duration || "N/A"}\n- Fees: ${courseRow.fees || "N/A"}`;
-        if (detailsRow) {
-          if (detailsRow.entry_requirements) fullPrompt += `\n- Entry Requirements: ${detailsRow.entry_requirements}`;
-          if (detailsRow.documents_required) fullPrompt += `\n- Documents Required: ${detailsRow.documents_required}`;
-        }
-      }
-    }
+    const imagePrompt = `Create a ${presetDimensions[preset] || "1080x1080 square"} marketing image.
 
-    if (brand?.brand_prompt) {
-      fullPrompt += `\n\nBrand Guidelines: ${brand.brand_prompt}`;
-    }
+VISUAL STYLE: ${agentOutput.visual_description}
 
-    // Collect multimodal image inputs
-    const imageInputs: Array<{ type: string; image_url: { url: string } }> = [];
+TEXT TO RENDER ON THE IMAGE (copy these EXACTLY, character-by-character — do NOT modify, translate, or rephrase):
+Headline: ${agentOutput.headline}
+Subheadline: ${agentOutput.subheadline}${bulletsText}
 
-    // Fetch the brand logo
-    const iconUrl = `${SUPABASE_URL}/storage/v1/object/public/brand-assets/eduforyou-logo.png`;
-    try {
-      const logoDataUrl = await fetchImageAsDataUrl(iconUrl);
-      if (logoDataUrl) imageInputs.push({ type: "image_url", image_url: { url: logoDataUrl } });
-    } catch (e) {
-      console.error("Failed to fetch icon:", e);
-    }
+LAYOUT:
+${agentOutput.layout_notes}
+- Keep bottom-right corner clear (logo will be added afterward).
+${includePhoto ? "- Keep bottom-left corner clean and unobstructed (profile photo will be overlaid afterward)." : ""}
+- DO NOT include any logo, watermark, or branding — those are added separately.
+- DO NOT generate any people, faces, or human figures.
+- The image should be ~70% visual, ~30% text. Clean, modern, professional.`;
 
-    fullPrompt += `\n\n=== MANDATORY LOGO PLACEMENT ===
-The FIRST attached image is the COMPLETE official EduForYou logo (gold graduation cap + orange pen icon with the text "EduForYou").
-- Place this EXACT logo image AS-IS in the bottom-right or top-right corner of the design.
-- DO NOT recreate, redraw, redesign, or modify the logo in any way — copy it pixel-perfect from the attached image.
-- DO NOT invent a different logo — the attached image IS the logo, use it exactly.
-- The logo area should have a subtle background (white pill or semi-transparent) for readability.
-- This is NON-NEGOTIABLE — every generated image MUST have this exact branding.`;
-
-    // Handle includePhoto — tell AI to leave space, client will composite
-    let avatarUrl: string | null = null;
-    if (includePhoto) {
-      if (!profile?.avatar_url) {
-        return new Response(
-          JSON.stringify({ ok: false, error: "Profile photo missing. Please upload one in Profile and try again." }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      avatarUrl = profile.avatar_url;
-
-      fullPrompt += `\n\n=== PROFILE PHOTO HANDOFF (CRITICAL) ===
-The final design will include the EXACT profile photo of the consultant "${profile.full_name || "the agent"}" as a real overlay added AFTER image generation.
-- DO NOT generate any people, faces, portraits, heads, models, or human silhouettes anywhere in the design.
-- Leave a clean, unobstructed circular area in the bottom-left corner for the real profile photo overlay.
-- Keep headlines, bullets, CTAs, and key design elements away from that reserved bottom-left photo area.
-- The ONLY human photo allowed in the final result is the exact profile photo that will be composited afterward.`;
-    }
-
-    fullPrompt += `\n\n=== FINAL REMINDER ===
-ABSOLUTE RULE #1 REPEATED: NEVER include ANY university name in the image. Only course names or fields of study. This is the most important rule.`;
-
-    // Build messages
-    let messageContent: any;
-    if (imageInputs.length > 0) {
-      messageContent = [
-        { type: "text", text: fullPrompt },
-        ...imageInputs,
-      ];
-    } else {
-      messageContent = fullPrompt;
-    }
+    console.log("Step 2: Generating image...");
 
     // Call AI with retry logic
     const aiRequestBody = JSON.stringify({
       model: "google/gemini-3.1-flash-image-preview",
-      messages: [{ role: "user", content: messageContent }],
+      messages: [{ role: "user", content: imagePrompt }],
       modalities: ["image", "text"],
     });
 
@@ -235,9 +192,8 @@ ABSOLUTE RULE #1 REPEATED: NEVER include ANY university name in the image. Only 
       );
     }
 
-    // Decode and upload (no server-side composition)
+    // Upload to storage
     const binaryData = dataUrlToBytes(imageBase64);
-
     const fileName = `${user.id}/${Date.now()}_${preset}.png`;
     const { error: uploadErr } = await adminClient.storage
       .from("generated-images")
@@ -261,12 +217,28 @@ ABSOLUTE RULE #1 REPEATED: NEVER include ANY university name in the image. Only 
       image_path: fileName,
     });
 
+    // Return the generated text along with the image for client-side review
+    let avatarUrl: string | null = null;
+    if (includePhoto) {
+      if (!profile?.avatar_url) {
+        // Image already generated, just skip avatar overlay
+        avatarUrl = null;
+      } else {
+        avatarUrl = profile.avatar_url;
+      }
+    }
+
     return new Response(
       JSON.stringify({
         ok: true,
         url: publicUrl.publicUrl,
-        avatarUrl: includePhoto ? avatarUrl : null,
+        avatarUrl,
         remaining: remainingCount,
+        generatedText: {
+          headline: agentOutput.headline,
+          subheadline: agentOutput.subheadline,
+          bullets: agentOutput.bullets,
+        },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
