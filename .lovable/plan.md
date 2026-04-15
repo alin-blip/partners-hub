@@ -1,37 +1,36 @@
 
 
-# Fix: ChatGPT-Style Image Generation Flow
+# Fix: Image Generation Quality Issues
 
-## Current Problems
-1. **Two sequential AI API calls** (prompt agent + image gen) cause rate limits (429) — both hit the same gateway within seconds
-2. **Edit mode sends full image URL** back to AI which is slow and unreliable
-3. **No "save or modify?" flow** — AI just dumps the image without asking
-4. **Cooldown/error messages feel broken**, not conversational
+## Problems Identified
 
-## Solution: Streamlined Single-Call Flow with Conversational UX
+1. **"LOGO" text drawn by AI** — The prompt says "logo will be added afterward" and "keep bottom-right corner clear (logo area)" — the AI image model interprets this literally and renders the word "LOGO" as a placeholder. Fix: remove ALL mentions of "logo" from the image generation prompt.
 
-### Architecture Change
-Instead of 2 API calls per generation, combine them:
-- **New images**: Keep the 2-step flow BUT increase the delay between calls to 5 seconds and use `google/gemini-2.5-flash-lite` for Step 1 (already done) — the real fix is better error handling and user feedback
-- **Edits**: Use the stored Supabase image URL (public URL from storage, not base64) for edits — much lighter
+2. **Logo overlay still applied when includePhoto is true** — Line 260 in `CreateImagePage.tsx` correctly passes `skipLogo = !!includePhoto`, but the prompt still tells the AI to "reserve space" for a logo, causing confusion.
 
-### UX Changes (CreateImagePage.tsx)
-1. After generating an image, the assistant message says: **"Here's your image! Would you like to save it, or tell me what to change?"**
-2. Add **"Save" and "Modify" quick-action buttons** below each generated image
-3. "Save" confirms and shows share buttons
-4. "Modify" focuses the input and prompts for changes
-5. Better loading states: show a progress indicator with steps ("Writing copy..." → "Generating image..." → "Applying branding...")
-6. On rate limit errors, show a friendlier message with auto-retry countdown
+3. **AI generates people despite "no people" rule** — The instruction is buried in the prompt. Need to make it the FIRST and most prominent rule, not a sub-bullet.
 
-### Edge Function Changes (index.ts)
-1. Increase inter-step delay from 3s to 5s
-2. For edit mode: use the Supabase public URL (already stored) instead of passing large image data
-3. Better error differentiation — return `retryAfter` seconds so the client can auto-retry
+## Changes
 
-### Files to Modify
+### 1. `supabase/functions/generate-image/index.ts` — Fix image prompt
+- Remove ALL references to "logo", "watermark", "branding" from the image generation prompt — the AI draws what it reads
+- When `includePhoto` is true: add "ABSOLUTELY NO human figures, people, faces, or silhouettes" as the FIRST line of the prompt (not buried in layout notes)
+- When `includePhoto` is false: same "no people" rule but less aggressive
+- Remove "keep bottom-right corner clear (logo area)" — just say nothing about that corner
+- Remove "logo will be added afterward" completely
+
+### 2. `supabase/functions/generate-image/prompt-agent.ts` — Fix visual description guidelines  
+- Remove references to "logo overlay" from the visual_description instructions
+- When `includePhoto` is true, the `layout_notes` should NOT mention logo/branding — just focus on text placement
+- Strengthen "no people" in visual_description guidance
+
+### 3. `src/pages/shared/CreateImagePage.tsx` — No changes needed
+The `skipLogo` flag is already correctly passed. The client-side compositing logic is fine.
+
+### Files to modify
 
 | File | Change |
 |------|--------|
-| `src/pages/shared/CreateImagePage.tsx` | Add Save/Modify buttons, progress steps, auto-retry on rate limit, conversational assistant messages |
-| `supabase/functions/generate-image/index.ts` | Increase inter-step delay to 5s, improve error response with retryAfter |
+| `supabase/functions/generate-image/index.ts` | Remove "logo"/"branding" mentions from AI prompt; strengthen no-people as first rule |
+| `supabase/functions/generate-image/prompt-agent.ts` | Remove logo references from layout_notes/visual_description guidance |
 
