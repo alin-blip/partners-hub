@@ -1,35 +1,59 @@
 
 
-# Fix: Edit Mode Fails + Logo/People Still Appearing
+# Plan: Agent Password Visibility & Reset for Admins/Owners
 
-## Root Causes
+## What We're Building
+A feature that lets Admins see and change passwords for their own agents, and Owners see and change passwords for all users. The last-set password will be stored so it can be viewed.
 
-### 1. Edit mode sends blob URL (causes "AI generation failed")
-`getLastImageUrl()` returns the **client-side blob URL** (from canvas compositing), not the Supabase public URL. The AI API cannot fetch `blob:https://...` URLs. The edge function passes this unfetchable URL to Gemini, which fails.
+## Database Changes
 
-**Fix**: Store the raw Supabase URL (`result.url`) in the ChatMessage alongside the display URL. Send the raw URL for edits.
+### New table: `user_passwords`
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid PK | |
+| user_id | uuid NOT NULL UNIQUE | References the user |
+| password_plaintext | text NOT NULL | Last-set password |
+| set_by | uuid | Who set it |
+| updated_at | timestamptz | |
 
-### 2. Logo still appearing in generated images
-The prompt-agent's visual description guidelines may still produce layout notes that reference reserved corners, which the image model interprets as "draw something there."
+### RLS Policies
+- **Owner SELECT/UPDATE**: `has_role(auth.uid(), 'owner')` — sees all
+- **Admin SELECT**: Admin can see passwords only for agents where `profiles.admin_id = auth.uid()`
+- **INSERT/UPDATE**: Only via service_role (edge function)
+- No agent access, no DELETE
 
-**Fix**: Add explicit negative instruction: "Do NOT render any text that reads 'LOGO'" to the image generation prompt.
+## Edge Function: `reset-user-password`
+- Accepts `{ user_id, new_password }`
+- Validates caller is owner (any user) or admin (only their agents via `profiles.admin_id`)
+- Calls `supabaseAdmin.auth.admin.updateUser(user_id, { password: new_password })`
+- Upserts into `user_passwords` table
+- Returns success/error
 
-## Changes
+## Backfill
+- Update `create-owner` edge function to also insert into `user_passwords` when creating a new user, so passwords are tracked from creation
 
-### `src/pages/shared/CreateImagePage.tsx`
-- Add `rawImageUrl?: string` field to `ChatMessage` type to store the original Supabase URL
-- When saving the assistant message (line ~270), store `result.url` as `rawImageUrl`
-- Change `getLastImageUrl()` to return `rawImageUrl` instead of the composited blob URL
-- This ensures edit requests send a fetchable HTTPS URL to the edge function
+## UI Changes
 
-### `supabase/functions/generate-image/index.ts`
-- Add "Do NOT render any text that reads 'LOGO' or placeholder text" to both the generation and edit prompts
-- The "no people" rule is already first — keep it
+### `src/pages/owner/AgentsPage.tsx`
+- Add a "Password" column or an action button per row
+- Click opens a dialog showing the current stored password + input to set a new one
+- Calls `reset-user-password` edge function
 
-### Files
+### `src/pages/admin/AdminAgentsPage.tsx`
+- Same pattern but only for the admin's own agents (already filtered by `admin_id`)
+
+## Files to Create/Modify
 
 | File | Change |
 |------|--------|
-| `src/pages/shared/CreateImagePage.tsx` | Store raw Supabase URL separately, use it for edits |
-| `supabase/functions/generate-image/index.ts` | Add anti-"LOGO text" instruction to prompts |
+| Migration | Create `user_passwords` table with RLS |
+| `supabase/functions/reset-user-password/index.ts` | New edge function |
+| `supabase/functions/create-owner/index.ts` | Add upsert to `user_passwords` on user creation |
+| `src/pages/owner/AgentsPage.tsx` | Add view/reset password UI |
+| `src/pages/admin/AdminAgentsPage.tsx` | Add view/reset password UI |
+
+## Security Notes
+- Plaintext password storage is intentional per the user's request (admin visibility)
+- RLS ensures admins only see their own agents' passwords
+- The edge function double-checks authorization before resetting
 
