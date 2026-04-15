@@ -55,9 +55,15 @@ const PRESETS = [
 const getGenerationErrorMessage = (errorType?: string, error?: string) => {
   if (errorType === "daily_limit" || error?.includes("Daily limit")) return "Daily limit reached";
   if (errorType === "credits_exhausted") return "AI credits exhausted — please contact admin";
-  if (errorType === "rate_limit") return "AI rate limit — please wait a moment and try again";
+  if (errorType === "rate_limit") return "AI is busy right now. Retrying automatically...";
   return error || "Generation failed. Please try again later.";
 };
+
+const PROGRESS_STEPS = [
+  "✍️ Writing marketing copy...",
+  "🎨 Generating image...",
+  "🖼️ Applying branding...",
+];
 
 type ChatMessage = {
   id: string;
@@ -66,6 +72,7 @@ type ChatMessage = {
   imageUrl?: string;
   generatedText?: { headline: string; subheadline: string; bullets: string[] };
   timestamp: Date;
+  saved?: boolean;
 };
 
 export default function CreateImagePage() {
@@ -81,6 +88,7 @@ export default function CreateImagePage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [copiedCaption, setCopiedCaption] = useState<string | null>(null);
+  const [progressStep, setProgressStep] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -171,8 +179,8 @@ export default function CreateImagePage() {
     return null;
   };
 
-  const handleSend = async () => {
-    const text = inputValue.trim();
+  const handleSend = async (overrideText?: string) => {
+    const text = (overrideText || inputValue).trim();
     if (!text || isGenerating) return;
 
     const userMsg: ChatMessage = {
@@ -185,72 +193,117 @@ export default function CreateImagePage() {
     setInputValue("");
     setIsGenerating(true);
     setSettingsOpen(false);
+    setProgressStep(0);
+
+    // Progress step animation
+    const progressInterval = setInterval(() => {
+      setProgressStep((prev) => Math.min(prev + 1, PROGRESS_STEPS.length - 1));
+    }, 8000);
+
+    const attemptGeneration = async (retryCount = 0): Promise<void> => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error("Not authenticated");
+
+        const lastImageUrl = getLastImageUrl();
+        const isEdit = !!lastImageUrl;
+
+        if (isEdit) setProgressStep(1); // skip copy step for edits
+
+        const resp = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              prompt: isEdit ? messages[0]?.content || text : text,
+              preset: selectedPreset,
+              includePhoto,
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              language: captionLanguage,
+              ...(selectedCourseId ? { courseId: selectedCourseId } : {}),
+              ...(isEdit ? { previousImageUrl: lastImageUrl, editInstruction: text } : {}),
+            }),
+          }
+        );
+
+        const result = await resp.json();
+        if (!resp.ok || result?.ok === false) {
+          const errorType = result?.errorType;
+          // Auto-retry on rate limit
+          if (errorType === "rate_limit" && retryCount < 2) {
+            const retryAfter = result?.retryAfter || 15;
+            startCooldown(retryAfter);
+            // Show retry message
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "assistant",
+                content: `⏳ AI is busy. Retrying automatically in ${retryAfter}s...`,
+                timestamp: new Date(),
+              },
+            ]);
+            await new Promise((r) => setTimeout(r, retryAfter * 1000));
+            return attemptGeneration(retryCount + 1);
+          }
+          throw new Error(getGenerationErrorMessage(errorType, result?.error));
+        }
+
+        // Client-side branding
+        setProgressStep(2);
+        let finalUrl = result.url;
+        const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/brand-assets/eduforyou-logo.png`;
+        finalUrl = await compositeFullBranding(result.url, logoUrl, result.avatarUrl || null, selectedPreset, !!includePhoto);
+
+        if (result.remaining !== undefined) setRemaining(result.remaining);
+        qc.invalidateQueries({ queryKey: ["my-generated-images"] });
+
+        const assistantMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: isEdit
+            ? "Here's the updated image! Would you like to **save it** or tell me what else to change?"
+            : "Here's your image! Would you like to **save it** or tell me what to change?",
+          imageUrl: finalUrl,
+          generatedText: result.generatedText,
+          timestamp: new Date(),
+          saved: false,
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+      } catch (e: any) {
+        const errorMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: `❌ ${e.message}`,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, errorMsg]);
+      }
+    };
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-
-      const lastImageUrl = getLastImageUrl();
-      const isEdit = !!lastImageUrl;
-
-      const resp = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            prompt: isEdit ? messages[0]?.content || text : text,
-            preset: selectedPreset,
-            includePhoto,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            language: captionLanguage,
-            ...(selectedCourseId ? { courseId: selectedCourseId } : {}),
-            ...(isEdit ? { previousImageUrl: lastImageUrl, editInstruction: text } : {}),
-          }),
-        }
-      );
-
-      const result = await resp.json();
-      if (!resp.ok || result?.ok === false) {
-        const errorType = result?.errorType;
-        if (errorType === "rate_limit") startCooldown(30);
-        throw new Error(getGenerationErrorMessage(errorType, result?.error));
-      }
-
-      // Client-side branding
-      let finalUrl = result.url;
-      const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/brand-assets/eduforyou-logo.png`;
-      finalUrl = await compositeFullBranding(result.url, logoUrl, result.avatarUrl || null, selectedPreset, !!includePhoto);
-
-      if (result.remaining !== undefined) setRemaining(result.remaining);
-      qc.invalidateQueries({ queryKey: ["my-generated-images"] });
-
-      const assistantMsg: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: isEdit
-          ? "✅ Image updated! Want to change anything else?"
-          : "✅ Here's your image! You can ask me to change colors, text, layout, or anything else.",
-        imageUrl: finalUrl,
-        generatedText: result.generatedText,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
-    } catch (e: any) {
-      const errorMsg: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: `❌ ${e.message}`,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMsg]);
+      await attemptGeneration();
     } finally {
+      clearInterval(progressInterval);
       setIsGenerating(false);
+      setProgressStep(0);
       inputRef.current?.focus();
     }
+  };
+
+  const handleSaveImage = (msgId: string) => {
+    setMessages((prev) =>
+      prev.map((m) => (m.id === msgId ? { ...m, saved: true } : m))
+    );
+    toast({ title: "✅ Image saved!", description: "You can find it in your gallery below." });
+  };
+
+  const handleModifyImage = () => {
+    inputRef.current?.focus();
   };
 
   const handleCopyCaption = async (text: string) => {
@@ -435,15 +488,37 @@ export default function CreateImagePage() {
                             alt="Generated"
                             className="rounded-lg max-w-full shadow-md"
                           />
-                          <div className="mt-2 flex items-center gap-2 flex-wrap">
-                            <SocialShareButtons
-                              imageUrl={msg.imageUrl}
-                              caption=""
-                              cardUrl={cardUrl}
-                              filenamePrefix="eduforyou-generated"
-                              size="sm"
-                            />
-                          </div>
+                          {/* Save / Modify quick actions */}
+                          {!msg.saved && (
+                            <div className="mt-3 flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                className="bg-accent text-accent-foreground hover:bg-accent/90"
+                                onClick={() => handleSaveImage(msg.id)}
+                              >
+                                <Check className="w-3.5 h-3.5 mr-1" /> Save
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={handleModifyImage}
+                              >
+                                <MessageSquare className="w-3.5 h-3.5 mr-1" /> Modify
+                              </Button>
+                            </div>
+                          )}
+                          {msg.saved && (
+                            <div className="mt-3">
+                              <p className="text-xs text-muted-foreground mb-2">✅ Saved! Share it:</p>
+                              <SocialShareButtons
+                                imageUrl={msg.imageUrl}
+                                caption=""
+                                cardUrl={cardUrl}
+                                filenamePrefix="eduforyou-generated"
+                                size="sm"
+                              />
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -485,9 +560,26 @@ export default function CreateImagePage() {
                 {isGenerating && (
                   <div className="flex justify-start">
                     <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        {getLastImageUrl() ? "Editing image..." : "Creating your image..."}
+                      <div className="space-y-1.5">
+                        {PROGRESS_STEPS.map((step, i) => (
+                          <div
+                            key={i}
+                            className={`flex items-center gap-2 text-sm transition-opacity ${
+                              i <= progressStep ? "opacity-100" : "opacity-30"
+                            }`}
+                          >
+                            {i < progressStep ? (
+                              <Check className="w-3.5 h-3.5 text-accent" />
+                            ) : i === progressStep ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
+                            ) : (
+                              <div className="w-3.5 h-3.5 rounded-full border border-muted-foreground/30" />
+                            )}
+                            <span className={i === progressStep ? "text-foreground" : "text-muted-foreground"}>
+                              {step}
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
