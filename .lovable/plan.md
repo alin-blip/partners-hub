@@ -1,59 +1,53 @@
 
 
-# Plan: Agent Password Visibility & Reset for Admins/Owners
+# Revert CreateImagePage to Simple Form UI
 
-## What We're Building
-A feature that lets Admins see and change passwords for their own agents, and Owners see and change passwords for all users. The last-set password will be stored so it can be viewed.
+## What's Changing
+Remove the chat/conversation UI from CreateImagePage and restore a straightforward form-based layout: settings on top, generate button, image result below with save/share/modify actions. Keep all the backend prompt improvements (no "LOGO" text, no people, `rawImageUrl` for edits).
 
-## Database Changes
+## UI Structure (restored)
 
-### New table: `user_passwords`
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid PK | |
-| user_id | uuid NOT NULL UNIQUE | References the user |
-| password_plaintext | text NOT NULL | Last-set password |
-| set_by | uuid | Who set it |
-| updated_at | timestamptz | |
+```text
+┌──────────────────────────────────────────┐
+│ AI Image Studio          [5/5 remaining] │
+├──────────────────────────────────────────┤
+│ Settings Card                            │
+│ ┌─ Format: [Post] [Story] [Flyer] [Ban]─┐│
+│ │ Institution: [___]  Course: [___]     ││
+│ │ [x] Include photo   Language: [RO]    ││
+│ └────────────────────────────────────────┘│
+│                                          │
+│ Prompt textarea                          │
+│ [Generate Image]                         │
+│                                          │
+│ ┌─ Result Card (if image) ──────────────┐│
+│ │ [Image]                               ││
+│ │ Generated text (copy)                 ││
+│ │ [Save] [Modify] [Share buttons]       ││
+│ │ Edit instruction input (if modifying) ││
+│ └────────────────────────────────────────┘│
+│                                          │
+│ Gallery (unchanged)                      │
+└──────────────────────────────────────────┘
+```
 
-### RLS Policies
-- **Owner SELECT/UPDATE**: `has_role(auth.uid(), 'owner')` — sees all
-- **Admin SELECT**: Admin can see passwords only for agents where `profiles.admin_id = auth.uid()`
-- **INSERT/UPDATE**: Only via service_role (edge function)
-- No agent access, no DELETE
+## Key Behaviors
+- **Generate**: Single button click, shows progress steps inline
+- **Result**: Image displayed in a result card with Save/Share/Modify buttons
+- **Modify**: Click "Modify" → shows an edit input below the image, sends `previousImageUrl` (raw Supabase URL) + `editInstruction` to the edge function
+- **Auto-retry on 429**: Same logic, shows toast instead of chat messages
+- **rawImageUrl tracking**: Keep storing the raw URL for edit mode
 
-## Edge Function: `reset-user-password`
-- Accepts `{ user_id, new_password }`
-- Validates caller is owner (any user) or admin (only their agents via `profiles.admin_id`)
-- Calls `supabaseAdmin.auth.admin.updateUser(user_id, { password: new_password })`
-- Upserts into `user_passwords` table
-- Returns success/error
-
-## Backfill
-- Update `create-owner` edge function to also insert into `user_passwords` when creating a new user, so passwords are tracked from creation
-
-## UI Changes
-
-### `src/pages/owner/AgentsPage.tsx`
-- Add a "Password" column or an action button per row
-- Click opens a dialog showing the current stored password + input to set a new one
-- Calls `reset-user-password` edge function
-
-### `src/pages/admin/AdminAgentsPage.tsx`
-- Same pattern but only for the admin's own agents (already filtered by `admin_id`)
-
-## Files to Create/Modify
+## Files to Modify
 
 | File | Change |
 |------|--------|
-| Migration | Create `user_passwords` table with RLS |
-| `supabase/functions/reset-user-password/index.ts` | New edge function |
-| `supabase/functions/create-owner/index.ts` | Add upsert to `user_passwords` on user creation |
-| `src/pages/owner/AgentsPage.tsx` | Add view/reset password UI |
-| `src/pages/admin/AdminAgentsPage.tsx` | Add view/reset password UI |
+| `src/pages/shared/CreateImagePage.tsx` | Full rewrite — replace chat UI with form-based layout. Keep all generation logic, branding compositing, gallery, and error handling. |
 
-## Security Notes
-- Plaintext password storage is intentional per the user's request (admin visibility)
-- RLS ensures admins only see their own agents' passwords
-- The edge function double-checks authorization before resetting
+## What's NOT Changing
+- Edge functions (prompt improvements stay)
+- Gallery section
+- SocialShareButtons usage
+- Generation logic & retry handling
+- Brand compositing pipeline
 
