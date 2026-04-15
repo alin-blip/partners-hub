@@ -1,30 +1,34 @@
 
 
-# Add /reset-password Page for Password Recovery
+# Fix: Show Both Participants in Conversation List for Owner
 
 ## Problem
-Password reset emails are sent successfully, but when agents click the recovery link, they land on `/login` which has no logic to detect the recovery token and show a "set new password" form. The password never actually gets reset.
+The owner sees ALL conversations (including between other users) due to RLS policy. But the UI only shows one name via `getOtherParticipant()` — which picks the participant that isn't the current user. When the owner isn't a participant in a conversation, this logic shows only `participant_1` (e.g., "Dalina") for every conversation, making it impossible to distinguish them.
 
 ## Solution
 
-### 1. Create `/reset-password` page (`src/pages/ResetPassword.tsx`)
-- On mount, listen for `PASSWORD_RECOVERY` event via `supabase.auth.onAuthStateChange`
-- Show a form with: New Password, Confirm Password (with show/hide toggles)
-- On submit, call `supabase.auth.updateUser({ password })` 
-- On success, redirect to `/login` with a toast confirmation
-- Handle edge cases: expired/invalid token shows an error message
+Update `MessagesPage.tsx` conversation list to show both participants when the current user is not part of the conversation:
 
-### 2. Update `Login.tsx` redirect URL
-- Change `redirectTo` in `handleForgotPassword` from `/login` to `/reset-password`
+1. **Conversation list item**: Show "Dalina → Agent Name" format when the owner is viewing a conversation they're not part of. When the owner IS a participant, show only the other person's name (current behavior).
 
-### 3. Add route in `App.tsx`
-- Add `<Route path="/reset-password" element={<ResetPassword />} />` as a public route
+2. **Chat header**: Same logic — show both names when the owner is observing someone else's conversation.
+
+3. **Helper function change**:
+   - Add `isMyConversation(convo)` check: `convo.participant_1 === user.id || convo.participant_2 === user.id`
+   - When not the owner's own conversation: display `"${p1.full_name} ↔ ${p2.full_name}"`
+   - When it is the owner's conversation: keep current single-name display
 
 ## Files to modify
 
 | File | Change |
 |------|--------|
-| `src/pages/ResetPassword.tsx` | New page — password reset form |
-| `src/pages/Login.tsx` | Update `redirectTo` to `/reset-password` |
-| `src/App.tsx` | Add `/reset-password` route |
+| `src/pages/shared/MessagesPage.tsx` | Update conversation list rendering and header to show both participants for non-own conversations |
+
+## UI example
+```text
+Current:          After:
+Dalina            Dalina ↔ John Smith
+Dalina            Dalina ↔ Maria Pop  
+Dalina            Dalina (own conversation - unchanged)
+```
 
