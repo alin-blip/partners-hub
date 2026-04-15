@@ -80,60 +80,68 @@ Respond with a JSON object matching this exact structure:
   "layout_notes": "..."
 }`;
 
-  const response = await fetch(LOVABLE_AI_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      tools: [
-        {
-          type: "function",
-          function: {
-            name: "create_marketing_content",
-            description: "Create structured marketing content for image generation",
-            parameters: {
-              type: "object",
-              properties: {
-                headline: { type: "string", description: `Bold headline, max 8 words, in ${language}` },
-                subheadline: { type: "string", description: `Supporting subheadline, max 15 words, in ${language}` },
-                bullets: {
-                  type: "array",
-                  items: { type: "string" },
-                  description: `Up to 5 short bullet points (max 6 words each) in ${language}. Can be empty.`,
+  let response: Response | null = null;
+  const MAX_RETRIES = 3;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    response = await fetch(LOVABLE_AI_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-lite",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "create_marketing_content",
+              description: "Create structured marketing content for image generation",
+              parameters: {
+                type: "object",
+                properties: {
+                  headline: { type: "string", description: `Bold headline, max 8 words, in ${language}` },
+                  subheadline: { type: "string", description: `Supporting subheadline, max 15 words, in ${language}` },
+                  bullets: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: `Up to 5 short bullet points (max 6 words each) in ${language}. Can be empty.`,
+                  },
+                  visual_description: {
+                    type: "string",
+                    description: "Detailed visual description for the image generator: colors, mood, layout, background",
+                  },
+                  layout_notes: {
+                    type: "string",
+                    description: "Notes about text placement and reserved areas",
+                  },
                 },
-                visual_description: {
-                  type: "string",
-                  description: "Detailed visual description for the image generator: colors, mood, layout, background",
-                },
-                layout_notes: {
-                  type: "string",
-                  description: "Notes about text placement and reserved areas",
-                },
+                required: ["headline", "subheadline", "bullets", "visual_description", "layout_notes"],
+                additionalProperties: false,
               },
-              required: ["headline", "subheadline", "bullets", "visual_description", "layout_notes"],
-              additionalProperties: false,
             },
           },
-        },
-      ],
-      tool_choice: { type: "function", function: { name: "create_marketing_content" } },
-    }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    console.error("Prompt agent error:", response.status, text);
-    throw new Error(`Prompt agent failed (${response.status})`);
+        ],
+        tool_choice: { type: "function", function: { name: "create_marketing_content" } },
+      }),
+    });
+    if (response!.status !== 429) break;
+    const delay = 4000 * Math.pow(2, attempt);
+    console.log(`Prompt agent rate limited (attempt ${attempt + 1}/${MAX_RETRIES}), retrying in ${delay/1000}s...`);
+    if (attempt < MAX_RETRIES - 1) await new Promise(r => setTimeout(r, delay));
   }
 
-  const data = await response.json();
+  if (!response!.ok) {
+    const text = await response!.text();
+    console.error("Prompt agent error:", response!.status, text);
+    throw new Error(`Prompt agent failed (${response!.status})`);
+  }
+
+  const data = await response!.json();
   const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
   if (!toolCall) {
     console.error("No tool call in prompt agent response:", JSON.stringify(data).slice(0, 500));

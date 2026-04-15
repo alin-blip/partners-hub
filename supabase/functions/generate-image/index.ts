@@ -183,8 +183,13 @@ ${includePhoto ? `- Keep bottom-left corner clean and unobstructed (profile phot
 
     console.log(`Step 2: ${isEditMode ? "Editing" : "Generating"} image...`);
 
+    // Add delay between Step 1 and Step 2 to avoid rate limits
+    if (!isEditMode) {
+      await new Promise(r => setTimeout(r, 3000));
+    }
+
     let aiResponse: Response | null = null;
-    const MAX_RETRIES = 3;
+    const MAX_RETRIES = 4;
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -195,8 +200,9 @@ ${includePhoto ? `- Keep bottom-left corner clean and unobstructed (profile phot
         body: aiRequestBody,
       });
       if (aiResponse.status !== 429) break;
-      console.log(`AI rate limited (attempt ${attempt + 1}/${MAX_RETRIES}), retrying...`);
-      if (attempt < MAX_RETRIES - 1) await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt)));
+      const delay = 5000 * Math.pow(2, attempt); // 5s, 10s, 20s, 40s
+      console.log(`AI rate limited (attempt ${attempt + 1}/${MAX_RETRIES}), retrying in ${delay/1000}s...`);
+      if (attempt < MAX_RETRIES - 1) await new Promise(r => setTimeout(r, delay));
     }
 
     if (!aiResponse!.ok) {
