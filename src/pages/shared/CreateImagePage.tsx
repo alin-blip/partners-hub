@@ -488,15 +488,37 @@ export default function CreateImagePage() {
                             alt="Generated"
                             className="rounded-lg max-w-full shadow-md"
                           />
-                          <div className="mt-2 flex items-center gap-2 flex-wrap">
-                            <SocialShareButtons
-                              imageUrl={msg.imageUrl}
-                              caption=""
-                              cardUrl={cardUrl}
-                              filenamePrefix="eduforyou-generated"
-                              size="sm"
-                            />
-                          </div>
+                          {/* Save / Modify quick actions */}
+                          {!msg.saved && (
+                            <div className="mt-3 flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                className="bg-accent text-accent-foreground hover:bg-accent/90"
+                                onClick={() => handleSaveImage(msg.id)}
+                              >
+                                <Check className="w-3.5 h-3.5 mr-1" /> Save
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={handleModifyImage}
+                              >
+                                <MessageSquare className="w-3.5 h-3.5 mr-1" /> Modify
+                              </Button>
+                            </div>
+                          )}
+                          {msg.saved && (
+                            <div className="mt-3">
+                              <p className="text-xs text-muted-foreground mb-2">✅ Saved! Share it:</p>
+                              <SocialShareButtons
+                                imageUrl={msg.imageUrl}
+                                caption=""
+                                cardUrl={cardUrl}
+                                filenamePrefix="eduforyou-generated"
+                                size="sm"
+                              />
+                            </div>
+                          )}
                         </div>
                       )}
 
