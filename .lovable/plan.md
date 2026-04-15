@@ -1,36 +1,35 @@
 
 
-# Fix: Image Generation Quality Issues
+# Fix: Edit Mode Fails + Logo/People Still Appearing
 
-## Problems Identified
+## Root Causes
 
-1. **"LOGO" text drawn by AI** — The prompt says "logo will be added afterward" and "keep bottom-right corner clear (logo area)" — the AI image model interprets this literally and renders the word "LOGO" as a placeholder. Fix: remove ALL mentions of "logo" from the image generation prompt.
+### 1. Edit mode sends blob URL (causes "AI generation failed")
+`getLastImageUrl()` returns the **client-side blob URL** (from canvas compositing), not the Supabase public URL. The AI API cannot fetch `blob:https://...` URLs. The edge function passes this unfetchable URL to Gemini, which fails.
 
-2. **Logo overlay still applied when includePhoto is true** — Line 260 in `CreateImagePage.tsx` correctly passes `skipLogo = !!includePhoto`, but the prompt still tells the AI to "reserve space" for a logo, causing confusion.
+**Fix**: Store the raw Supabase URL (`result.url`) in the ChatMessage alongside the display URL. Send the raw URL for edits.
 
-3. **AI generates people despite "no people" rule** — The instruction is buried in the prompt. Need to make it the FIRST and most prominent rule, not a sub-bullet.
+### 2. Logo still appearing in generated images
+The prompt-agent's visual description guidelines may still produce layout notes that reference reserved corners, which the image model interprets as "draw something there."
+
+**Fix**: Add explicit negative instruction: "Do NOT render any text that reads 'LOGO'" to the image generation prompt.
 
 ## Changes
 
-### 1. `supabase/functions/generate-image/index.ts` — Fix image prompt
-- Remove ALL references to "logo", "watermark", "branding" from the image generation prompt — the AI draws what it reads
-- When `includePhoto` is true: add "ABSOLUTELY NO human figures, people, faces, or silhouettes" as the FIRST line of the prompt (not buried in layout notes)
-- When `includePhoto` is false: same "no people" rule but less aggressive
-- Remove "keep bottom-right corner clear (logo area)" — just say nothing about that corner
-- Remove "logo will be added afterward" completely
+### `src/pages/shared/CreateImagePage.tsx`
+- Add `rawImageUrl?: string` field to `ChatMessage` type to store the original Supabase URL
+- When saving the assistant message (line ~270), store `result.url` as `rawImageUrl`
+- Change `getLastImageUrl()` to return `rawImageUrl` instead of the composited blob URL
+- This ensures edit requests send a fetchable HTTPS URL to the edge function
 
-### 2. `supabase/functions/generate-image/prompt-agent.ts` — Fix visual description guidelines  
-- Remove references to "logo overlay" from the visual_description instructions
-- When `includePhoto` is true, the `layout_notes` should NOT mention logo/branding — just focus on text placement
-- Strengthen "no people" in visual_description guidance
+### `supabase/functions/generate-image/index.ts`
+- Add "Do NOT render any text that reads 'LOGO' or placeholder text" to both the generation and edit prompts
+- The "no people" rule is already first — keep it
 
-### 3. `src/pages/shared/CreateImagePage.tsx` — No changes needed
-The `skipLogo` flag is already correctly passed. The client-side compositing logic is fine.
-
-### Files to modify
+### Files
 
 | File | Change |
 |------|--------|
-| `supabase/functions/generate-image/index.ts` | Remove "logo"/"branding" mentions from AI prompt; strengthen no-people as first rule |
-| `supabase/functions/generate-image/prompt-agent.ts` | Remove logo references from layout_notes/visual_description guidance |
+| `src/pages/shared/CreateImagePage.tsx` | Store raw Supabase URL separately, use it for edits |
+| `supabase/functions/generate-image/index.ts` | Add anti-"LOGO text" instruction to prompts |
 
