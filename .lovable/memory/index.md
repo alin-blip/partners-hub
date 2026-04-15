@@ -44,9 +44,13 @@ not_started, application_submitted, approved, rejected, disbursed
 
 ## AI Features
 - AI Chat: edge function ai-chat, persisted in ai_conversations + ai_messages
-- AI Image Generator: edge function generate-image, uses google/gemini-3.1-flash-image-preview
-  - 5 images/user/day limit
-  - Brand settings (prompt + logo) auto-injected
+- AI Image Generator: Two-step pipeline (prompt-agent.ts → image generation)
+  - Step 1: Gemini Flash text model refines user input into structured JSON (headline, subheadline, bullets, visual_description)
+  - Step 2: Gemini Flash Image generates based on simplified prompt
+  - Client-side Canvas compositing for logo + profile photo (pixel-perfect)
+  - When includePhoto=true: skip logo overlay (already in branded avatar), no AI-generated people
+  - Chat-style UI for iterative refinements (edit mode sends previousImageUrl + editInstruction)
+  - 5 images/user/day limit, brand settings auto-injected
 
 ## Agent Digital Card
 - Public page at /card/:slug (no auth required)

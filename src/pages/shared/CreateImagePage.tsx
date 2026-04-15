@@ -1,17 +1,19 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { compositeFullBranding } from "@/lib/image-composite";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { SocialShareButtons } from "@/components/SocialShareButtons";
 import {
@@ -27,6 +29,10 @@ import {
   MessageSquare,
   Copy,
   Check,
+  Send,
+  Settings2,
+  ChevronDown,
+  Bot,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -40,10 +46,10 @@ const LANGUAGES = [
 ];
 
 const PRESETS = [
-  { id: "social_post", label: "Social Media Post", desc: "1080×1080 square", icon: Square },
-  { id: "story", label: "Story", desc: "1080×1920 vertical", icon: Smartphone },
-  { id: "flyer", label: "Flyer", desc: "A5 portrait", icon: FileText },
-  { id: "banner", label: "Banner", desc: "1200×628 horizontal", icon: LayoutTemplate },
+  { id: "social_post", label: "Social Post", desc: "1080×1080", icon: Square },
+  { id: "story", label: "Story", desc: "1080×1920", icon: Smartphone },
+  { id: "flyer", label: "Flyer", desc: "A5", icon: FileText },
+  { id: "banner", label: "Banner", desc: "1200×628", icon: LayoutTemplate },
 ];
 
 const getGenerationErrorMessage = (errorType?: string, error?: string) => {
@@ -53,52 +59,36 @@ const getGenerationErrorMessage = (errorType?: string, error?: string) => {
   return error || "Generation failed. Please try again later.";
 };
 
-function CaptionDisplay({ caption, onClose }: { caption: string; onClose: () => void }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(caption);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="mt-3 space-y-2">
-      <div className="flex items-center justify-between">
-        <Label className="text-xs font-medium flex items-center gap-1">
-          <MessageSquare className="w-3 h-3" />
-          Generated Caption
-        </Label>
-        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={handleCopy}>
-          {copied ? <Check className="w-3 h-3 mr-1" /> : <Copy className="w-3 h-3 mr-1" />}
-          {copied ? "Copied!" : "Copy"}
-        </Button>
-      </div>
-      <div className="p-3 rounded-md bg-muted text-sm whitespace-pre-wrap border">
-        {caption}
-      </div>
-    </div>
-  );
-}
+type ChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  imageUrl?: string;
+  generatedText?: { headline: string; subheadline: string; bullets: string[] };
+  timestamp: Date;
+};
 
 export default function CreateImagePage() {
   const { user, profile } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
   const [selectedPreset, setSelectedPreset] = useState("social_post");
-  const [prompt, setPrompt] = useState("");
+  const [inputValue, setInputValue] = useState("");
   const [includePhoto, setIncludePhoto] = useState(false);
-  const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
   const [remaining, setRemaining] = useState<number | null>(null);
-  const [captions, setCaptions] = useState<Record<string, string>>({});
-  const [captionLoading, setCaptionLoading] = useState<Record<string, boolean>>({});
   const [captionLanguage, setCaptionLanguage] = useState("Romanian");
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(true);
+  const [copiedCaption, setCopiedCaption] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // --- Course context state ---
+  // Course context
   const [selectedUniId, setSelectedUniId] = useState<string>("");
   const [selectedCourseId, setSelectedCourseId] = useState<string>("");
 
-  // --- Cooldown state ---
+  // Cooldown
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
@@ -119,10 +109,8 @@ export default function CreateImagePage() {
   };
 
   const isCoolingDown = cooldownUntil !== null && Date.now() < cooldownUntil;
-
   const hasAvatar = !!(profile as any)?.avatar_url;
 
-  // --- Course context queries ---
   const { data: universities = [] } = useQuery({
     queryKey: ["universities-active"],
     queryFn: async () => {
@@ -141,20 +129,11 @@ export default function CreateImagePage() {
 
   const filteredCourses = selectedUniId ? courses.filter((c: any) => c.university_id === selectedUniId) : courses;
 
-  // Fetch card settings for share link
   const { data: cardSettings } = useQuery({
     queryKey: ["my-card-settings", user?.id],
     queryFn: async () => {
-      const { data: card } = await supabase
-        .from("agent_card_settings")
-        .select("is_public")
-        .eq("user_id", user!.id)
-        .maybeSingle();
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("slug")
-        .eq("id", user!.id)
-        .single();
+      const { data: card } = await supabase.from("agent_card_settings").select("is_public").eq("user_id", user!.id).maybeSingle();
+      const { data: prof } = await supabase.from("profiles").select("slug").eq("id", user!.id).single();
       return { is_public: card?.is_public || false, slug: prof?.slug || null };
     },
     enabled: !!user,
@@ -177,10 +156,42 @@ export default function CreateImagePage() {
     enabled: !!user,
   });
 
-  const generate = useMutation({
-    mutationFn: async () => {
+  // Auto-scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Get the last generated image URL for edit mode
+  const getLastImageUrl = (): string | null => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "assistant" && messages[i].imageUrl) {
+        return messages[i].imageUrl!;
+      }
+    }
+    return null;
+  };
+
+  const handleSend = async () => {
+    const text = inputValue.trim();
+    if (!text || isGenerating) return;
+
+    const userMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: text,
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    setInputValue("");
+    setIsGenerating(true);
+    setSettingsOpen(false);
+
+    try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
+
+      const lastImageUrl = getLastImageUrl();
+      const isEdit = !!lastImageUrl;
 
       const resp = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-image`,
@@ -190,7 +201,15 @@ export default function CreateImagePage() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ prompt, preset: selectedPreset, includePhoto, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, language: captionLanguage, ...(selectedCourseId ? { courseId: selectedCourseId } : {}) }),
+          body: JSON.stringify({
+            prompt: isEdit ? messages[0]?.content || text : text,
+            preset: selectedPreset,
+            includePhoto,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            language: captionLanguage,
+            ...(selectedCourseId ? { courseId: selectedCourseId } : {}),
+            ...(isEdit ? { previousImageUrl: lastImageUrl, editInstruction: text } : {}),
+          }),
         }
       );
 
@@ -201,53 +220,48 @@ export default function CreateImagePage() {
         throw new Error(getGenerationErrorMessage(errorType, result?.error));
       }
 
-      // Client-side branding composition (logo + profile photo)
+      // Client-side branding
       let finalUrl = result.url;
       const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/brand-assets/eduforyou-logo.png`;
-      finalUrl = await compositeFullBranding(result.url, logoUrl, result.avatarUrl || null, selectedPreset);
+      finalUrl = await compositeFullBranding(result.url, logoUrl, result.avatarUrl || null, selectedPreset, !!includePhoto);
 
-      return { url: finalUrl, remaining: result.remaining, generatedText: result.generatedText };
-    },
-    onSuccess: (data) => {
-      setGeneratedUrl(data.url);
-      if (data.remaining !== undefined) setRemaining(data.remaining);
+      if (result.remaining !== undefined) setRemaining(result.remaining);
       qc.invalidateQueries({ queryKey: ["my-generated-images"] });
-      toast({ title: "Image generated!" });
-    },
-    onError: (e: any) => {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
-    },
-  });
 
-  const generateCaption = async (key: string, imgPrompt: string, imgPreset: string) => {
-    setCaptionLoading((prev) => ({ ...prev, [key]: true }));
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-
-      const resp = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-caption`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ prompt: imgPrompt, preset: imgPreset, language: captionLanguage, ...(selectedCourseId ? { courseId: selectedCourseId } : {}) }),
-        }
-      );
-
-      const result = await resp.json();
-      if (!resp.ok || result?.ok === false) {
-        if (result?.errorType === "rate_limit") startCooldown(30);
-        throw new Error(getGenerationErrorMessage(result?.errorType, result?.error || "Caption generation failed"));
-      }
-      setCaptions((prev) => ({ ...prev, [key]: result.caption }));
+      const assistantMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: isEdit
+          ? "✅ Image updated! Want to change anything else?"
+          : "✅ Here's your image! You can ask me to change colors, text, layout, or anything else.",
+        imageUrl: finalUrl,
+        generatedText: result.generatedText,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, assistantMsg]);
     } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+      const errorMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: `❌ ${e.message}`,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
     } finally {
-      setCaptionLoading((prev) => ({ ...prev, [key]: false }));
+      setIsGenerating(false);
+      inputRef.current?.focus();
     }
+  };
+
+  const handleCopyCaption = async (text: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopiedCaption(text);
+    setTimeout(() => setCopiedCaption(null), 2000);
+  };
+
+  const handleNewConversation = () => {
+    setMessages([]);
+    setSettingsOpen(true);
   };
 
   const getPublicUrl = (path: string) => {
@@ -255,199 +269,273 @@ export default function CreateImagePage() {
     return data.publicUrl;
   };
 
+  const lastImageMsg = [...messages].reverse().find((m) => m.role === "assistant" && m.imageUrl);
+
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-4">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
               <Sparkles className="w-6 h-6 text-accent" />
-              AI Image Generator
+              AI Image Studio
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Create branded marketing images with AI
+              Chat with AI to create and refine marketing images
             </p>
           </div>
-          {remaining !== null && (
-            <Badge variant="secondary" className="text-sm">
-              {remaining}/5 remaining today
-            </Badge>
-          )}
-        </div>
-
-        {/* Preset selector */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {PRESETS.map((p) => (
-            <Card
-              key={p.id}
-              className={`cursor-pointer transition-all hover:shadow-md ${
-                selectedPreset === p.id
-                  ? "ring-2 ring-accent border-accent"
-                  : "hover:border-accent/50"
-              }`}
-              onClick={() => setSelectedPreset(p.id)}
-            >
-              <CardContent className="p-4 text-center">
-                <p.icon className={`w-8 h-8 mx-auto mb-2 ${selectedPreset === p.id ? "text-accent" : "text-muted-foreground"}`} />
-                <p className="font-medium text-sm">{p.label}</p>
-                <p className="text-xs text-muted-foreground">{p.desc}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Prompt & Options */}
-        <Card>
-          <CardContent className="pt-6 space-y-4">
-            {/* Course context selectors */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-sm">Filter by institution (optional)</Label>
-                <Select value={selectedUniId} onValueChange={(v) => { setSelectedUniId(v === "__clear__" ? "" : v); setSelectedCourseId(""); }}>
-                  <SelectTrigger><SelectValue placeholder="All institutions" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__clear__">All institutions</SelectItem>
-                    {universities.map((u: any) => (
-                      <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-sm">Select course (optional — enriches AI context)</Label>
-                <Select value={selectedCourseId} onValueChange={(v) => setSelectedCourseId(v === "__clear__" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder="No course selected" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__clear__">No course selected</SelectItem>
-                    {filteredCourses.map((c: any) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name} ({c.level})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>What should the image show?</Label>
-              <Textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="e.g. A vibrant promotional post about studying in London with scholarship opportunities..."
-                rows={3}
-              />
-            </div>
-
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-4">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={includePhoto}
-                        onCheckedChange={setIncludePhoto}
-                        disabled={!hasAvatar}
-                      />
-                      <Label className="flex items-center gap-1 cursor-pointer">
-                        <User className="w-4 h-4" />
-                        Include my photo
-                      </Label>
-                    </div>
-                  </TooltipTrigger>
-                  {!hasAvatar && (
-                    <TooltipContent>
-                      Upload your photo in Profile first
-                    </TooltipContent>
-                  )}
-                </Tooltip>
-
-                <div className="flex items-center gap-2">
-                  <Label className="text-sm whitespace-nowrap">Caption language:</Label>
-                  <Select value={captionLanguage} onValueChange={setCaptionLanguage}>
-                    <SelectTrigger className="w-[140px] h-9">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LANGUAGES.map((l) => (
-                        <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <Button
-                onClick={() => generate.mutate()}
-                disabled={generate.isPending || !prompt.trim() || isCoolingDown}
-                className="bg-accent text-accent-foreground hover:bg-accent/90"
-              >
-                {isCoolingDown ? (
-                  <>AI busy — wait {cooldownSeconds}s</>
-                ) : generate.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4 mr-1" />
-                    Generate Image
-                  </>
-                )}
+          <div className="flex items-center gap-2">
+            {remaining !== null && (
+              <Badge variant="secondary" className="text-sm">
+                {remaining}/5 remaining
+              </Badge>
+            )}
+            {messages.length > 0 && (
+              <Button variant="outline" size="sm" onClick={handleNewConversation}>
+                New Image
               </Button>
-            </div>
-          </CardContent>
-        </Card>
+            )}
+          </div>
+        </div>
 
-        {/* Generated Result */}
-        {generatedUrl && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Generated Image</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="relative group">
-                <img
-                  src={generatedUrl}
-                  alt="Generated"
-                  className="w-full max-w-lg mx-auto rounded-lg shadow-md"
-                />
-                <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Settings Panel */}
+        <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
+          <CollapsibleTrigger asChild>
+            <Button variant="outline" size="sm" className="w-full justify-between">
+              <span className="flex items-center gap-2">
+                <Settings2 className="w-4 h-4" />
+                Image Settings
+              </span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${settingsOpen ? "rotate-180" : ""}`} />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-3">
+            <Card>
+              <CardContent className="pt-4 space-y-4">
+                {/* Preset selector */}
+                <div>
+                  <Label className="text-sm mb-2 block">Format</Label>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {PRESETS.map((p) => (
+                      <button
+                        key={p.id}
+                        className={`flex items-center gap-2 p-2.5 rounded-lg border text-left transition-all text-sm ${
+                          selectedPreset === p.id
+                            ? "ring-2 ring-accent border-accent bg-accent/5"
+                            : "hover:border-accent/50"
+                        }`}
+                        onClick={() => setSelectedPreset(p.id)}
+                      >
+                        <p.icon className={`w-4 h-4 flex-shrink-0 ${selectedPreset === p.id ? "text-accent" : "text-muted-foreground"}`} />
+                        <div>
+                          <p className="font-medium text-xs">{p.label}</p>
+                          <p className="text-[10px] text-muted-foreground">{p.desc}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Course context */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Institution (optional)</Label>
+                    <Select value={selectedUniId} onValueChange={(v) => { setSelectedUniId(v === "__clear__" ? "" : v); setSelectedCourseId(""); }}>
+                      <SelectTrigger className="h-9"><SelectValue placeholder="All" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__clear__">All institutions</SelectItem>
+                        {universities.map((u: any) => (
+                          <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Course (optional)</Label>
+                    <Select value={selectedCourseId} onValueChange={(v) => setSelectedCourseId(v === "__clear__" ? "" : v)}>
+                      <SelectTrigger className="h-9"><SelectValue placeholder="No course" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__clear__">No course</SelectItem>
+                        {filteredCourses.map((c: any) => (
+                          <SelectItem key={c.id} value={c.id}>{c.name} ({c.level})</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Options row */}
+                <div className="flex items-center gap-4 flex-wrap">
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button
-                        size="icon"
-                        variant="secondary"
-                        onClick={() => generateCaption("latest", prompt, selectedPreset)}
-                        disabled={captionLoading["latest"]}
-                      >
-                        {captionLoading["latest"] ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <MessageSquare className="w-4 h-4" />
-                        )}
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Switch checked={includePhoto} onCheckedChange={setIncludePhoto} disabled={!hasAvatar} />
+                        <Label className="flex items-center gap-1 cursor-pointer text-sm">
+                          <User className="w-3.5 h-3.5" />
+                          Include my photo
+                        </Label>
+                      </div>
                     </TooltipTrigger>
-                    <TooltipContent>Generate caption</TooltipContent>
+                    {!hasAvatar && (
+                      <TooltipContent>Upload your photo in Profile first</TooltipContent>
+                    )}
                   </Tooltip>
+
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs whitespace-nowrap">Language:</Label>
+                    <Select value={captionLanguage} onValueChange={setCaptionLanguage}>
+                      <SelectTrigger className="w-[130px] h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LANGUAGES.map((l) => (
+                          <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
+              </CardContent>
+            </Card>
+          </CollapsibleContent>
+        </Collapsible>
+
+        {/* Chat Area */}
+        <Card className="flex flex-col" style={{ minHeight: messages.length > 0 ? "500px" : "200px" }}>
+          <ScrollArea className="flex-1 p-4">
+            {messages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Bot className="w-12 h-12 text-muted-foreground/40 mb-4" />
+                <h3 className="font-semibold text-lg mb-1">Start creating</h3>
+                <p className="text-sm text-muted-foreground max-w-md">
+                  Describe what you want — e.g. "A post about studying Business in London" — and I'll create a branded marketing image. You can then refine it through conversation.
+                </p>
               </div>
-              <div className="mt-3 flex justify-center">
-                <SocialShareButtons
-                  imageUrl={generatedUrl}
-                  caption={captions["latest"] || ""}
-                  cardUrl={cardUrl}
-                  filenamePrefix="eduforyou-generated"
-                />
+            ) : (
+              <div className="space-y-4">
+                {messages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                  >
+                    <div
+                      className={`max-w-[85%] rounded-2xl px-4 py-2.5 ${
+                        msg.role === "user"
+                          ? "bg-accent text-accent-foreground rounded-br-md"
+                          : "bg-muted rounded-bl-md"
+                      }`}
+                    >
+                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+
+                      {msg.imageUrl && (
+                        <div className="mt-3">
+                          <img
+                            src={msg.imageUrl}
+                            alt="Generated"
+                            className="rounded-lg max-w-full shadow-md"
+                          />
+                          <div className="mt-2 flex items-center gap-2 flex-wrap">
+                            <SocialShareButtons
+                              imageUrl={msg.imageUrl}
+                              caption=""
+                              cardUrl={cardUrl}
+                              filenamePrefix="eduforyou-generated"
+                              size="sm"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {msg.generatedText && (
+                        <div className="mt-2 p-2 rounded-md bg-background/60 text-xs space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium text-muted-foreground">Generated text:</span>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 text-[10px] px-2"
+                              onClick={() => {
+                                const text = `${msg.generatedText!.headline}\n${msg.generatedText!.subheadline}${msg.generatedText!.bullets.length > 0 ? "\n" + msg.generatedText!.bullets.map(b => `• ${b}`).join("\n") : ""}`;
+                                handleCopyCaption(text);
+                              }}
+                            >
+                              {copiedCaption ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                            </Button>
+                          </div>
+                          <p className="font-semibold">{msg.generatedText.headline}</p>
+                          <p>{msg.generatedText.subheadline}</p>
+                          {msg.generatedText.bullets.length > 0 && (
+                            <ul className="list-disc pl-4">
+                              {msg.generatedText.bullets.map((b, i) => (
+                                <li key={i}>{b}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+
+                      <p className="text-[10px] mt-1 opacity-50">
+                        {format(msg.timestamp, "HH:mm")}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+
+                {isGenerating && (
+                  <div className="flex justify-start">
+                    <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        {getLastImageUrl() ? "Editing image..." : "Creating your image..."}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
               </div>
-              {captions["latest"] && (
-                <CaptionDisplay
-                  caption={captions["latest"]}
-                  onClose={() => setCaptions((prev) => { const n = { ...prev }; delete n["latest"]; return n; })}
-                />
-              )}
-            </CardContent>
-          </Card>
-        )}
+            )}
+          </ScrollArea>
+
+          {/* Input bar */}
+          <div className="border-t p-3">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSend();
+              }}
+              className="flex items-center gap-2"
+            >
+              <Input
+                ref={inputRef}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder={
+                  messages.length === 0
+                    ? "Describe the image you want..."
+                    : "Ask for changes — e.g. 'make the background darker'..."
+                }
+                disabled={isGenerating || isCoolingDown}
+                className="flex-1"
+              />
+              <Button
+                type="submit"
+                size="icon"
+                disabled={isGenerating || !inputValue.trim() || isCoolingDown}
+                className="bg-accent text-accent-foreground hover:bg-accent/90 flex-shrink-0"
+              >
+                {isCoolingDown ? (
+                  <span className="text-[10px]">{cooldownSeconds}s</span>
+                ) : isGenerating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+              </Button>
+            </form>
+          </div>
+        </Card>
 
         {/* Gallery */}
         <Card>
@@ -465,7 +553,7 @@ export default function CreateImagePage() {
               </div>
             ) : gallery.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">
-                No images generated yet. Create your first one above!
+                No images generated yet. Start a conversation above!
               </p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -480,60 +568,26 @@ export default function CreateImagePage() {
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2">
                         <p className="text-white text-xs line-clamp-2">{img.prompt}</p>
                         <div className="flex items-center justify-between mt-1">
-                          <Badge variant="secondary" className="text-[10px]">
-                            {img.preset}
-                          </Badge>
-                          <span className="text-[10px] text-white/70">
-                            {format(new Date(img.created_at), "dd MMM")}
-                          </span>
+                          <Badge variant="secondary" className="text-[10px]">{img.preset}</Badge>
+                          <span className="text-[10px] text-white/70">{format(new Date(img.created_at), "dd MMM")}</span>
                         </div>
-                      </div>
-                      <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              size="icon"
-                              variant="secondary"
-                              className="h-7 w-7"
-                              onClick={() => generateCaption(img.id, img.prompt, img.preset)}
-                              disabled={captionLoading[img.id]}
-                            >
-                              {captionLoading[img.id] ? (
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                              ) : (
-                                <MessageSquare className="w-3 h-3" />
-                              )}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Generate caption</TooltipContent>
-                        </Tooltip>
                       </div>
                     </div>
                     <div className="p-2 flex justify-center">
                       <SocialShareButtons
                         imageUrl={getPublicUrl(img.image_path)}
-                        caption={captions[img.id] || ""}
+                        caption=""
                         cardUrl={cardUrl}
                         filenamePrefix={`eduforyou-${img.id.slice(0, 8)}`}
                         size="sm"
                       />
                     </div>
-                    {captions[img.id] && (
-                      <div className="p-3">
-                        <CaptionDisplay
-                          caption={captions[img.id]}
-                          onClose={() => setCaptions((prev) => { const n = { ...prev }; delete n[img.id]; return n; })}
-                        />
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
             )}
           </CardContent>
         </Card>
-
-
       </div>
     </DashboardLayout>
   );
