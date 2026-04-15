@@ -1,92 +1,39 @@
 
 
-# Audit: Image Generation Quality Issues
+# Image Generator: 3 Improvements
 
-## Problems Found
+## 1. Skip Logo Overlay When Profile Photo Is Included
+The user's branded profile picture already contains the EduForYou logo (gold frame with logo). Adding a second logo overlay is redundant.
 
-### 1. Romanian Text is Broken
-The screenshot shows "ANTUL TĂU, ALIN" — clearly truncated/corrupted text. **Root cause**: AI image generation models (Gemini Flash Image) are notoriously bad at rendering non-English text, especially with diacritics (ă, ț, î, ș). The model tries to "draw" Romanian characters and frequently misspells, truncates, or garbles them.
+**Change**: In `CreateImagePage.tsx` and `SocialPostsPage.tsx`, when `includePhoto` is true, skip the logo overlay step — only composite the profile photo. When `includePhoto` is false, keep the logo overlay as-is.
 
-### 2. Prompt Overload (~2000 words)
-The current prompt contains **18 separate instruction blocks** crammed into one message. The model gets confused trying to follow all rules simultaneously:
-- Zero university name rules (repeated 3 times)
-- Mandatory text structure
-- Logo placement instructions
-- Profile photo space reservation
-- Brand guidelines
-- Course context
-- Language rules
-- Content restrictions
+**File**: `src/lib/image-composite.ts` — update `compositeFullBranding` to accept a flag and conditionally skip logo.
+**Files**: `src/pages/shared/CreateImagePage.tsx` and `SocialPostsPage.tsx` — pass the flag.
 
-### 3. No Prompt Refinement Layer
-The user's raw input (e.g., "fă un post despre sănătate") goes directly to image generation without any intelligent preprocessing. There's no agent that:
-- Understands the user's intent
-- Writes optimized, correct Romanian marketing text
-- Creates a structured prompt for the image model
+## 2. No Random People in Image When Photo Is Included
+The prompt already says "DO NOT generate any people, faces, or human figures" (line 144 of generate-image/index.ts). This rule should remain but be reinforced specifically when `includePhoto` is true — emphasize that the agent's real photo will be added and no other humans should appear. When `includePhoto` is false and it's not a group context, the same rule applies.
 
-### 4. Logo "Pixel-Perfect Copy" is Impossible
-The prompt asks the AI to "copy pixel-perfect from the attached image" — image generation models cannot do this. They always redraw/reinterpret logos.
+**File**: `supabase/functions/generate-image/index.ts` — strengthen the "no people" instruction when includePhoto is true.
+**File**: `supabase/functions/generate-image/prompt-agent.ts` — reinforce in the visual description guidelines.
 
-### 5. Profile Photo Composition is Fragile
-The client-side Canvas composite works but the AI doesn't always leave the right amount of clear space in the bottom-left corner.
+## 3. Chat-Style Interface for Image Instructions
+Replace the single textarea + generate button with a conversational chat interface (like ChatGPT). Users type instructions, see the generated image inline, and can follow up with refinements ("make it more blue", "change the headline", "add more text"). Each message in the conversation feeds back into the prompt agent.
 
----
-
-## Solution: Two-Step AI Agent Architecture
-
-Instead of one massive prompt → image, split into **two sequential calls**:
-
-```text
-Step 1: PROMPT AGENT (text model — Gemini Flash, fast & cheap)
-   User input + course context + brand rules
-   → Generates: exact headline, subheadline, bullet points in perfect Romanian
-   → Generates: visual description (colors, layout, mood)
-   → Returns structured JSON
-
-Step 2: IMAGE GENERATOR (image model — Gemini Flash Image)
-   Receives ONLY: visual description + exact text to render
-   Much simpler prompt = much better results
-```
-
-### Step 1: Smart Prompt Agent
-- Uses `google/gemini-3-flash-preview` (text-only, fast)
-- Receives: user's creative brief, language, course data, brand rules
-- Returns structured JSON:
-  ```json
-  {
-    "headline": "Transformă-ți Viitorul",
-    "subheadline": "Licență în Sănătate — Birmingham, UK",
-    "bullets": ["Studiu flexibil", "Finanțare disponibilă"],
-    "visual_description": "Modern gradient background, navy to gold...",
-    "layout_notes": "Clean bottom-left corner for profile photo"
-  }
-  ```
-- This model is excellent at Romanian and can spell-check itself
-
-### Step 2: Simplified Image Generation
-- Receives the structured output from Step 1
-- Much shorter, focused prompt: "Create this exact layout with this exact text"
-- No more 2000-word instruction blocks
-- Logo overlay done client-side (Canvas) instead of asking AI to copy it
-
-### Step 3: Logo + Profile Photo — All Client-Side
-- **Logo**: Overlay the real logo PNG via Canvas API (pixel-perfect guaranteed)
-- **Profile photo**: Already done client-side, keep as-is but improve positioning
-- The AI generates a **clean background design only** — all branding elements are composited afterward
+**Implementation**:
+- Transform `CreateImagePage.tsx` into a chat-style UI with message bubbles
+- User messages appear on the right, AI responses (image + generated text) on the left
+- "Send" button replaces "Generate" — first message generates, follow-ups refine
+- The edge function receives conversation history to understand iterative requests
+- Use the `--edit-image` capability of Gemini to refine existing images based on follow-up instructions
+- Keep preset/course/language selectors as a collapsible settings panel above the chat
 
 ### Files to modify
 
 | File | Change |
 |------|--------|
-| `supabase/functions/generate-image/index.ts` | Split into 2 AI calls: text agent → image generator. Remove logo attachment. Simplify image prompt drastically. |
-| `src/lib/image-composite.ts` | Add logo overlay compositing on top of profile photo compositing |
-| `src/pages/shared/CreateImagePage.tsx` | Update to handle new response format (structured text + image). Show generated text for user review. |
-| `src/pages/shared/SocialPostsPage.tsx` | Same client-side changes |
-
-### Key benefits
-- **Perfect Romanian**: Text model writes flawless Romanian, then image model just renders it
-- **Consistent quality**: Structured prompts = predictable layouts
-- **Real logo**: Canvas overlay = pixel-perfect branding every time
-- **Faster**: Text agent call is ~2s, image call is simpler/faster
-- **Debuggable**: Can see the intermediate text output and fix issues
+| `src/lib/image-composite.ts` | `compositeFullBranding` accepts `skipLogo` param |
+| `src/pages/shared/CreateImagePage.tsx` | Chat UI + pass `skipLogo` when includePhoto |
+| `src/pages/shared/SocialPostsPage.tsx` | Pass `skipLogo` when includePhoto |
+| `supabase/functions/generate-image/index.ts` | Accept conversation history, support edit mode, strengthen no-people rule |
+| `supabase/functions/generate-image/prompt-agent.ts` | Accept conversation context for iterative refinement |
 
