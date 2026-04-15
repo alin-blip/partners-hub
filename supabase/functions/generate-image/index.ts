@@ -97,38 +97,9 @@ serve(async (req) => {
     const lang = language || "English";
     const isEditMode = !!previousImageUrl && !!editInstruction;
 
-    let imageBase64: string | undefined;
     let agentOutput: any = null;
 
-    if (isEditMode) {
-      // ═══════════════════════════════════════════════════════
-      // EDIT MODE: Refine an existing image based on user feedback
-      // ═══════════════════════════════════════════════════════
-      console.log("Edit mode: Refining existing image...");
-
-      const editPrompt = `Edit this marketing image according to these instructions: ${editInstruction}
-
-RULES:
-- Keep the overall layout and style consistent
-- Apply ONLY the requested changes
-- Text must be in ${lang} with perfect spelling and diacritics
-- DO NOT add any logo, watermark, or branding
-${includePhoto ? "- Keep bottom-left corner clean (profile photo area)\n- Do NOT add any people, faces, or human figures" : "- Do NOT add any people, faces, or human figures"}
-- Keep bottom-right corner clear (logo area)`;
-
-      const aiRequestBody = JSON.stringify({
-        model: "google/gemini-3.1-flash-image-preview",
-        messages: [{
-          role: "user",
-          content: [
-            { type: "text", text: editPrompt },
-            { type: "image_url", image_url: { url: previousImageUrl } },
-          ],
-        }],
-        modalities: ["image", "text"],
-      });
-
-    } else {
+    if (!isEditMode) {
       // ═══════════════════════════════════════════════════════
       // STEP 1: Prompt Agent — generate structured marketing copy
       // ═══════════════════════════════════════════════════════
