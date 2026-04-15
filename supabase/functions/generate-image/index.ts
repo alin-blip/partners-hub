@@ -95,27 +95,61 @@ serve(async (req) => {
     }
 
     const lang = language || "English";
+    const isEditMode = !!previousImageUrl && !!editInstruction;
+
+    let imageBase64: string | undefined;
+    let agentOutput: any = null;
+
+    if (isEditMode) {
+      // ═══════════════════════════════════════════════════════
+      // EDIT MODE: Refine an existing image based on user feedback
+      // ═══════════════════════════════════════════════════════
+      console.log("Edit mode: Refining existing image...");
+
+      const editPrompt = `Edit this marketing image according to these instructions: ${editInstruction}
+
+RULES:
+- Keep the overall layout and style consistent
+- Apply ONLY the requested changes
+- Text must be in ${lang} with perfect spelling and diacritics
+- DO NOT add any logo, watermark, or branding
+${includePhoto ? "- Keep bottom-left corner clean (profile photo area)\n- Do NOT add any people, faces, or human figures" : "- Do NOT add any people, faces, or human figures"}
+- Keep bottom-right corner clear (logo area)`;
+
+      const aiRequestBody = JSON.stringify({
+        model: "google/gemini-3.1-flash-image-preview",
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text", text: editPrompt },
+            { type: "image_url", image_url: { url: previousImageUrl } },
+          ],
+        }],
+        modalities: ["image", "text"],
+      });
+
+    } else {
+      // ═══════════════════════════════════════════════════════
+      // STEP 1: Prompt Agent — generate structured marketing copy
+      // ═══════════════════════════════════════════════════════
+      console.log("Step 1: Running prompt agent...");
+      agentOutput = await runPromptAgent(
+        {
+          userPrompt: prompt,
+          language: lang,
+          preset,
+          brandPrompt: brand?.brand_prompt || undefined,
+          courseContext: courseContext || undefined,
+          includePhoto: !!includePhoto,
+          agentName: profile?.full_name || undefined,
+        },
+        LOVABLE_API_KEY
+      );
+      console.log("Step 1 complete:", JSON.stringify(agentOutput).slice(0, 300));
+    }
 
     // ═══════════════════════════════════════════════════════
-    // STEP 1: Prompt Agent — generate structured marketing copy
-    // ═══════════════════════════════════════════════════════
-    console.log("Step 1: Running prompt agent...");
-    const agentOutput = await runPromptAgent(
-      {
-        userPrompt: prompt,
-        language: lang,
-        preset,
-        brandPrompt: brand?.brand_prompt || undefined,
-        courseContext: courseContext || undefined,
-        includePhoto: !!includePhoto,
-        agentName: profile?.full_name || undefined,
-      },
-      LOVABLE_API_KEY
-    );
-    console.log("Step 1 complete:", JSON.stringify(agentOutput).slice(0, 300));
-
-    // ═══════════════════════════════════════════════════════
-    // STEP 2: Image Generation — simplified prompt with exact text
+    // STEP 2: Image Generation / Edit
     // ═══════════════════════════════════════════════════════
     const presetDimensions: Record<string, string> = {
       social_post: "1080x1080 square",
@@ -124,34 +158,59 @@ serve(async (req) => {
       banner: "1200x628 horizontal",
     };
 
-    const bulletsText = agentOutput.bullets.length > 0
-      ? `\nBullet points (render these on the image):\n${agentOutput.bullets.map(b => `• ${b}`).join("\n")}`
-      : "";
+    let aiRequestBody: string;
 
-    const imagePrompt = `Create a ${presetDimensions[preset] || "1080x1080 square"} marketing image.
+    if (isEditMode) {
+      const editPrompt = `Edit this marketing image according to these instructions: ${editInstruction}
 
-VISUAL STYLE: ${agentOutput.visual_description}
+RULES:
+- Keep the overall layout and style consistent
+- Apply ONLY the requested changes
+- Text must be in ${lang} with perfect spelling and diacritics
+- DO NOT add any logo, watermark, or branding
+${includePhoto ? "- Keep bottom-left corner clean (profile photo area)\n- Do NOT add any people, faces, or human figures" : "- Do NOT add any people, faces, or human figures"}
+- Keep bottom-right corner clear (logo area)`;
+
+      aiRequestBody = JSON.stringify({
+        model: "google/gemini-3.1-flash-image-preview",
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text", text: editPrompt },
+            { type: "image_url", image_url: { url: previousImageUrl } },
+          ],
+        }],
+        modalities: ["image", "text"],
+      });
+    } else {
+      const bulletsText = agentOutput!.bullets.length > 0
+        ? `\nBullet points (render these on the image):\n${agentOutput!.bullets.map((b: string) => `• ${b}`).join("\n")}`
+        : "";
+
+      const imagePrompt = `Create a ${presetDimensions[preset] || "1080x1080 square"} marketing image.
+
+VISUAL STYLE: ${agentOutput!.visual_description}
 
 TEXT TO RENDER ON THE IMAGE (copy these EXACTLY, character-by-character — do NOT modify, translate, or rephrase):
-Headline: ${agentOutput.headline}
-Subheadline: ${agentOutput.subheadline}${bulletsText}
+Headline: ${agentOutput!.headline}
+Subheadline: ${agentOutput!.subheadline}${bulletsText}
 
 LAYOUT:
-${agentOutput.layout_notes}
+${agentOutput!.layout_notes}
 - Keep bottom-right corner clear (logo will be added afterward).
 ${includePhoto ? `- Keep bottom-left corner clean and unobstructed (profile photo will be overlaid afterward).
 - CRITICAL: Do NOT generate any people, faces, human figures, or silhouettes anywhere in the image. The agent's REAL photo will be composited afterward — any AI-generated person would clash with it.` : "- DO NOT generate any people, faces, or human figures."}
 - DO NOT include any logo, watermark, or branding — those are added separately.
 - The image should be ~70% visual, ~30% text. Clean, modern, professional.`;
 
-    console.log("Step 2: Generating image...");
+      aiRequestBody = JSON.stringify({
+        model: "google/gemini-3.1-flash-image-preview",
+        messages: [{ role: "user", content: imagePrompt }],
+        modalities: ["image", "text"],
+      });
+    }
 
-    // Call AI with retry logic
-    const aiRequestBody = JSON.stringify({
-      model: "google/gemini-3.1-flash-image-preview",
-      messages: [{ role: "user", content: imagePrompt }],
-      modalities: ["image", "text"],
-    });
+    console.log(`Step 2: ${isEditMode ? "Editing" : "Generating"} image...`);
 
     let aiResponse: Response | null = null;
     const MAX_RETRIES = 3;
