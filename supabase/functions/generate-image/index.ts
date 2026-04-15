@@ -38,7 +38,7 @@ serve(async (req) => {
       .single();
     const isOwner = roleRow?.role === "owner";
 
-    const { prompt, preset, includePhoto, timezone, language, courseId } = await req.json();
+    const { prompt, preset, includePhoto, timezone, language, courseId, previousImageUrl, editInstruction } = await req.json();
     if (!prompt || !preset) throw new Error("Missing prompt or preset");
 
     // Daily limit check
