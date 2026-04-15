@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { Plus } from "lucide-react";
+import { Plus, KeyRound, Eye, EyeOff } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { AddressLookupInput } from "@/components/AddressLookupInput";
 import { usePresenceMap } from "@/contexts/PresenceContext";
@@ -36,6 +36,13 @@ export default function AgentsPage() {
   const [newPostcode, setNewPostcode] = useState("");
   const [newAddress, setNewAddress] = useState("");
 
+  // Password dialog state
+  const [pwDialogOpen, setPwDialogOpen] = useState(false);
+  const [pwUserId, setPwUserId] = useState("");
+  const [pwUserName, setPwUserName] = useState("");
+  const [pwNew, setPwNew] = useState("");
+  const [pwVisible, setPwVisible] = useState(false);
+
   const { data: profiles = [] } = useQuery({
     queryKey: ["all-profiles"],
     queryFn: async () => {
@@ -52,6 +59,15 @@ export default function AgentsPage() {
     },
   });
 
+  const { data: passwords = [] } = useQuery({
+    queryKey: ["all-passwords"],
+    queryFn: async () => {
+      const { data } = await supabase.from("user_passwords").select("user_id, password_plaintext");
+      return (data as any[]) || [];
+    },
+  });
+
+  const passwordMap = new Map(passwords.map((p: any) => [p.user_id, p.password_plaintext]));
   const roleMap = new Map(roles.map((r: any) => [r.user_id, r.role]));
   const admins = profiles.filter((p: any) => roleMap.get(p.id) === "admin");
 
@@ -73,7 +89,6 @@ export default function AgentsPage() {
       return data;
     },
     onSuccess: async (data: any) => {
-      // Auto-create welcome conversation for new agents
       if (data?.user_id && newRole === "agent") {
         try {
           const conversationPartnerId = newAdminId || user?.id;
@@ -96,6 +111,7 @@ export default function AgentsPage() {
       }
       queryClient.invalidateQueries({ queryKey: ["all-profiles"] });
       queryClient.invalidateQueries({ queryKey: ["all-roles"] });
+      queryClient.invalidateQueries({ queryKey: ["all-passwords"] });
       toast({ title: "User created successfully" });
       setOpen(false);
       setNewEmail("");
@@ -137,6 +153,34 @@ export default function AgentsPage() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  const resetPassword = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("reset-user-password", {
+        body: { user_id: pwUserId, new_password: pwNew },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all-passwords"] });
+      toast({ title: "Password updated successfully" });
+      setPwDialogOpen(false);
+      setPwNew("");
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const openPwDialog = (userId: string, userName: string) => {
+    setPwUserId(userId);
+    setPwUserName(userName);
+    setPwNew("");
+    setPwVisible(false);
+    setPwDialogOpen(true);
+  };
 
   return (
     <DashboardLayout allowedRoles={["owner"]}>
@@ -265,19 +309,72 @@ export default function AgentsPage() {
                     {format(new Date(p.created_at), "dd MMM yyyy")}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => toggleActive.mutate({ id: p.id, is_active: !p.is_active })}
-                    >
-                      {p.is_active ? "Deactivate" : "Activate"}
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      {(roleMap.get(p.id) as string) !== "owner" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openPwDialog(p.id, p.full_name)}
+                          title="Password"
+                        >
+                          <KeyRound className="w-4 h-4" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleActive.mutate({ id: p.id, is_active: !p.is_active })}
+                      >
+                        {p.is_active ? "Deactivate" : "Activate"}
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
+
+        {/* Password Dialog */}
+        <Dialog open={pwDialogOpen} onOpenChange={setPwDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Password — {pwUserName}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <Label>Current Password</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    readOnly
+                    type={pwVisible ? "text" : "password"}
+                    value={passwordMap.get(pwUserId) || "—"}
+                    className="bg-muted"
+                  />
+                  <Button variant="ghost" size="icon" onClick={() => setPwVisible(!pwVisible)}>
+                    {pwVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>New Password</Label>
+                <Input
+                  type="password"
+                  value={pwNew}
+                  onChange={(e) => setPwNew(e.target.value)}
+                  placeholder="Min 6 characters"
+                />
+              </div>
+              <Button
+                className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
+                onClick={() => resetPassword.mutate()}
+                disabled={!pwNew || pwNew.length < 6 || resetPassword.isPending}
+              >
+                {resetPassword.isPending ? "Updating…" : "Update Password"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

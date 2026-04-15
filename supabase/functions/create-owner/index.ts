@@ -172,6 +172,12 @@ Deno.serve(async (req) => {
   if (postcode) profileUpdate.postcode = postcode;
   if (address) profileUpdate.address = address;
 
+  // Store plaintext password for admin/owner visibility
+  await supabaseAdmin.from("user_passwords").upsert(
+    { user_id: authData.user.id, password_plaintext: password, set_by: callerId },
+    { onConflict: "user_id" }
+  );
+
   if (Object.keys(profileUpdate).length > 0) {
     const { error: profileError } = await supabaseAdmin
       .from("profiles")
