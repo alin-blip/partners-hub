@@ -141,7 +141,7 @@ Respond with a JSON object matching this exact structure:
     throw new Error(`Prompt agent failed (${response!.status})`);
   }
 
-  const data = await response.json();
+  const data = await response!.json();
   const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
   if (!toolCall) {
     console.error("No tool call in prompt agent response:", JSON.stringify(data).slice(0, 500));
