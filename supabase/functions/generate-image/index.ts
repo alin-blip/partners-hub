@@ -132,15 +132,16 @@ serve(async (req) => {
     let aiRequestBody: string;
 
     if (isEditMode) {
-      const editPrompt = `Edit this marketing image according to these instructions: ${editInstruction}
+      const editPrompt = `ABSOLUTE RULE: Do NOT draw any people, faces, human figures, silhouettes, or portraits anywhere in the image.
+
+Edit this marketing image according to these instructions: ${editInstruction}
 
 RULES:
 - Keep the overall layout and style consistent
 - Apply ONLY the requested changes
 - Text must be in ${lang} with perfect spelling and diacritics
-- DO NOT add any logo, watermark, or branding
-${includePhoto ? "- Keep bottom-left corner clean (profile photo area)\n- Do NOT add any people, faces, or human figures" : "- Do NOT add any people, faces, or human figures"}
-- Keep bottom-right corner clear (logo area)`;
+${includePhoto ? "- Keep bottom-left corner clean and empty" : ""}
+- Do NOT add any people, faces, or human figures`;
 
       aiRequestBody = JSON.stringify({
         model: "google/gemini-3.1-flash-image-preview",
