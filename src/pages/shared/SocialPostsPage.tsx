@@ -275,11 +275,10 @@ export default function SocialPostsPage() {
       return { preset, error: errorMessage };
     }
 
-    // Client-side profile photo composition
+    // Client-side branding composition (logo + profile photo)
     let finalUrl = result.url;
-    if (result.avatarUrl && result.url) {
-      finalUrl = await compositeProfilePhoto(result.url, result.avatarUrl, preset);
-    }
+    const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/brand-assets/eduforyou-logo.png`;
+    finalUrl = await compositeFullBranding(result.url, logoUrl, result.avatarUrl || null, preset);
 
     if (result.remaining !== undefined) setRemaining(result.remaining);
     return { preset, url: finalUrl };

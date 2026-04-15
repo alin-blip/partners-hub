@@ -201,13 +201,12 @@ export default function CreateImagePage() {
         throw new Error(getGenerationErrorMessage(errorType, result?.error));
       }
 
-      // Client-side profile photo composition
+      // Client-side branding composition (logo + profile photo)
       let finalUrl = result.url;
-      if (result.avatarUrl && result.url) {
-        finalUrl = await compositeProfilePhoto(result.url, result.avatarUrl, selectedPreset);
-      }
+      const logoUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/brand-assets/eduforyou-logo.png`;
+      finalUrl = await compositeFullBranding(result.url, logoUrl, result.avatarUrl || null, selectedPreset);
 
-      return { url: finalUrl, remaining: result.remaining };
+      return { url: finalUrl, remaining: result.remaining, generatedText: result.generatedText };
     },
     onSuccess: (data) => {
       setGeneratedUrl(data.url);
