@@ -216,9 +216,19 @@ export default function MessagesPage() {
     setNewConvoOpen(false);
   };
 
+  const isMyConversation = (convo: any) =>
+    convo.participant_1 === user?.id || convo.participant_2 === user?.id;
+
   const getOtherParticipant = (convo: any) => {
     if (convo.p1?.id === user?.id) return convo.p2;
     return convo.p1;
+  };
+
+  const getConvoDisplayName = (convo: any) => {
+    if (isMyConversation(convo)) {
+      return getOtherParticipant(convo)?.full_name || "Unknown";
+    }
+    return `${convo.p1?.full_name || "?"} ↔ ${convo.p2?.full_name || "?"}`;
   };
 
   const getUnreadForConvo = (convoId: string) => {
