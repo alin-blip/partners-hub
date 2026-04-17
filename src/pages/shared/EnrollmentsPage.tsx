@@ -314,6 +314,13 @@ export default function EnrollmentsPage() {
           </div>
         )}
       </div>
+
+      <AssessmentBookingDialog
+        open={!!bookingEnrollmentId}
+        onOpenChange={(open) => !open && setBookingEnrollmentId(null)}
+        onConfirm={handleBookAssessment}
+        loading={bookingLoading}
+      />
     </DashboardLayout>
   );
 }
