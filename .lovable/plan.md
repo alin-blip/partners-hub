@@ -1,43 +1,53 @@
 
+The user is asking where to set the assessment test date.
 
-# Plan: Show Campus in Tables + Owner/Admin Date+Time Booking
+Based on the previous implementation:
+- The booking dialog (`AssessmentBookingDialog`) is triggered from inside the **Student Detail page → Enrollments tab**, by changing an enrollment's status to "Assessment Booked".
+- It's NOT available directly from the `/owner/enrollments` list page (where the user currently is).
 
-## What's wrong now
+Let me give a clear answer on where to find it, and offer to add a shortcut.
 
-1. **Campus missing in tables**: The Students table and the Enrollments table don't show the campus where the student applied. The data IS in the database (`enrollments.campus_id`), it's just not selected/rendered.
-2. **Booking dialog only for agents**: When Owner/Admin set status to `assessment_booked` via the dropdown, no dialog appears — they can't pick a date/time. Only agents get the `AssessmentBookingDialog` (which already supports date + time correctly).
+# Where to Set the Assessment Test Date
 
-## Changes (additive only — no functional regressions)
+## Current location (already working)
 
-### 1. `src/pages/shared/StudentsPage.tsx` — add Campus column
-- Extend the students query to also fetch the latest enrollment's campus per student. Approach: a second lightweight query for `enrollments` filtered by the visible student IDs, joining `campuses(name, city)` and `courses(name)`, take the most recent per student into a map.
-- Add columns: **Course** and **Campus** (with city) — hidden on mobile (`hidden md:table-cell`) to keep the layout clean. Show "—" if no enrollment yet.
-- Update CSV export to include those two columns.
+The date + time picker for the assessment test lives inside each student's detail page:
 
-### 2. `src/pages/shared/EnrollmentsPage.tsx` — add Campus column
-- Extend the existing `enrollments` select to also pull `campuses(name, city)` (left join — campus is nullable).
-- Add a **Campus** column right after "Course". Show "—" when null.
-- Add Campus to CSV export.
+```text
+Enrollments page (/owner/enrollments)
+        │
+        │ click on a student row / "View" button
+        ▼
+Student Detail page → "Enrollments" tab
+        │
+        │ in the enrollment row, open the Status dropdown
+        ▼
+Select "Assessment Booked"
+        │
+        ▼
+📅 Dialog opens → pick Date + Time → Confirm
+```
 
-### 3. `src/components/student-detail/StudentEnrollmentsTab.tsx` — Owner/Admin booking dialog
-- When Owner or Admin picks `assessment_booked` from the status dropdown, instead of writing the status directly, open the existing `AssessmentBookingDialog` so they can pick **date + time** (same UX as agents).
-- After confirm, run the same DB update agents already run (`status: "assessment_booked", assessment_date, assessment_time`).
-- Any other status change keeps current behavior (direct mutation).
-- Also add a small **"Assessment: <date> at <time>"** line under the row when those fields are set, so it's visible without re-opening the dialog.
+After confirming, the row shows: **"Assessment: 22 Apr 2026 at 10:00"** inline.
 
-### 4. `src/components/student-detail/StudentEnrollmentsTab.tsx` — show campus per row
-- Extend the enrollments select to include `campuses(name, city)` and add a Campus column to the per-student enrollment history table.
+This works for Owner, Admin, and Agent (same dialog for all roles since the last update).
 
-## What stays the same
-- `AssessmentBookingDialog` already supports date + time — no changes needed.
-- All RLS, statuses, agent permissions, transfer flow, cancellation flow.
-- Booking writes the same fields (`assessment_date`, `assessment_time`) already used by agents — no schema change.
-- No migrations.
+## Optional improvement — quicker access from `/owner/enrollments`
 
-## Files modified
+Right now you have to click into the student first. If you want, I can add a **calendar icon button** directly in each row of the Enrollments table that opens the same date+time dialog — no need to open the student detail. It would:
+
+- Appear next to the status badge on every enrollment row
+- Open the same `AssessmentBookingDialog` (date + time)
+- On confirm, set status → `assessment_booked` and save the date/time
+- If a date is already set, the icon would show the booked date as a tooltip
+
+Nothing else changes — same dialog, same DB fields, same permissions.
+
+## Files that would change (only if you want the shortcut)
+
 | File | Change |
 |------|--------|
-| `src/pages/shared/StudentsPage.tsx` | + Course & Campus columns, + CSV columns |
-| `src/pages/shared/EnrollmentsPage.tsx` | + Campus column, + CSV column |
-| `src/components/student-detail/StudentEnrollmentsTab.tsx` | + Campus column, route Owner/Admin "assessment_booked" through the existing booking dialog, show booked date/time inline |
+| `src/pages/shared/EnrollmentsPage.tsx` | + small calendar button per row, + reuse `AssessmentBookingDialog` |
+
+No DB migration. Fully additive.
 
