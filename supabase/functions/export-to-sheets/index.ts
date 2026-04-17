@@ -285,7 +285,7 @@ serve(async (req) => {
       admin
         .from("students")
         .select(
-          "id, first_name, last_name, email, phone, date_of_birth, nationality, immigration_status, agent_id, created_at"
+          "id, title, first_name, last_name, email, phone, date_of_birth, gender, nationality, immigration_status, ni_number, share_code, crn, uk_entry_date, full_address, next_of_kin_name, next_of_kin_phone, next_of_kin_relationship, qualifications, study_pattern, previous_funding_years, notes, agent_id, created_at, updated_at"
         )
         .in("agent_id", agentIds.length ? agentIds : ["00000000-0000-0000-0000-000000000000"]),
       admin
