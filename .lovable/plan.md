@@ -1,85 +1,43 @@
 
 
-# Plan: "Start Here" Learning Hub
+# Plan: Show Campus in Tables + Owner/Admin Date+Time Booking
 
-## What We're Building
-A new "Start Here" section in the sidebar that opens a learning page — structured like an online course with modules, lessons, videos, and resources. Owners/Admins can manage content; Agents consume it and track progress.
+## What's wrong now
 
-## Sidebar Change
-Add a new top item **"Start Here"** (icon: `Rocket` or `GraduationCap`) above "Dashboard" with a small "NEW" badge to draw attention. Visible to all roles.
+1. **Campus missing in tables**: The Students table and the Enrollments table don't show the campus where the student applied. The data IS in the database (`enrollments.campus_id`), it's just not selected/rendered.
+2. **Booking dialog only for agents**: When Owner/Admin set status to `assessment_booked` via the dropdown, no dialog appears — they can't pick a date/time. Only agents get the `AssessmentBookingDialog` (which already supports date + time correctly).
 
-## Page Structure: `/[role]/learn`
+## Changes (additive only — no functional regressions)
 
-```text
-┌─────────────────────────────────────────────┐
-│ 🚀 Start Here — Your Learning Path          │
-│ Progress: ████████░░ 60% (12/20 lessons)    │
-├─────────────────────────────────────────────┤
-│ ▼ Start Here — Setup & Commissions          │
-│   ✓ Optimize your platform profile  [3:24]  │
-│   ✓ Understanding commissions       [5:10]  │
-│                                             │
-│ ▼ Module 1 — Master the Process             │
-│   ○ Enrollment process overview     [4:00]  │
-│   ○ Funding & requirements          [6:15]  │
-│   ○ Admission test walkthrough      [3:45]  │
-│   ○ University: GBS                 [5:00]  │
-│   ○ University: Regent              [5:00]  │
-│   ○ ... (one per uni)                       │
-│                                             │
-│ ▼ Module 2 — Admission Test Prep            │
-│ ▼ Module 3 — Marketing & First Client       │
-│ ▼ 7-Day Live Challenge                      │
-└─────────────────────────────────────────────┘
+### 1. `src/pages/shared/StudentsPage.tsx` — add Campus column
+- Extend the students query to also fetch the latest enrollment's campus per student. Approach: a second lightweight query for `enrollments` filtered by the visible student IDs, joining `campuses(name, city)` and `courses(name)`, take the most recent per student into a map.
+- Add columns: **Course** and **Campus** (with city) — hidden on mobile (`hidden md:table-cell`) to keep the layout clean. Show "—" if no enrollment yet.
+- Update CSV export to include those two columns.
 
-[Click lesson] → Video player + description + attached resources (PDFs, links)
-```
+### 2. `src/pages/shared/EnrollmentsPage.tsx` — add Campus column
+- Extend the existing `enrollments` select to also pull `campuses(name, city)` (left join — campus is nullable).
+- Add a **Campus** column right after "Course". Show "—" when null.
+- Add Campus to CSV export.
 
-## Database (3 new tables)
+### 3. `src/components/student-detail/StudentEnrollmentsTab.tsx` — Owner/Admin booking dialog
+- When Owner or Admin picks `assessment_booked` from the status dropdown, instead of writing the status directly, open the existing `AssessmentBookingDialog` so they can pick **date + time** (same UX as agents).
+- After confirm, run the same DB update agents already run (`status: "assessment_booked", assessment_date, assessment_time`).
+- Any other status change keeps current behavior (direct mutation).
+- Also add a small **"Assessment: <date> at <time>"** line under the row when those fields are set, so it's visible without re-opening the dialog.
 
-| Table | Purpose | Key columns |
-|-------|---------|-------------|
-| `learn_modules` | Top-level sections | `id`, `title`, `description`, `icon`, `sort_order`, `is_published` |
-| `learn_lessons` | Videos inside modules | `id`, `module_id`, `title`, `description`, `video_url`, `video_duration`, `thumbnail_url`, `attachments` (jsonb), `sort_order`, `is_published` |
-| `learn_progress` | Per-agent tracking | `id`, `user_id`, `lesson_id`, `completed_at`, `watched_seconds` |
+### 4. `src/components/student-detail/StudentEnrollmentsTab.tsx` — show campus per row
+- Extend the enrollments select to include `campuses(name, city)` and add a Campus column to the per-student enrollment history table.
 
-**RLS**: Everyone reads published modules/lessons. Only Owner/Admin write. `learn_progress` — users read/write only their own rows.
+## What stays the same
+- `AssessmentBookingDialog` already supports date + time — no changes needed.
+- All RLS, statuses, agent permissions, transfer flow, cancellation flow.
+- Booking writes the same fields (`assessment_date`, `assessment_time`) already used by agents — no schema change.
+- No migrations.
 
-**Seed data**: Pre-populate the 4 modules + section titles ("Start Here", "Module 1", "Module 2", "Module 3", "7-Day Challenge") so structure exists immediately. Lessons can be added later via the UI.
-
-## Video Storage
-- New Supabase storage bucket `learn-videos` (public read, owner/admin write).
-- Videos are uploaded directly via the lesson editor (drag & drop, MP4).
-- Thumbnails auto-extracted on upload (or uploaded manually).
-- Also support external URLs (YouTube/Loom) so screen recordings hosted elsewhere can be embedded without re-upload.
-
-## Pages & Components
-
-| File | Purpose |
-|------|---------|
-| `src/pages/shared/LearnPage.tsx` | Main learning hub (modules + lessons accordion, progress bar) |
-| `src/components/learn/LessonPlayer.tsx` | Dialog/full-screen with video player, description, resources, "Mark complete" |
-| `src/components/learn/LessonEditor.tsx` | Owner/Admin: create/edit lessons (upload video, set title, attach files) |
-| `src/components/learn/ModuleEditor.tsx` | Owner/Admin: create/edit modules |
-| `src/components/AppSidebar.tsx` | Add "Start Here" nav item with NEW badge |
-| `src/App.tsx` | Add routes: `/owner/learn`, `/admin/learn`, `/agent/learn` |
-
-## Editor UX (Owner/Admin only)
-- Floating "+ Add Lesson" button per module
-- Inline drag-and-drop reorder for modules and lessons
-- Video upload with progress bar
-- Rich text description
-- Multiple file attachments (PDFs, slides)
-
-## Agent UX
-- Clean Udemy-style accordion list
-- ✓ checkmark on completed lessons
-- Auto-mark complete when video reaches 90%
-- Manual "Mark as complete" button as fallback
-- Progress bar at top showing % completion across all published lessons
-
-## Notes
-- Reuses existing `DashboardLayout`, brand colors (Navy + Gold), and accordion components — no design system changes
-- Fully additive: no existing tables, routes, or components are modified beyond adding the sidebar item and routes
-- 7-Day Live Challenge is just a module like the others — lessons can include scheduled live session links/replays
+## Files modified
+| File | Change |
+|------|--------|
+| `src/pages/shared/StudentsPage.tsx` | + Course & Campus columns, + CSV columns |
+| `src/pages/shared/EnrollmentsPage.tsx` | + Campus column, + CSV column |
+| `src/components/student-detail/StudentEnrollmentsTab.tsx` | + Campus column, route Owner/Admin "assessment_booked" through the existing booking dialog, show booked date/time inline |
 
