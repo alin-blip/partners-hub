@@ -65,6 +65,7 @@ const App = () => (
             
             {/* Owner routes */}
             <Route path="/owner/dashboard" element={<OwnerDashboard />} />
+            <Route path="/owner/learn" element={<LearnPage />} />
             <Route path="/owner/students" element={<StudentsPage />} />
             <Route path="/owner/students/:id" element={<StudentDetailPage />} />
             <Route path="/owner/enrollments" element={<EnrollmentsPage />} />
