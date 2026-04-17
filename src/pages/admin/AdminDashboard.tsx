@@ -15,6 +15,7 @@ import {
 import { format } from "date-fns";
 import { CommissionOfferCards } from "@/components/CommissionOfferCards";
 import { DashboardSearchCard } from "@/components/DashboardSearchCard";
+import { ExportToSheetsButton } from "@/components/ExportToSheetsButton";
 import { useNavigate } from "react-router-dom";
 
 export default function AdminDashboard() {
@@ -106,7 +107,10 @@ export default function AdminDashboard() {
         <PromoBanner />
         <CommissionOfferCards />
         <DashboardSearchCard />
-        <h1 className="text-2xl font-bold tracking-tight">Team Dashboard</h1>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h1 className="text-2xl font-bold tracking-tight">Team Dashboard</h1>
+          <ExportToSheetsButton />
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard title="My Agents" value={agents.length} icon={UserCheck} />

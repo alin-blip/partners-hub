@@ -31,6 +31,7 @@ import { PromoBanner } from "@/components/PromoBanner";
 import { EmailLogSection } from "@/components/EmailLogSection";
 import { DashboardSearchCard } from "@/components/DashboardSearchCard";
 import { CancellationRequestsSection } from "@/components/CancellationRequestsSection";
+import { ExportToSheetsButton } from "@/components/ExportToSheetsButton";
 
 const teamChartConfig: ChartConfig = {
   students: { label: "Students", color: "hsl(var(--primary))" },
@@ -360,7 +361,10 @@ export default function OwnerDashboard() {
       <div className="space-y-6">
         <PromoBanner />
         <DashboardSearchCard />
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <ExportToSheetsButton />
+        </div>
 
         <CancellationRequestsSection />
 
