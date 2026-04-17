@@ -54,7 +54,8 @@ export default function EnrollmentsPage() {
           id, status, created_at, updated_at, notes, student_id,
           students!inner(first_name, last_name, agent_id),
           universities!inner(name),
-          courses!inner(name)
+          courses!inner(name),
+          campuses(name, city)
         `, { count: "exact" });
 
       if (search.trim()) {
@@ -107,11 +108,12 @@ export default function EnrollmentsPage() {
   });
 
   const handleExport = () => {
-    const headers = ["Student", "University", "Course", "Status", "Date"];
+    const headers = ["Student", "University", "Course", "Campus", "Status", "Date"];
     const rows = enrollments.map((e: any) => [
       `${e.students?.first_name} ${e.students?.last_name}`,
       e.universities?.name || "",
       e.courses?.name || "",
+      e.campuses ? `${e.campuses.name}${e.campuses.city ? ` (${e.campuses.city})` : ""}` : "",
       e.status,
       format(new Date(e.created_at), "yyyy-MM-dd"),
     ]);
@@ -167,6 +169,7 @@ export default function EnrollmentsPage() {
                 <TableHead className="hidden lg:table-cell">Agent</TableHead>
                 <TableHead>University</TableHead>
                 <TableHead>Course</TableHead>
+                <TableHead className="hidden md:table-cell">Campus</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
               </TableRow>
@@ -174,7 +177,7 @@ export default function EnrollmentsPage() {
             <TableBody>
               {isLoading && Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={`skel-${i}`}>
-                  {Array.from({ length: 6 }).map((_, j) => (
+                  {Array.from({ length: 7 }).map((_, j) => (
                     <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                   ))}
                 </TableRow>
@@ -189,6 +192,11 @@ export default function EnrollmentsPage() {
                   <TableCell className="hidden lg:table-cell text-muted-foreground">{(enrollmentAgentProfiles as any)[e.students?.agent_id] || "—"}</TableCell>
                   <TableCell>{e.universities?.name}</TableCell>
                   <TableCell>{e.courses?.name}</TableCell>
+                  <TableCell className="hidden md:table-cell text-muted-foreground">
+                    {e.campuses ? (
+                      <span>{e.campuses.name}{e.campuses.city && <span className="text-xs text-muted-foreground/70"> · {e.campuses.city}</span>}</span>
+                    ) : "—"}
+                  </TableCell>
                   <TableCell onClick={(ev) => ev.stopPropagation()}>
                     {canEdit ? (
                       <Select
@@ -215,7 +223,7 @@ export default function EnrollmentsPage() {
               ))}
               {!isLoading && enrollments.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                     No enrollments found
                   </TableCell>
                 </TableRow>
