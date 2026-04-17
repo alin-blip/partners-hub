@@ -22,6 +22,7 @@ import {
   School,
   Shield,
   Receipt,
+  Rocket,
 } from "lucide-react";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { NavLink } from "@/components/NavLink";
