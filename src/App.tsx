@@ -40,6 +40,7 @@ import AuditLogPage from "./pages/owner/AuditLogPage";
 import LeadsPage from "./pages/shared/LeadsPage";
 import TasksPage from "./pages/shared/TasksPage";
 import LeaderboardPage from "./pages/shared/LeaderboardPage";
+import LearnPage from "./pages/shared/LearnPage";
 import NotFound from "./pages/NotFound";
 import { IdleTimeoutDialog } from "./components/IdleTimeoutDialog";
 
@@ -64,6 +65,7 @@ const App = () => (
             
             {/* Owner routes */}
             <Route path="/owner/dashboard" element={<OwnerDashboard />} />
+            <Route path="/owner/learn" element={<LearnPage />} />
             <Route path="/owner/students" element={<StudentsPage />} />
             <Route path="/owner/students/:id" element={<StudentDetailPage />} />
             <Route path="/owner/enrollments" element={<EnrollmentsPage />} />
@@ -91,6 +93,7 @@ const App = () => (
             
             {/* Admin routes */}
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/learn" element={<LearnPage />} />
             <Route path="/admin/students" element={<StudentsPage />} />
             <Route path="/admin/students/:id" element={<StudentDetailPage />} />
             <Route path="/admin/enrollments" element={<EnrollmentsPage />} />
@@ -111,6 +114,7 @@ const App = () => (
             
             {/* Agent routes */}
             <Route path="/agent/dashboard" element={<AgentDashboard />} />
+            <Route path="/agent/learn" element={<LearnPage />} />
             <Route path="/agent/students" element={<StudentsPage />} />
             <Route path="/agent/students/:id" element={<StudentDetailPage />} />
             <Route path="/agent/enrollments" element={<EnrollmentsPage />} />

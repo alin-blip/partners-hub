@@ -22,6 +22,7 @@ import {
   School,
   Shield,
   Receipt,
+  Rocket,
 } from "lucide-react";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { NavLink } from "@/components/NavLink";
@@ -43,7 +44,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { SidebarXPWidget } from "@/components/SidebarXPWidget";
 
-type NavItem = { title: string; url: string; icon: React.ElementType; badge?: number };
+type NavItem = { title: string; url: string; icon: React.ElementType; badge?: number; badgeText?: string };
 
 function SidebarNavGroup({ label, items, collapsed }: { label: string; items: NavItem[]; collapsed: boolean }) {
   if (items.length === 0) return null;
@@ -65,6 +66,11 @@ function SidebarNavGroup({ label, items, collapsed }: { label: string; items: Na
                 >
                   <item.icon className="mr-2 h-4 w-4 shrink-0" />
                   {!collapsed && <span className="flex-1">{item.title}</span>}
+                  {!collapsed && item.badgeText && (
+                    <span className="ml-auto inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[9px] font-bold px-1.5 h-[16px] uppercase tracking-wider">
+                      {item.badgeText}
+                    </span>
+                  )}
                   {item.badge && item.badge > 0 && (
                     <span className="ml-auto inline-flex items-center justify-center rounded-full bg-accent text-accent-foreground text-[10px] font-bold min-w-[18px] h-[18px] px-1">
                       {item.badge > 99 ? "99+" : item.badge}
@@ -152,6 +158,7 @@ export function AppSidebar() {
   });
 
   const mainItems: NavItem[] = [
+    { title: "Start Here", url: `${prefix}/learn`, icon: Rocket, badgeText: "NEW" },
     { title: "Dashboard", url: `${prefix}/dashboard`, icon: LayoutDashboard },
     { title: "Students", url: `${prefix}/students`, icon: Users },
     { title: "Leads", url: `${prefix}/leads`, icon: ContactRound, badge: newLeadsCount },
