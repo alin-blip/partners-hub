@@ -111,6 +111,32 @@ export default function EnrollmentsPage() {
     },
   });
 
+  const handleBookAssessment = async (date: Date, time: string) => {
+    if (!bookingEnrollmentId) return;
+    setBookingLoading(true);
+    try {
+      const dateStr = format(date, "yyyy-MM-dd");
+      const enrollment = enrollments.find((e: any) => e.id === bookingEnrollmentId);
+      const oldStatus = enrollment?.status || "";
+      const { error } = await supabase.from("enrollments").update({
+        status: "assessment_booked",
+        assessment_date: dateStr,
+        assessment_time: time,
+      }).eq("id", bookingEnrollmentId);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["enrollments-list"] });
+      toast({ title: "Assessment booked", description: `${format(date, "dd MMM yyyy")} at ${time}` });
+      if (oldStatus !== "assessment_booked") {
+        notifyAgentOfStatusChange(bookingEnrollmentId, "assessment_booked", oldStatus, profile?.full_name);
+      }
+      setBookingEnrollmentId(null);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
   const handleExport = () => {
     const headers = ["Student", "University", "Course", "Campus", "Status", "Date"];
     const rows = enrollments.map((e: any) => [
