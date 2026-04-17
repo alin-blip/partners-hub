@@ -1,53 +1,64 @@
 
-The user is asking where to set the assessment test date.
 
-Based on the previous implementation:
-- The booking dialog (`AssessmentBookingDialog`) is triggered from inside the **Student Detail page → Enrollments tab**, by changing an enrollment's status to "Assessment Booked".
-- It's NOT available directly from the `/owner/enrollments` list page (where the user currently is).
+# Fix: Image Generator Writing "Headline:" / "Subheadline:" Labels
 
-Let me give a clear answer on where to find it, and offer to add a shortcut.
+## The Problem (confirmed in code)
 
-# Where to Set the Assessment Test Date
-
-## Current location (already working)
-
-The date + time picker for the assessment test lives inside each student's detail page:
+In `supabase/functions/generate-image/index.ts`, lines 171–173, the prompt sent to the Nano Banana image model includes:
 
 ```text
-Enrollments page (/owner/enrollments)
-        │
-        │ click on a student row / "View" button
-        ▼
-Student Detail page → "Enrollments" tab
-        │
-        │ in the enrollment row, open the Status dropdown
-        ▼
-Select "Assessment Booked"
-        │
-        ▼
-📅 Dialog opens → pick Date + Time → Confirm
+TEXT TO RENDER ON THE IMAGE (copy these EXACTLY...):
+Headline: Earn £2,000+ Monthly Commission
+Subheadline: Recruit students for UK universities...
 ```
 
-After confirming, the row shows: **"Assessment: 22 Apr 2026 at 10:00"** inline.
+The model is doing exactly what we asked — rendering the labels `Headline:` and `Subheadline:` as visible text in the image. Same risk for `Bullet points (render these on the image):` on line 161.
 
-This works for Owner, Admin, and Agent (same dialog for all roles since the last update).
+## What We'll Improve (3 small, surgical fixes)
 
-## Optional improvement — quicker access from `/owner/enrollments`
+### 1. Strip the labels from the image prompt
+Reframe the text block so the model sees only the content to render — never the words "Headline" / "Subheadline" / "Bullet points":
 
-Right now you have to click into the student first. If you want, I can add a **calendar icon button** directly in each row of the Enrollments table that opens the same date+time dialog — no need to open the student detail. It would:
+```text
+TEXT TO RENDER ON THE IMAGE (these are the only words allowed in the image — render them EXACTLY, do not modify, translate, or add labels like "Headline:" or "Subheadline:"):
 
-- Appear next to the status badge on every enrollment row
-- Open the same `AssessmentBookingDialog` (date + time)
-- On confirm, set status → `assessment_booked` and save the date/time
-- If a date is already set, the icon would show the booked date as a tooltip
+PRIMARY TEXT (largest, top): "<headline>"
+SUPPORTING TEXT (smaller, below primary): "<subheadline>"
+SHORT POINTS (small list):
+  • <bullet 1>
+  • <bullet 2>
+```
 
-Nothing else changes — same dialog, same DB fields, same permissions.
+Plus an explicit forbidden-words rule: *"Never render the words 'Headline', 'Subheadline', 'Bullet', 'Headline:', 'Subheadline:', or any colon-prefixed label."*
 
-## Files that would change (only if you want the shortcut)
+### 2. Add a typography/style block
+Right now layout is vague. Add concrete rules so the design looks intentional:
+- Primary text: bold, large, highest contrast
+- Supporting text: medium weight, ~50% size of primary
+- Bullets: small, tight spacing, with simple bullet marks (•)
+- Minimum margin from all edges: 8%
+- No text overlapping faces/objects in the background photo
+- Single, harmonious font family (sans-serif)
+
+### 3. Mirror the same fix in edit mode
+The edit prompt (lines 135–146) doesn't have this bug today, but I'll add the same forbidden-words clause so edits never reintroduce labels.
+
+## Optional bonus (only if you want)
+
+**Quality bump on the prompt agent**: currently uses `google/gemini-2.5-flash-lite` (cheap, weakest at nuance). Switching to `google/gemini-2.5-flash` would give us better headline/subheadline copy with negligible extra cost. Default: keep flash-lite to minimize cost — say the word if you want the upgrade.
+
+## Files Modified
 
 | File | Change |
 |------|--------|
-| `src/pages/shared/EnrollmentsPage.tsx` | + small calendar button per row, + reuse `AssessmentBookingDialog` |
+| `supabase/functions/generate-image/index.ts` | Rewrite the `TEXT TO RENDER` section (no labels), add typography rules, add forbidden-words rule to both generate + edit prompts |
 
-No DB migration. Fully additive.
+## What stays the same
+- All RLS, daily limits, owner bypass, storage, retries, rate-limit handling
+- Prompt agent (`prompt-agent.ts`) untouched — it already produces clean `{ headline, subheadline, bullets }` JSON
+- Client-side branding (logo + photo composite) untouched
+- No DB migration, no schema changes, no new dependencies
+
+## Expected result
+Generated images will show only the actual marketing copy — no more "Headline:" / "Subheadline:" prefixes baked into the artwork.
 
