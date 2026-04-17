@@ -1,13 +1,6 @@
 
-User wants Google Sheets export instead of XLSX/ZIP. Structure: one Google Sheet per Admin, with one tab/worksheet per Agent under that admin. Owner gets all admins.
+User asks: "What I want is for the data to go into a Google Sheet. Does that happen?"
 
-We already have a Google service account (`GOOGLE_DRIVE_SERVICE_ACCOUNT`) and a root folder (`GOOGLE_DRIVE_ROOT_FOLDER_ID`) used by `sync-to-drive`. We can reuse the same service account by enabling Sheets API scope.
+They're confirming whether the current implementation actually pushes data to Google Sheets. Yes — the previous round did exactly that. Let me confirm clearly and explain what's already working vs what's still pending (the auto-sync plan I proposed but they haven't approved yet).
 
-Approach: Edge function `export-to-sheets` that:
-1. Auths with service account (Drive + Sheets scopes)
-2. Groups data: admins → agents → students/enrollments
-3. For each admin: creates/updates a Google Sheet in the root folder, named `Admin - {Name}.xlsx-style sheet`
-4. Inside the sheet: one tab per agent + a "Summary" tab
-5. Returns links to all created sheets
-
-Keep concise.
+Short, no new build needed unless they want the auto-sync. Just clarify status.
