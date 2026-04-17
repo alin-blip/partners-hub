@@ -132,6 +132,56 @@ const sanitizeTabName = (s: string) =>
     .trim()
     .slice(0, 95) || "Untitled";
 
+type GoogleServiceAccount = {
+  client_email: string;
+  private_key: string;
+};
+
+function parseServiceAccountSecret(raw: string): GoogleServiceAccount {
+  let parsed: unknown = raw;
+
+  for (let i = 0; i < 3; i++) {
+    if (typeof parsed !== "string") break;
+
+    const trimmed = parsed.trim();
+    if (!trimmed) break;
+
+    try {
+      parsed = JSON.parse(trimmed);
+      continue;
+    } catch {
+      try {
+        parsed = new TextDecoder().decode(Uint8Array.from(atob(trimmed), (c) => c.charCodeAt(0)));
+        continue;
+      } catch {
+        break;
+      }
+    }
+  }
+
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("GOOGLE_DRIVE_SERVICE_ACCOUNT must be a full service account JSON object");
+  }
+
+  const serviceAccount = parsed as Record<string, unknown>;
+  const client_email = typeof serviceAccount.client_email === "string"
+    ? serviceAccount.client_email.trim()
+    : "";
+  const private_key = typeof serviceAccount.private_key === "string"
+    ? serviceAccount.private_key.replace(/\\n/g, "\n").trim()
+    : "";
+
+  if (!client_email) {
+    throw new Error("Service account JSON missing client_email field");
+  }
+
+  if (!private_key) {
+    throw new Error("Service account JSON missing private_key field");
+  }
+
+  return { client_email, private_key };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS")
     return new Response("ok", { headers: corsHeaders });
@@ -142,7 +192,7 @@ serve(async (req) => {
     const SA_RAW = Deno.env.get("GOOGLE_DRIVE_SERVICE_ACCOUNT");
 
     if (!SA_RAW) throw new Error("GOOGLE_DRIVE_SERVICE_ACCOUNT not set");
-    const serviceAccount = JSON.parse(SA_RAW);
+    const serviceAccount = parseServiceAccountSecret(SA_RAW);
     const serviceEmail = serviceAccount.client_email;
 
     // Auth caller
