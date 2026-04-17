@@ -55,7 +55,7 @@ export default function EnrollmentsPage() {
       let query = supabase
         .from("enrollments")
         .select(`
-          id, status, created_at, updated_at, notes, student_id,
+          id, status, created_at, updated_at, notes, student_id, assessment_date, assessment_time,
           students!inner(first_name, last_name, agent_id),
           universities!inner(name),
           courses!inner(name),
