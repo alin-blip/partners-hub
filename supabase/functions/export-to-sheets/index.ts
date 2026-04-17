@@ -7,6 +7,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Hard-coded target sheet (the user's existing Google Sheet)
+const TARGET_SPREADSHEET_ID = "12MPGTL2nJKiqa8d0aiuVO4kHG7LH-zm8_6vNrSdjv9M";
+
 // ---- Google auth ----
 async function getAccessToken(serviceAccount: any): Promise<string> {
   const headerB64 = btoa(JSON.stringify({ alg: "RS256", typ: "JWT" }));
@@ -63,85 +66,15 @@ async function getAccessToken(serviceAccount: any): Promise<string> {
   return json.access_token;
 }
 
-async function findOrCreateFolder(
-  accessToken: string,
-  name: string,
-  parentId: string
-): Promise<string> {
-  const q = `name='${name.replace(/'/g, "\\'")}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-  const sr = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&supportsAllDrives=true&includeItemsFromAllDrives=true`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  );
-  const sd = await sr.json();
-  if (sd.files?.length > 0) return sd.files[0].id;
-
-  const cr = await fetch(
-    `https://www.googleapis.com/drive/v3/files?supportsAllDrives=true`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name,
-        mimeType: "application/vnd.google-apps.folder",
-        parents: [parentId],
-      }),
-    }
-  );
-  const cd = await cr.json();
-  if (!cd.id)
-    throw new Error(`Failed to create folder "${name}": ${JSON.stringify(cd)}`);
-  return cd.id;
-}
-
-async function findSpreadsheet(
-  accessToken: string,
-  name: string,
-  parentId: string
-): Promise<string | null> {
-  const q = `name='${name.replace(/'/g, "\\'")}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`;
-  const r = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&supportsAllDrives=true&includeItemsFromAllDrives=true`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  );
-  const d = await r.json();
-  return d.files?.[0]?.id ?? null;
-}
-
-async function createSpreadsheet(
-  accessToken: string,
-  name: string,
-  parentId: string
-): Promise<string> {
-  const r = await fetch(
-    `https://www.googleapis.com/drive/v3/files?supportsAllDrives=true`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name,
-        mimeType: "application/vnd.google-apps.spreadsheet",
-        parents: [parentId],
-      }),
-    }
-  );
-  const d = await r.json();
-  if (!d.id)
-    throw new Error(`Failed to create spreadsheet "${name}": ${JSON.stringify(d)}`);
-  return d.id;
-}
-
 async function getSheetsMeta(accessToken: string, spreadsheetId: string) {
   const r = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
+  if (!r.ok) {
+    const txt = await r.text();
+    throw new Error(`Failed to read spreadsheet (status ${r.status}): ${txt}`);
+  }
   const d = await r.json();
   return (d.sheets || []).map((s: any) => s.properties);
 }
@@ -193,15 +126,11 @@ async function writeValues(
   }
 }
 
-// ---- Helpers ----
 const sanitizeTabName = (s: string) =>
   (s || "Untitled")
     .replace(/[\[\]\*\?\/\\:]/g, " ")
     .trim()
     .slice(0, 95) || "Untitled";
-
-const sanitizeFileName = (s: string) =>
-  (s || "Untitled").replace(/[\/\\:*?"<>|]/g, "-").trim().slice(0, 100);
 
 serve(async (req) => {
   if (req.method === "OPTIONS")
@@ -210,13 +139,11 @@ serve(async (req) => {
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const ROOT_FOLDER_ID = Deno.env.get("GOOGLE_DRIVE_ROOT_FOLDER_ID");
     const SA_RAW = Deno.env.get("GOOGLE_DRIVE_SERVICE_ACCOUNT");
 
-    if (!ROOT_FOLDER_ID) throw new Error("GOOGLE_DRIVE_ROOT_FOLDER_ID not set");
     if (!SA_RAW) throw new Error("GOOGLE_DRIVE_SERVICE_ACCOUNT not set");
-
     const serviceAccount = JSON.parse(SA_RAW);
+    const serviceEmail = serviceAccount.client_email;
 
     // Auth caller
     const authHeader = req.headers.get("Authorization");
@@ -252,7 +179,30 @@ serve(async (req) => {
       });
     }
 
-    // Fetch profiles (agents + admins)
+    // Get Google access token first — so we can return the service email if sharing fails
+    const accessToken = await getAccessToken(serviceAccount);
+
+    // Validate access to the target sheet upfront
+    let existingTabs: any[];
+    try {
+      existingTabs = await getSheetsMeta(accessToken, TARGET_SPREADSHEET_ID);
+    } catch (err: any) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Cannot access the Google Sheet. Please share it with the service account as Editor.`,
+          service_account_email: serviceEmail,
+          spreadsheet_url: `https://docs.google.com/spreadsheets/d/${TARGET_SPREADSHEET_ID}/edit`,
+          details: err.message,
+        }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Fetch profiles + roles
     const { data: profiles } = await admin
       .from("profiles")
       .select("id, full_name, email, admin_id");
@@ -262,7 +212,6 @@ serve(async (req) => {
     const roleByUser = new Map<string, string>();
     (roles || []).forEach((r: any) => roleByUser.set(r.user_id, r.role));
 
-    // Determine scope
     const allAgents = (profiles || []).filter(
       (p: any) => roleByUser.get(p.id) === "agent"
     );
@@ -278,20 +227,22 @@ serve(async (req) => {
     }
 
     const agentIds = agentsInScope.map((a: any) => a.id);
+    const agentById = new Map<string, any>();
+    agentsInScope.forEach((a: any) => agentById.set(a.id, a));
 
     // Pull data
     const [studentsRes, enrollRes, snapsRes, paysRes] = await Promise.all([
       admin
         .from("students")
         .select(
-          "id, first_name, last_name, email, phone, date_of_birth, nationality, immigration_status, address, postcode, agent_id, created_at"
+          "id, first_name, last_name, email, phone, date_of_birth, nationality, immigration_status, agent_id, created_at"
         )
         .in("agent_id", agentIds.length ? agentIds : ["00000000-0000-0000-0000-000000000000"]),
       admin
         .from("enrollments")
         .select(
           `id, status, created_at, assessment_date, assessment_time, funding_status, funding_type, notes, student_id,
-          students!inner(first_name, last_name, agent_id),
+          students!inner(first_name, last_name, email, phone, agent_id),
           universities(name),
           courses(name),
           campuses(name),
@@ -319,117 +270,93 @@ serve(async (req) => {
       if (!agentsByAdmin.has(key)) agentsByAdmin.set(key, []);
       agentsByAdmin.get(key)!.push(a);
     }
-
-    // Make sure each admin in scope has an entry (even with 0 agents)
     for (const adm of adminsInScope) {
       if (!agentsByAdmin.has(adm.id)) agentsByAdmin.set(adm.id, []);
     }
 
-    const accessToken = await getAccessToken(serviceAccount);
-    const exportsFolderId = await findOrCreateFolder(
-      accessToken,
-      "Exports",
-      ROOT_FOLDER_ID
+    // Plan tabs: Summary + one per Admin
+    const adminEntries = Array.from(agentsByAdmin.entries()).map(
+      ([adminKey, teamAgents]) => {
+        const adminProfile = adminsInScope.find((p: any) => p.id === adminKey);
+        const adminName =
+          adminKey === "__unassigned__"
+            ? "Unassigned Agents"
+            : adminProfile?.full_name || adminProfile?.email || "Unknown Admin";
+        return { adminKey, adminName, teamAgents };
+      }
     );
 
-    const results: any[] = [];
+    const desiredTabs = [
+      "Summary",
+      ...adminEntries.map((e) => sanitizeTabName(e.adminName)),
+    ];
 
-    for (const [adminKey, teamAgents] of agentsByAdmin.entries()) {
-      const adminProfile = adminsInScope.find((p: any) => p.id === adminKey);
-      const adminName =
-        adminKey === "__unassigned__"
-          ? "Unassigned Agents"
-          : adminProfile?.full_name || adminProfile?.email || "Unknown Admin";
+    // Ensure unique tab names
+    const seen = new Set<string>();
+    const uniqueDesired = desiredTabs.map((t) => {
+      let name = t;
+      let i = 2;
+      while (seen.has(name)) name = `${t} (${i++})`.slice(0, 95);
+      seen.add(name);
+      return name;
+    });
 
-      const sheetName = sanitizeFileName(`Admin - ${adminName} — Team Export`);
+    // ---- Reset tabs in the target spreadsheet ----
+    // Step 1: temp tab
+    const tempTabTitle = `__tmp_${Date.now()}`;
+    await batchUpdateSheets(accessToken, TARGET_SPREADSHEET_ID, [
+      { addSheet: { properties: { title: tempTabTitle } } },
+    ]);
 
-      // Find or create
-      let spreadsheetId = await findSpreadsheet(
-        accessToken,
-        sheetName,
-        exportsFolderId
-      );
-      if (!spreadsheetId) {
-        spreadsheetId = await createSpreadsheet(
-          accessToken,
-          sheetName,
-          exportsFolderId
-        );
-      }
+    // Step 2: delete all existing non-temp tabs
+    const refreshed = await getSheetsMeta(accessToken, TARGET_SPREADSHEET_ID);
+    const deleteReqs = refreshed
+      .filter((p: any) => p.title !== tempTabTitle)
+      .map((p: any) => ({ deleteSheet: { sheetId: p.sheetId } }));
+    if (deleteReqs.length) {
+      await batchUpdateSheets(accessToken, TARGET_SPREADSHEET_ID, deleteReqs);
+    }
 
-      // Plan tabs
-      const desiredTabs = [
-        "Summary",
-        ...teamAgents.map((a: any) =>
-          sanitizeTabName(a.full_name || a.email || "Agent")
-        ),
-      ];
+    // Step 3: add desired tabs
+    const addReqs = uniqueDesired.map((title) => ({
+      addSheet: { properties: { title } },
+    }));
+    await batchUpdateSheets(accessToken, TARGET_SPREADSHEET_ID, addReqs);
 
-      // Ensure unique tab names (in case of duplicates)
-      const seen = new Set<string>();
-      const uniqueDesired = desiredTabs.map((t) => {
-        let name = t;
-        let i = 2;
-        while (seen.has(name)) name = `${t} (${i++})`.slice(0, 95);
-        seen.add(name);
-        return name;
-      });
-
-      // Get current tabs
-      const existing = await getSheetsMeta(accessToken, spreadsheetId);
-
-      // Step 1: add a temporary tab (sheets must always have ≥1 sheet)
-      const tempTabTitle = `__tmp_${Date.now()}`;
-      await batchUpdateSheets(accessToken, spreadsheetId, [
-        { addSheet: { properties: { title: tempTabTitle } } },
+    // Step 4: delete temp
+    const finalMeta = await getSheetsMeta(accessToken, TARGET_SPREADSHEET_ID);
+    const tmp = finalMeta.find((p: any) => p.title === tempTabTitle);
+    if (tmp) {
+      await batchUpdateSheets(accessToken, TARGET_SPREADSHEET_ID, [
+        { deleteSheet: { sheetId: tmp.sheetId } },
       ]);
+    }
 
-      // Step 2: delete all existing (non-temp) tabs
-      const refreshed = await getSheetsMeta(accessToken, spreadsheetId);
-      const deleteReqs = refreshed
-        .filter((p: any) => p.title !== tempTabTitle)
-        .map((p: any) => ({ deleteSheet: { sheetId: p.sheetId } }));
-      if (deleteReqs.length) {
-        await batchUpdateSheets(accessToken, spreadsheetId, deleteReqs);
-      }
+    // ---- Build values ----
+    const valueWrites: { range: string; values: any[][] }[] = [];
 
-      // Step 3: add the desired tabs
-      const addReqs = uniqueDesired.map((title) => ({
-        addSheet: { properties: { title } },
-      }));
-      await batchUpdateSheets(accessToken, spreadsheetId, addReqs);
+    // Summary tab: one row per agent, grouped by admin
+    const summaryRows: any[][] = [
+      [
+        "Admin",
+        "Agent",
+        "Email",
+        "Total Students",
+        "Total Enrollments",
+        "New Application",
+        "Assessment Booked",
+        "Conditional Offer",
+        "Final Offer",
+        "Enrolled",
+        "Cancelled / Withdrawn",
+        "Commission Earned (£)",
+        "Commission Paid (£)",
+        "Commission Remaining (£)",
+      ],
+    ];
 
-      // Step 4: delete temp
-      const finalMeta = await getSheetsMeta(accessToken, spreadsheetId);
-      const tmp = finalMeta.find((p: any) => p.title === tempTabTitle);
-      if (tmp) {
-        await batchUpdateSheets(accessToken, spreadsheetId, [
-          { deleteSheet: { sheetId: tmp.sheetId } },
-        ]);
-      }
-
-      // Build values
-      const valueWrites: { range: string; values: any[][] }[] = [];
-
-      // Summary tab
-      const summaryRows: any[][] = [
-        [
-          "Agent",
-          "Email",
-          "Total Students",
-          "Total Enrollments",
-          "New Application",
-          "Assessment Booked",
-          "Conditional Offer",
-          "Final Offer",
-          "Enrolled",
-          "Cancelled / Withdrawn",
-          "Commission Earned (£)",
-          "Commission Paid (£)",
-          "Commission Remaining (£)",
-        ],
-      ];
-      for (const ag of teamAgents) {
+    for (const entry of adminEntries) {
+      for (const ag of entry.teamAgents) {
         const myStudents = students.filter((s: any) => s.agent_id === ag.id);
         const myEnrolls = enrollments.filter(
           (e: any) => e.students?.agent_id === ag.id
@@ -449,6 +376,7 @@ serve(async (req) => {
           )
           .reduce((acc: number, p: any) => acc + Number(p.amount || 0), 0);
         summaryRows.push([
+          entry.adminName,
           ag.full_name || "—",
           ag.email || "—",
           myStudents.length,
@@ -464,125 +392,131 @@ serve(async (req) => {
           (earned - paid).toFixed(2),
         ]);
       }
-      if (teamAgents.length === 0) {
-        summaryRows.push(["(no agents on this team)"]);
+      if (entry.teamAgents.length === 0) {
+        summaryRows.push([entry.adminName, "(no agents on this team)"]);
       }
+    }
+
+    valueWrites.push({ range: `'Summary'!A1`, values: summaryRows });
+
+    // Per-admin tab: ALL students + ALL enrollments for the team
+    for (let idx = 0; idx < adminEntries.length; idx++) {
+      const entry = adminEntries[idx];
+      const tabTitle = uniqueDesired[idx + 1];
+      const teamAgentIds = new Set(entry.teamAgents.map((a: any) => a.id));
+      const teamStudents = students.filter((s: any) =>
+        teamAgentIds.has(s.agent_id)
+      );
+      const teamEnrolls = enrollments.filter((e: any) =>
+        teamAgentIds.has(e.students?.agent_id)
+      );
+
+      const rows: any[][] = [];
+      rows.push([`ADMIN: ${entry.adminName}`]);
+      rows.push([
+        `Agents: ${entry.teamAgents.length}`,
+        `Students: ${teamStudents.length}`,
+        `Enrollments: ${teamEnrolls.length}`,
+      ]);
+      rows.push([]);
+
+      rows.push(["STUDENTS"]);
+      rows.push([
+        "Agent",
+        "First Name",
+        "Last Name",
+        "Email",
+        "Phone",
+        "Date of Birth",
+        "Nationality",
+        "Immigration Status",
+        "Created",
+      ]);
+      if (teamStudents.length === 0) {
+        rows.push(["(no students)"]);
+      } else {
+        for (const s of teamStudents) {
+          const ag = agentById.get(s.agent_id);
+          rows.push([
+            ag?.full_name || ag?.email || "—",
+            s.first_name || "",
+            s.last_name || "",
+            s.email || "",
+            s.phone || "",
+            s.date_of_birth || "",
+            s.nationality || "",
+            s.immigration_status || "",
+            s.created_at ? new Date(s.created_at).toISOString().split("T")[0] : "",
+          ]);
+        }
+      }
+      rows.push([]);
+
+      rows.push(["ENROLLMENTS"]);
+      rows.push([
+        "Agent",
+        "Student",
+        "University",
+        "Course",
+        "Campus",
+        "Intake",
+        "Status",
+        "Created",
+        "Assessment Date",
+        "Assessment Time",
+        "Funding Status",
+        "Funding Type",
+        "Notes",
+      ]);
+      if (teamEnrolls.length === 0) {
+        rows.push(["(no enrollments)"]);
+      } else {
+        for (const e of teamEnrolls) {
+          const ag = agentById.get(e.students?.agent_id);
+          rows.push([
+            ag?.full_name || ag?.email || "—",
+            `${e.students?.first_name || ""} ${e.students?.last_name || ""}`.trim(),
+            e.universities?.name || "",
+            e.courses?.name || "",
+            e.campuses?.name || "",
+            e.intakes?.label || "",
+            e.status || "",
+            e.created_at ? new Date(e.created_at).toISOString().split("T")[0] : "",
+            e.assessment_date || "",
+            e.assessment_time || "",
+            e.funding_status || "",
+            e.funding_type || "",
+            e.notes || "",
+          ]);
+        }
+      }
+
       valueWrites.push({
-        range: `'Summary'!A1`,
-        values: summaryRows,
-      });
-
-      // Per-agent tabs
-      for (let idx = 0; idx < teamAgents.length; idx++) {
-        const ag = teamAgents[idx];
-        const tabTitle = uniqueDesired[idx + 1]; // +1 because Summary is at 0
-        const myStudents = students.filter((s: any) => s.agent_id === ag.id);
-        const myEnrolls = enrollments.filter(
-          (e: any) => e.students?.agent_id === ag.id
-        );
-
-        const rows: any[][] = [];
-        rows.push([`AGENT: ${ag.full_name || ag.email}`]);
-        rows.push([`Email: ${ag.email || "—"}`]);
-        rows.push([]);
-        rows.push(["STUDENTS"]);
-        rows.push([
-          "First Name",
-          "Last Name",
-          "Email",
-          "Phone",
-          "Date of Birth",
-          "Nationality",
-          "Immigration Status",
-          "Address",
-          "Postcode",
-          "Created",
-        ]);
-        if (myStudents.length === 0) {
-          rows.push(["(no students)"]);
-        } else {
-          for (const s of myStudents) {
-            rows.push([
-              s.first_name || "",
-              s.last_name || "",
-              s.email || "",
-              s.phone || "",
-              s.date_of_birth || "",
-              s.nationality || "",
-              s.immigration_status || "",
-              s.address || "",
-              s.postcode || "",
-              s.created_at ? new Date(s.created_at).toISOString().split("T")[0] : "",
-            ]);
-          }
-        }
-        rows.push([]);
-        rows.push(["ENROLLMENTS"]);
-        rows.push([
-          "Student",
-          "University",
-          "Course",
-          "Campus",
-          "Intake",
-          "Status",
-          "Created",
-          "Assessment Date",
-          "Assessment Time",
-          "Funding Status",
-          "Funding Type",
-          "Notes",
-        ]);
-        if (myEnrolls.length === 0) {
-          rows.push(["(no enrollments)"]);
-        } else {
-          for (const e of myEnrolls) {
-            rows.push([
-              `${e.students?.first_name || ""} ${e.students?.last_name || ""}`.trim(),
-              e.universities?.name || "",
-              e.courses?.name || "",
-              e.campuses?.name || "",
-              e.intakes?.label || "",
-              e.status || "",
-              e.created_at ? new Date(e.created_at).toISOString().split("T")[0] : "",
-              e.assessment_date || "",
-              e.assessment_time || "",
-              e.funding_status || "",
-              e.funding_type || "",
-              e.notes || "",
-            ]);
-          }
-        }
-
-        valueWrites.push({
-          range: `'${tabTitle.replace(/'/g, "''")}'!A1`,
-          values: rows,
-        });
-      }
-
-      // Write in chunks of 5 ranges to be safe
-      for (let i = 0; i < valueWrites.length; i += 5) {
-        await writeValues(
-          accessToken,
-          spreadsheetId,
-          valueWrites.slice(i, i + 5)
-        );
-      }
-
-      results.push({
-        admin: adminName,
-        spreadsheet_id: spreadsheetId,
-        url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`,
-        agents_count: teamAgents.length,
-        students_count: teamAgents.reduce(
-          (acc: number, a: any) =>
-            acc + students.filter((s: any) => s.agent_id === a.id).length,
-          0
-        ),
+        range: `'${tabTitle.replace(/'/g, "''")}'!A1`,
+        values: rows,
       });
     }
 
+    // Write in chunks
+    for (let i = 0; i < valueWrites.length; i += 5) {
+      await writeValues(
+        accessToken,
+        TARGET_SPREADSHEET_ID,
+        valueWrites.slice(i, i + 5)
+      );
+    }
+
     return new Response(
-      JSON.stringify({ success: true, sheets: results }),
+      JSON.stringify({
+        success: true,
+        spreadsheet_id: TARGET_SPREADSHEET_ID,
+        spreadsheet_url: `https://docs.google.com/spreadsheets/d/${TARGET_SPREADSHEET_ID}/edit`,
+        service_account_email: serviceEmail,
+        admins_count: adminEntries.length,
+        agents_count: agentsInScope.length,
+        students_count: students.length,
+        enrollments_count: enrollments.length,
+      }),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
