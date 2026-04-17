@@ -133,7 +133,7 @@ serve(async (req) => {
 
     if (isEditMode) {
       const editPrompt = `ABSOLUTE RULE: Do NOT draw any people, faces, human figures, silhouettes, or portraits anywhere in the image. The image must contain ZERO humans.
-ABSOLUTE RULE: Do NOT render any text that reads "LOGO", "WATERMARK", or any placeholder text.
+ABSOLUTE RULE: Do NOT render any text that reads "LOGO", "WATERMARK", "Headline", "Subheadline", "Bullet", "Primary text", "Supporting text", or any colon-prefixed label or placeholder text.
 
 Edit this marketing image according to these instructions: ${editInstruction}
 
@@ -143,7 +143,8 @@ RULES:
 - Text must be in ${lang} with perfect spelling and diacritics
 ${includePhoto ? "- Keep bottom-left corner clean and empty" : ""}
 - Do NOT add any people, faces, or human figures
-- Do NOT write the word "LOGO" or any placeholder/watermark text`;
+- Do NOT write the word "LOGO", "Headline:", "Subheadline:", "Bullet:", or any placeholder/label/watermark text
+- Only render the actual marketing copy itself — never render field names or labels`;
 
       aiRequestBody = JSON.stringify({
         model: "google/gemini-3.1-flash-image-preview",
@@ -157,26 +158,34 @@ ${includePhoto ? "- Keep bottom-left corner clean and empty" : ""}
         modalities: ["image", "text"],
       });
     } else {
-      const bulletsText = agentOutput!.bullets.length > 0
-        ? `\nBullet points (render these on the image):\n${agentOutput!.bullets.map((b: string) => `• ${b}`).join("\n")}`
+      const bulletsBlock = agentOutput!.bullets.length > 0
+        ? `\nSHORT POINTS (small list, below supporting text, render with bullet marks):\n${agentOutput!.bullets.map((b: string) => `  • "${b}"`).join("\n")}`
         : "";
 
       const imagePrompt = `ABSOLUTE RULE: Do NOT draw any people, faces, human figures, silhouettes, or portraits anywhere in the image. The image must contain ZERO humans.
-ABSOLUTE RULE: Do NOT render any text that reads "LOGO", "WATERMARK", or any placeholder text. No branding placeholders.
+ABSOLUTE RULE: Do NOT render any text that reads "LOGO", "WATERMARK", "Headline", "Subheadline", "Headline:", "Subheadline:", "Bullet", "Bullets", "Primary text", "Supporting text", or any colon-prefixed label, field name, or placeholder text. Only the quoted marketing copy below may appear as visible text.
 
 Create a ${presetDimensions[preset] || "1080x1080 square"} marketing image.
 
 VISUAL STYLE: ${agentOutput!.visual_description}
 
-TEXT TO RENDER ON THE IMAGE (copy these EXACTLY, character-by-character — do NOT modify, translate, or rephrase):
-Headline: ${agentOutput!.headline}
-Subheadline: ${agentOutput!.subheadline}${bulletsText}
+TEXT TO RENDER ON THE IMAGE — render ONLY the quoted strings below, EXACTLY character-by-character. Do NOT render the field names ("PRIMARY TEXT", "SUPPORTING TEXT", "SHORT POINTS"). Do NOT add labels, prefixes, colons, or any extra words. Do NOT translate or rephrase.
 
-LAYOUT:
+PRIMARY TEXT (largest, top of composition): "${agentOutput!.headline}"
+SUPPORTING TEXT (medium size, directly below primary): "${agentOutput!.subheadline}"${bulletsBlock}
+
+TYPOGRAPHY & LAYOUT RULES:
+- Single harmonious sans-serif font family throughout
+- Primary text: bold, largest, highest contrast against background
+- Supporting text: medium weight, ~50% the size of primary text
+- Short points (if any): small, tight line spacing, simple "•" bullet marks
+- Minimum margin from every edge: 8% of the image
+- Text must NOT overlap faces, logos, or focal objects in the background visual
+- Clean hierarchy: primary > supporting > points
 ${agentOutput!.layout_notes}
-${includePhoto ? `- Keep bottom-left corner clean and empty.` : ""}
-- The image should be ~70% visual, ~30% text. Clean, modern, professional.
-- Do NOT draw any placeholder text like "LOGO" or "YOUR BRAND HERE".`;
+${includePhoto ? `- Keep the bottom-left corner clean and empty (reserved for an avatar overlay).` : ""}
+- Composition: ~70% visual, ~30% text. Modern, professional, intentional.
+- Do NOT draw placeholder text like "LOGO", "YOUR BRAND HERE", "Headline:", "Subheadline:", or any field labels.`;
 
       aiRequestBody = JSON.stringify({
         model: "google/gemini-3.1-flash-image-preview",
