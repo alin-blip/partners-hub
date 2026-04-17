@@ -15,10 +15,12 @@ import {
 } from "@/components/ui/select";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { Search, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Download, CalendarDays } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { notifyAgentOfStatusChange } from "@/lib/enrollment-emails";
 import { getVisibleStatuses, getDisplayStatus, getAdminEditableStatuses } from "@/lib/status-utils";
+import { AssessmentBookingDialog } from "@/components/student-detail/AssessmentBookingDialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const PAGE_SIZE = 20;
 
@@ -34,6 +36,8 @@ export default function EnrollmentsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [page, setPage] = useState(0);
+  const [bookingEnrollmentId, setBookingEnrollmentId] = useState<string | null>(null);
+  const [bookingLoading, setBookingLoading] = useState(false);
 
   const { data: profile } = useQuery({
     queryKey: ["my-profile-name"],
@@ -51,7 +55,7 @@ export default function EnrollmentsPage() {
       let query = supabase
         .from("enrollments")
         .select(`
-          id, status, created_at, updated_at, notes, student_id,
+          id, status, created_at, updated_at, notes, student_id, assessment_date, assessment_time,
           students!inner(first_name, last_name, agent_id),
           universities!inner(name),
           courses!inner(name),
@@ -106,6 +110,32 @@ export default function EnrollmentsPage() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  const handleBookAssessment = async (date: Date, time: string) => {
+    if (!bookingEnrollmentId) return;
+    setBookingLoading(true);
+    try {
+      const dateStr = format(date, "yyyy-MM-dd");
+      const enrollment = enrollments.find((e: any) => e.id === bookingEnrollmentId);
+      const oldStatus = enrollment?.status || "";
+      const { error } = await supabase.from("enrollments").update({
+        status: "assessment_booked",
+        assessment_date: dateStr,
+        assessment_time: time,
+      }).eq("id", bookingEnrollmentId);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["enrollments-list"] });
+      toast({ title: "Assessment booked", description: `${format(date, "dd MMM yyyy")} at ${time}` });
+      if (oldStatus !== "assessment_booked") {
+        notifyAgentOfStatusChange(bookingEnrollmentId, "assessment_booked", oldStatus, profile?.full_name);
+      }
+      setBookingEnrollmentId(null);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setBookingLoading(false);
+    }
+  };
 
   const handleExport = () => {
     const headers = ["Student", "University", "Course", "Campus", "Status", "Date"];
@@ -198,23 +228,59 @@ export default function EnrollmentsPage() {
                     ) : "—"}
                   </TableCell>
                   <TableCell onClick={(ev) => ev.stopPropagation()}>
-                    {canEdit ? (
-                      <Select
-                        value={e.status}
-                        onValueChange={(v) => updateStatus.mutate({ id: e.id, status: v, oldStatus: e.status })}
-                      >
-                        <SelectTrigger className="w-[180px] h-8">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-1">
+                        {canEdit ? (
+                          <Select
+                            value={e.status}
+                            onValueChange={(v) => {
+                              if (v === "assessment_booked") {
+                                setBookingEnrollmentId(e.id);
+                              } else {
+                                updateStatus.mutate({ id: e.id, status: v, oldStatus: e.status });
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="w-[180px] h-8">
+                              <StatusBadge status={getDisplayStatus(e.status, role)} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {editableStatuses.map((s) => (
+                                <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
                           <StatusBadge status={getDisplayStatus(e.status, role)} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {editableStatuses.map((s) => (
-                            <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <StatusBadge status={getDisplayStatus(e.status, role)} />
-                    )}
+                        )}
+                        {canEdit && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 shrink-0"
+                                  onClick={() => setBookingEnrollmentId(e.id)}
+                                >
+                                  <CalendarDays className="w-4 h-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {e.assessment_date
+                                  ? `Assessment: ${format(new Date(e.assessment_date), "dd MMM yyyy")}${e.assessment_time ? ` at ${e.assessment_time.slice(0, 5)}` : ""}`
+                                  : "Set assessment date & time"}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
+                      {e.assessment_date && (
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(e.assessment_date), "dd MMM yyyy")}{e.assessment_time && ` · ${e.assessment_time.slice(0, 5)}`}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
                     {format(new Date(e.created_at), "dd MMM yyyy")}
@@ -248,6 +314,13 @@ export default function EnrollmentsPage() {
           </div>
         )}
       </div>
+
+      <AssessmentBookingDialog
+        open={!!bookingEnrollmentId}
+        onOpenChange={(open) => !open && setBookingEnrollmentId(null)}
+        onConfirm={handleBookAssessment}
+        loading={bookingLoading}
+      />
     </DashboardLayout>
   );
 }
