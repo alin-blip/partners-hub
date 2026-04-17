@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 // Hard-coded target sheet (the user's existing Google Sheet)
-const TARGET_SPREADSHEET_ID = "12MPGTL2nJKiqa8d0aiuVO4kHG7LH-zm8_6vNrSdjv9M";
+const TARGET_SPREADSHEET_ID = "1Rag7Oa81ZhxhZeUbBXcUrjMDU9U39EdVPL1TUlgBUjQ";
 
 // ---- Google auth ----
 async function getAccessToken(serviceAccount: any): Promise<string> {
