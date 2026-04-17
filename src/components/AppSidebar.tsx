@@ -44,7 +44,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { SidebarXPWidget } from "@/components/SidebarXPWidget";
 
-type NavItem = { title: string; url: string; icon: React.ElementType; badge?: number };
+type NavItem = { title: string; url: string; icon: React.ElementType; badge?: number; badgeText?: string };
 
 function SidebarNavGroup({ label, items, collapsed }: { label: string; items: NavItem[]; collapsed: boolean }) {
   if (items.length === 0) return null;
