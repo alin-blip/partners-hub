@@ -36,6 +36,8 @@ export default function EnrollmentsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [page, setPage] = useState(0);
+  const [bookingEnrollmentId, setBookingEnrollmentId] = useState<string | null>(null);
+  const [bookingLoading, setBookingLoading] = useState(false);
 
   const { data: profile } = useQuery({
     queryKey: ["my-profile-name"],
