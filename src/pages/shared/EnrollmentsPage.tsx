@@ -228,23 +228,59 @@ export default function EnrollmentsPage() {
                     ) : "—"}
                   </TableCell>
                   <TableCell onClick={(ev) => ev.stopPropagation()}>
-                    {canEdit ? (
-                      <Select
-                        value={e.status}
-                        onValueChange={(v) => updateStatus.mutate({ id: e.id, status: v, oldStatus: e.status })}
-                      >
-                        <SelectTrigger className="w-[180px] h-8">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-1">
+                        {canEdit ? (
+                          <Select
+                            value={e.status}
+                            onValueChange={(v) => {
+                              if (v === "assessment_booked") {
+                                setBookingEnrollmentId(e.id);
+                              } else {
+                                updateStatus.mutate({ id: e.id, status: v, oldStatus: e.status });
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="w-[180px] h-8">
+                              <StatusBadge status={getDisplayStatus(e.status, role)} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {editableStatuses.map((s) => (
+                                <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
                           <StatusBadge status={getDisplayStatus(e.status, role)} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {editableStatuses.map((s) => (
-                            <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <StatusBadge status={getDisplayStatus(e.status, role)} />
-                    )}
+                        )}
+                        {canEdit && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 shrink-0"
+                                  onClick={() => setBookingEnrollmentId(e.id)}
+                                >
+                                  <CalendarDays className="w-4 h-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {e.assessment_date
+                                  ? `Assessment: ${format(new Date(e.assessment_date), "dd MMM yyyy")}${e.assessment_time ? ` at ${e.assessment_time.slice(0, 5)}` : ""}`
+                                  : "Set assessment date & time"}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </div>
+                      {e.assessment_date && (
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(e.assessment_date), "dd MMM yyyy")}{e.assessment_time && ` · ${e.assessment_time.slice(0, 5)}`}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
                     {format(new Date(e.created_at), "dd MMM yyyy")}
