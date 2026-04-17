@@ -15,10 +15,12 @@ import {
 } from "@/components/ui/select";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { Search, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Download, CalendarDays } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { notifyAgentOfStatusChange } from "@/lib/enrollment-emails";
 import { getVisibleStatuses, getDisplayStatus, getAdminEditableStatuses } from "@/lib/status-utils";
+import { AssessmentBookingDialog } from "@/components/student-detail/AssessmentBookingDialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const PAGE_SIZE = 20;
 
