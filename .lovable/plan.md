@@ -1,40 +1,85 @@
 
 
-# Fix: Online Status Shows "Never" for All Users
+# Plan: "Start Here" Learning Hub
 
-## Root Causes
+## What We're Building
+A new "Start Here" section in the sidebar that opens a learning page — structured like an online course with modules, lessons, videos, and resources. Owners/Admins can manage content; Agents consume it and track progress.
 
-### 1. Stale `is_online` flag — users never go offline
-The `sendBeacon` on tab close (line 73-78 of `usePresence.ts`) sends a REST API request **without** the required `apikey` and `Authorization` headers. Supabase rejects it silently, so `is_online` stays `true` forever. Some users show `is_online: true` with `last_seen_at` from hours ago.
+## Sidebar Change
+Add a new top item **"Start Here"** (icon: `Rocket` or `GraduationCap`) above "Dashboard" with a small "NEW" badge to draw attention. Visible to all roles.
 
-### 2. "Never" for all users — presenceMap may be empty
-Some newly created users have no `user_presence` row at all, and the fetch may be returning data but the map lookup fails, or the query returns empty due to a runtime issue with the `as any` cast.
+## Page Structure: `/[role]/learn`
 
-### 3. No offline cleanup mechanism
-There's no server-side or client-side logic to mark users as offline when their heartbeat stops (last_seen_at > 2 minutes ago).
+```text
+┌─────────────────────────────────────────────┐
+│ 🚀 Start Here — Your Learning Path          │
+│ Progress: ████████░░ 60% (12/20 lessons)    │
+├─────────────────────────────────────────────┤
+│ ▼ Start Here — Setup & Commissions          │
+│   ✓ Optimize your platform profile  [3:24]  │
+│   ✓ Understanding commissions       [5:10]  │
+│                                             │
+│ ▼ Module 1 — Master the Process             │
+│   ○ Enrollment process overview     [4:00]  │
+│   ○ Funding & requirements          [6:15]  │
+│   ○ Admission test walkthrough      [3:45]  │
+│   ○ University: GBS                 [5:00]  │
+│   ○ University: Regent              [5:00]  │
+│   ○ ... (one per uni)                       │
+│                                             │
+│ ▼ Module 2 — Admission Test Prep            │
+│ ▼ Module 3 — Marketing & First Client       │
+│ ▼ 7-Day Live Challenge                      │
+└─────────────────────────────────────────────┘
 
-## Solution
+[Click lesson] → Video player + description + attached resources (PDFs, links)
+```
 
-### 1. Fix `usePresence.ts` — derive online status from `last_seen_at`
-Instead of trusting `is_online` (which is broken), compute online status client-side:
-- A user is "online" if `last_seen_at` is within the last 2 minutes
-- Remove `as any` casts since `user_presence` is in the types
-- Fix `sendBeacon` to include required headers (apikey + auth token)
+## Database (3 new tables)
 
-### 2. Fix `AgentsPage.tsx` — improve display logic
-Update the Online column to use the derived status:
-- Show green dot + "Online" if `last_seen_at` < 2 min ago
-- Show gray dot + relative time ("5 min ago", "2 hours ago") otherwise
-- Show "Never" only if there's truly no presence row
+| Table | Purpose | Key columns |
+|-------|---------|-------------|
+| `learn_modules` | Top-level sections | `id`, `title`, `description`, `icon`, `sort_order`, `is_published` |
+| `learn_lessons` | Videos inside modules | `id`, `module_id`, `title`, `description`, `video_url`, `video_duration`, `thumbnail_url`, `attachments` (jsonb), `sort_order`, `is_published` |
+| `learn_progress` | Per-agent tracking | `id`, `user_id`, `lesson_id`, `completed_at`, `watched_seconds` |
 
-### 3. Fix `AdminAgentsPage.tsx` — same pattern
-Apply the same fix to the admin view.
+**RLS**: Everyone reads published modules/lessons. Only Owner/Admin write. `learn_progress` — users read/write only their own rows.
 
-## Files to Modify
+**Seed data**: Pre-populate the 4 modules + section titles ("Start Here", "Module 1", "Module 2", "Module 3", "7-Day Challenge") so structure exists immediately. Lessons can be added later via the UI.
 
-| File | Change |
-|------|--------|
-| `src/hooks/usePresence.ts` | Remove `as any`, fix sendBeacon headers, derive `is_online` from `last_seen_at` |
-| `src/pages/owner/AgentsPage.tsx` | Update Online column to use time-based online detection |
-| `src/pages/admin/AdminAgentsPage.tsx` | Same fix for admin view |
+## Video Storage
+- New Supabase storage bucket `learn-videos` (public read, owner/admin write).
+- Videos are uploaded directly via the lesson editor (drag & drop, MP4).
+- Thumbnails auto-extracted on upload (or uploaded manually).
+- Also support external URLs (YouTube/Loom) so screen recordings hosted elsewhere can be embedded without re-upload.
+
+## Pages & Components
+
+| File | Purpose |
+|------|---------|
+| `src/pages/shared/LearnPage.tsx` | Main learning hub (modules + lessons accordion, progress bar) |
+| `src/components/learn/LessonPlayer.tsx` | Dialog/full-screen with video player, description, resources, "Mark complete" |
+| `src/components/learn/LessonEditor.tsx` | Owner/Admin: create/edit lessons (upload video, set title, attach files) |
+| `src/components/learn/ModuleEditor.tsx` | Owner/Admin: create/edit modules |
+| `src/components/AppSidebar.tsx` | Add "Start Here" nav item with NEW badge |
+| `src/App.tsx` | Add routes: `/owner/learn`, `/admin/learn`, `/agent/learn` |
+
+## Editor UX (Owner/Admin only)
+- Floating "+ Add Lesson" button per module
+- Inline drag-and-drop reorder for modules and lessons
+- Video upload with progress bar
+- Rich text description
+- Multiple file attachments (PDFs, slides)
+
+## Agent UX
+- Clean Udemy-style accordion list
+- ✓ checkmark on completed lessons
+- Auto-mark complete when video reaches 90%
+- Manual "Mark as complete" button as fallback
+- Progress bar at top showing % completion across all published lessons
+
+## Notes
+- Reuses existing `DashboardLayout`, brand colors (Navy + Gold), and accordion components — no design system changes
+- Fully additive: no existing tables, routes, or components are modified beyond adding the sidebar item and routes
+- 7-Day Live Challenge is just a module like the others — lessons can include scheduled live session links/replays
 
