@@ -66,6 +66,11 @@ function SidebarNavGroup({ label, items, collapsed }: { label: string; items: Na
                 >
                   <item.icon className="mr-2 h-4 w-4 shrink-0" />
                   {!collapsed && <span className="flex-1">{item.title}</span>}
+                  {!collapsed && item.badgeText && (
+                    <span className="ml-auto inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[9px] font-bold px-1.5 h-[16px] uppercase tracking-wider">
+                      {item.badgeText}
+                    </span>
+                  )}
                   {item.badge && item.badge > 0 && (
                     <span className="ml-auto inline-flex items-center justify-center rounded-full bg-accent text-accent-foreground text-[10px] font-bold min-w-[18px] h-[18px] px-1">
                       {item.badge > 99 ? "99+" : item.badge}
