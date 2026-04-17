@@ -133,7 +133,7 @@ serve(async (req) => {
 
     if (isEditMode) {
       const editPrompt = `ABSOLUTE RULE: Do NOT draw any people, faces, human figures, silhouettes, or portraits anywhere in the image. The image must contain ZERO humans.
-ABSOLUTE RULE: Do NOT render any text that reads "LOGO", "WATERMARK", or any placeholder text.
+ABSOLUTE RULE: Do NOT render any text that reads "LOGO", "WATERMARK", "Headline", "Subheadline", "Bullet", "Primary text", "Supporting text", or any colon-prefixed label or placeholder text.
 
 Edit this marketing image according to these instructions: ${editInstruction}
 
@@ -143,7 +143,8 @@ RULES:
 - Text must be in ${lang} with perfect spelling and diacritics
 ${includePhoto ? "- Keep bottom-left corner clean and empty" : ""}
 - Do NOT add any people, faces, or human figures
-- Do NOT write the word "LOGO" or any placeholder/watermark text`;
+- Do NOT write the word "LOGO", "Headline:", "Subheadline:", "Bullet:", or any placeholder/label/watermark text
+- Only render the actual marketing copy itself — never render field names or labels`;
 
       aiRequestBody = JSON.stringify({
         model: "google/gemini-3.1-flash-image-preview",
