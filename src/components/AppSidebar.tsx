@@ -158,6 +158,7 @@ export function AppSidebar() {
   });
 
   const mainItems: NavItem[] = [
+    { title: "Start Here", url: `${prefix}/learn`, icon: Rocket, badgeText: "NEW" },
     { title: "Dashboard", url: `${prefix}/dashboard`, icon: LayoutDashboard },
     { title: "Students", url: `${prefix}/students`, icon: Users },
     { title: "Leads", url: `${prefix}/leads`, icon: ContactRound, badge: newLeadsCount },
