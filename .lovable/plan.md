@@ -1,15 +1,15 @@
 
-User is on the Google Cloud OAuth consent screen ("Google Auth Platform / Create branding"). They're asking if they should fill this in to get access to the Sheet, and whether they need Drive.
+User is confused about Google Cloud Console settings. They're asking about "Add domains to allowlist" in Google Admin — this is yet another wrong screen. They keep clicking around in GCP trying to find the right place.
 
-Reality check:
-- The error is "Service account JSON missing private_key field" — the secret `GOOGLE_DRIVE_SERVICE_ACCOUNT` was saved but the JSON is malformed/incomplete (likely missing the `private_key` field).
-- The OAuth consent screen they're filling out is **completely unrelated**. OAuth consent is for end-user "Sign in with Google" flows. Service accounts don't use OAuth consent at all — they use a JSON key file.
-- They already have a service account (used by `sync-to-drive`). They just need its **JSON key file** (the full one), then re-paste it into the secret.
-- Drive: not strictly needed for this feature (only Sheets API). But the existing service account is already used for Drive sync, so reusing it is fine. They only need the **Google Sheets API enabled** in the GCP project + share the sheet with the service account email.
+Reality:
+- Service accounts do NOT need: OAuth consent, domain allowlists, Google Admin, branding, etc.
+- Service accounts ONLY need:
+  1. The JSON key file (downloaded from Service Accounts page)
+  2. Sheets API enabled in the project
+  3. The target Sheet shared with the service account email as Editor
 
-What to tell them (concise):
-1. Don't fill out OAuth consent — wrong screen, not needed.
-2. They need to: (a) enable Google Sheets API in GCP, (b) get/regenerate the service account JSON key, (c) paste the COMPLETE JSON into the secret.
-3. Drive API is already enabled (sync-to-drive works), so just enable Sheets API on the same project.
+"Add domains to allowlist" is for OAuth user-facing apps, completely irrelevant.
 
-This is a guidance/explanation answer — no code changes. Keep it tight in Romanian.
+I need to give crystal-clear step-by-step instructions in Romanian, with exact URLs, telling them to STOP clicking on OAuth/Branding/Admin screens. Just 3 simple steps.
+
+No code changes needed — pure guidance. Keep it tight and visual.
