@@ -62,7 +62,7 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
     queryFn: async () => {
       const { data } = await supabase
         .from("enrollments")
-        .select("id, status, created_at, course_id, university_id, campus_id, intake_id, funding_status, funding_type, funding_reference, funding_notes, universities!inner(name), courses!inner(name)")
+        .select("id, status, created_at, course_id, university_id, campus_id, intake_id, assessment_date, assessment_time, funding_status, funding_type, funding_reference, funding_notes, universities!inner(name), courses!inner(name), campuses(name, city)")
         .eq("student_id", studentId)
         .order("created_at", { ascending: false });
       return data || [];
@@ -324,6 +324,7 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
               <TableRow>
                 <TableHead>University</TableHead>
                 <TableHead>Course</TableHead>
+                <TableHead className="hidden md:table-cell">Campus</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead className="w-20" />
@@ -338,34 +339,59 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
                     <TableRow className={isTransferred ? "opacity-60" : ""}>
                       <TableCell className="font-medium">{e.universities?.name}</TableCell>
                       <TableCell>{e.courses?.name}</TableCell>
+                      <TableCell className="hidden md:table-cell text-muted-foreground">
+                        {e.campuses ? (
+                          <span>{e.campuses.name}{e.campuses.city && <span className="text-xs text-muted-foreground/70"> · {e.campuses.city}</span>}</span>
+                        ) : "—"}
+                      </TableCell>
                       <TableCell>
                         {isTransferred ? (
                           <StatusBadge status="transferred" />
                         ) : role === "agent" ? (
-                          <div className="flex items-center gap-1 flex-wrap">
-                            <StatusBadge status={getDisplayStatus(e.status, role)} />
-                            {canAgentBookAssessment(e.status) && hasSignedConsent && (
-                              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setAssessmentEnrollmentId(e.id)}>
-                                <CalendarDays className="w-3 h-3 mr-1" /> Book Assessment
-                              </Button>
-                            )}
-                            {canAgentRequestCancel(e.status) && (
-                              <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30" onClick={() => setCancelEnrollmentId(e.id)}>
-                                <XCircle className="w-3 h-3 mr-1" /> Request Cancel
-                              </Button>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <StatusBadge status={getDisplayStatus(e.status, role)} />
+                              {canAgentBookAssessment(e.status) && hasSignedConsent && (
+                                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setAssessmentEnrollmentId(e.id)}>
+                                  <CalendarDays className="w-3 h-3 mr-1" /> Book Assessment
+                                </Button>
+                              )}
+                              {canAgentRequestCancel(e.status) && (
+                                <Button variant="outline" size="sm" className="h-7 text-xs text-destructive border-destructive/30" onClick={() => setCancelEnrollmentId(e.id)}>
+                                  <XCircle className="w-3 h-3 mr-1" /> Request Cancel
+                                </Button>
+                              )}
+                            </div>
+                            {e.assessment_date && (
+                              <span className="text-xs text-muted-foreground">
+                                Assessment: {format(new Date(e.assessment_date), "dd MMM yyyy")}{e.assessment_time && ` at ${e.assessment_time.slice(0, 5)}`}
+                              </span>
                             )}
                           </div>
                         ) : canChangeStatus ? (
-                          <Select value={e.status} onValueChange={(v) => updateStatus.mutate({ id: e.id, status: v, oldStatus: e.status })}>
-                            <SelectTrigger className="w-[180px] h-8">
-                              <StatusBadge status={getDisplayStatus(e.status, role)} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {availableStatuses.map((s) => (
-                                <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <div className="flex flex-col gap-1">
+                            <Select value={e.status} onValueChange={(v) => {
+                              if (v === "assessment_booked") {
+                                setAssessmentEnrollmentId(e.id);
+                              } else {
+                                updateStatus.mutate({ id: e.id, status: v, oldStatus: e.status });
+                              }
+                            }}>
+                              <SelectTrigger className="w-[180px] h-8">
+                                <StatusBadge status={getDisplayStatus(e.status, role)} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableStatuses.map((s) => (
+                                  <SelectItem key={s} value={s}><StatusBadge status={s} /></SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {e.assessment_date && (
+                              <span className="text-xs text-muted-foreground">
+                                Assessment: {format(new Date(e.assessment_date), "dd MMM yyyy")}{e.assessment_time && ` at ${e.assessment_time.slice(0, 5)}`}
+                              </span>
+                            )}
+                          </div>
                         ) : (
                           <StatusBadge status={getDisplayStatus(e.status, role)} />
                         )}
@@ -386,7 +412,7 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
                     </TableRow>
                     {expandedId === e.id && e.course_id && (
                       <TableRow>
-                        <TableCell colSpan={5} className="p-2">
+                        <TableCell colSpan={6} className="p-2">
                           <CourseDetailsInfoCard courseId={e.course_id} compact />
                         </TableCell>
                       </TableRow>
@@ -395,7 +421,7 @@ export function StudentEnrollmentsTab({ studentId, canChangeStatus }: Props) {
                 );
               })}
               {enrollments.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No enrollments</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No enrollments</TableCell></TableRow>
               )}
             </TableBody>
           </Table>

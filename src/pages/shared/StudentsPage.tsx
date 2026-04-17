@@ -78,6 +78,31 @@ export default function StudentsPage() {
     enabled: adminIds.length > 0,
   });
 
+  // Fetch latest enrollment (course + campus) per visible student
+  const studentIds = (data?.students || []).map((s: any) => s.id);
+  const { data: latestEnrollments = {} } = useQuery({
+    queryKey: ["latest-enrollments-for-students", studentIds],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("enrollments")
+        .select("student_id, created_at, courses(name), campuses(name, city)")
+        .in("student_id", studentIds)
+        .order("created_at", { ascending: false });
+      const map: Record<string, { course?: string; campus?: string; city?: string }> = {};
+      (data || []).forEach((e: any) => {
+        if (!map[e.student_id]) {
+          map[e.student_id] = {
+            course: e.courses?.name,
+            campus: e.campuses?.name,
+            city: e.campuses?.city,
+          };
+        }
+      });
+      return map;
+    },
+    enabled: studentIds.length > 0,
+  });
+
   // Fetch urgent note counts
   const { data: urgentCounts = {} } = useQuery({
     queryKey: ["urgent-note-counts"],
@@ -101,11 +126,17 @@ export default function StudentsPage() {
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   const handleExport = () => {
-    const headers = ["First Name", "Last Name", "Email", "Phone", "Immigration Status", "Created"];
-    const rows = students.map((s: any) => [
-      s.first_name, s.last_name, s.email || "", s.phone || "", s.immigration_status || "",
-      s.created_at ? format(new Date(s.created_at), "yyyy-MM-dd") : "",
-    ]);
+    const headers = ["First Name", "Last Name", "Email", "Phone", "Course", "Campus", "Immigration Status", "Created"];
+    const rows = students.map((s: any) => {
+      const enr = (latestEnrollments as any)[s.id] || {};
+      return [
+        s.first_name, s.last_name, s.email || "", s.phone || "",
+        enr.course || "",
+        enr.campus ? `${enr.campus}${enr.city ? ` (${enr.city})` : ""}` : "",
+        s.immigration_status || "",
+        s.created_at ? format(new Date(s.created_at), "yyyy-MM-dd") : "",
+      ];
+    });
     const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -161,6 +192,8 @@ export default function StudentsPage() {
                 <TableHead>Name</TableHead>
                 <TableHead className="hidden sm:table-cell">Email</TableHead>
                 <TableHead className="hidden md:table-cell">Phone</TableHead>
+                <TableHead className="hidden md:table-cell">Course</TableHead>
+                <TableHead className="hidden md:table-cell">Campus</TableHead>
                 <TableHead className="hidden lg:table-cell">Agent</TableHead>
                 <TableHead className="hidden lg:table-cell">Admin</TableHead>
                 <TableHead className="hidden md:table-cell">Immigration</TableHead>
@@ -170,7 +203,7 @@ export default function StudentsPage() {
             <TableBody>
               {isLoading && Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={`skel-${i}`}>
-                  {Array.from({ length: 7 }).map((_, j) => (
+                  {Array.from({ length: 9 }).map((_, j) => (
                     <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                   ))}
                 </TableRow>
@@ -180,6 +213,7 @@ export default function StudentsPage() {
                 const agentInfo = (agentProfiles as any)[s.agent_id];
                 const agentName = agentInfo?.full_name || "—";
                 const adminName = agentInfo?.admin_id ? (adminProfiles as any)[agentInfo.admin_id] || "—" : "—";
+                const enr = (latestEnrollments as any)[s.id] || {};
                 return (
                   <TableRow
                     key={s.id}
@@ -199,6 +233,12 @@ export default function StudentsPage() {
                     </TableCell>
                     <TableCell className="hidden sm:table-cell text-muted-foreground">{s.email || "—"}</TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground">{s.phone || "—"}</TableCell>
+                    <TableCell className="hidden md:table-cell text-muted-foreground">{enr.course || "—"}</TableCell>
+                    <TableCell className="hidden md:table-cell text-muted-foreground">
+                      {enr.campus ? (
+                        <span>{enr.campus}{enr.city && <span className="text-xs text-muted-foreground/70"> · {enr.city}</span>}</span>
+                      ) : "—"}
+                    </TableCell>
                     <TableCell className="hidden lg:table-cell text-muted-foreground">{agentName}</TableCell>
                     <TableCell className="hidden lg:table-cell text-muted-foreground">{adminName}</TableCell>
                     <TableCell className="hidden md:table-cell">{s.immigration_status || "—"}</TableCell>
@@ -210,7 +250,7 @@ export default function StudentsPage() {
               })}
               {students.length === 0 && !isLoading && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                     No students found
                   </TableCell>
                 </TableRow>
