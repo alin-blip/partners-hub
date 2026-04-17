@@ -285,7 +285,7 @@ serve(async (req) => {
       admin
         .from("students")
         .select(
-          "id, first_name, last_name, email, phone, date_of_birth, nationality, immigration_status, agent_id, created_at"
+          "id, title, first_name, last_name, email, phone, date_of_birth, gender, nationality, immigration_status, ni_number, share_code, crn, uk_entry_date, full_address, next_of_kin_name, next_of_kin_phone, next_of_kin_relationship, qualifications, study_pattern, previous_funding_years, notes, agent_id, created_at, updated_at"
         )
         .in("agent_id", agentIds.length ? agentIds : ["00000000-0000-0000-0000-000000000000"]),
       admin
@@ -473,14 +473,29 @@ serve(async (req) => {
       rows.push(["STUDENTS"]);
       rows.push([
         "Agent",
+        "Title",
         "First Name",
         "Last Name",
         "Email",
         "Phone",
         "Date of Birth",
+        "Gender",
         "Nationality",
         "Immigration Status",
+        "NI Number",
+        "Share Code",
+        "CRN",
+        "UK Entry Date",
+        "Full Address",
+        "Next of Kin Name",
+        "Next of Kin Phone",
+        "Next of Kin Relationship",
+        "Qualifications",
+        "Study Pattern",
+        "Previous Funding Years",
+        "Notes",
         "Created",
+        "Updated",
       ]);
       if (teamStudents.length === 0) {
         rows.push(["(no students)"]);
@@ -489,14 +504,29 @@ serve(async (req) => {
           const ag = agentById.get(s.agent_id);
           rows.push([
             ag?.full_name || ag?.email || "—",
+            s.title || "",
             s.first_name || "",
             s.last_name || "",
             s.email || "",
             s.phone || "",
             s.date_of_birth || "",
+            s.gender || "",
             s.nationality || "",
             s.immigration_status || "",
+            s.ni_number || "",
+            s.share_code || "",
+            s.crn || "",
+            s.uk_entry_date || "",
+            s.full_address || "",
+            s.next_of_kin_name || "",
+            s.next_of_kin_phone || "",
+            s.next_of_kin_relationship || "",
+            s.qualifications || "",
+            s.study_pattern || "",
+            s.previous_funding_years ?? "",
+            s.notes || "",
             s.created_at ? new Date(s.created_at).toISOString().split("T")[0] : "",
+            s.updated_at ? new Date(s.updated_at).toISOString().split("T")[0] : "",
           ]);
         }
       }
