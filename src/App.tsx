@@ -40,6 +40,7 @@ import AuditLogPage from "./pages/owner/AuditLogPage";
 import LeadsPage from "./pages/shared/LeadsPage";
 import TasksPage from "./pages/shared/TasksPage";
 import LeaderboardPage from "./pages/shared/LeaderboardPage";
+import LearnPage from "./pages/shared/LearnPage";
 import NotFound from "./pages/NotFound";
 import { IdleTimeoutDialog } from "./components/IdleTimeoutDialog";
 
