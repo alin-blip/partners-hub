@@ -1817,6 +1817,53 @@ export type Database = {
         }
         Relationships: []
       }
+      student_document_requests: {
+        Row: {
+          agent_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          message: string | null
+          requested_doc_types: string[]
+          status: string
+          student_id: string
+          submitted_at: string | null
+          token: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          message?: string | null
+          requested_doc_types?: string[]
+          status?: string
+          student_id: string
+          submitted_at?: string | null
+          token?: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          message?: string | null
+          requested_doc_types?: string[]
+          status?: string
+          student_id?: string
+          submitted_at?: string | null
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_document_requests_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_documents: {
         Row: {
           agent_id: string
