@@ -1,85 +1,84 @@
 
 
-User wants: agent sends a secure link to student → student opens link → uploads documents → docs appear directly in the student's profile in the platform. No more email back-and-forth.
+User wants a discussion/comments system on each lesson in the Learn section, similar to YouTube/Disqus comments.
 
-This is similar to the existing **consent signing flow** (`consent_signing_tokens` + `/sign-consent/:token` page + `submit-consent-signature` edge function). I'll mirror that pattern for document uploads.
+## Requirements
+1. Comments per lesson — visible to everyone (all roles)
+2. Replies (nested, 1 level deep — comment → replies)
+3. Image attachments in comments
+4. Emoji reactions on comments (👍 ❤️ 🎉 🙌 🔥)
+5. Quick-reply shortcut buttons: "Great!", "So powerful!", "Amazing!", "Thank you!"
+6. Owners + Admins can delete ANY comment; users can delete their own
+7. All visible to all authenticated users
 
-## Architecture (mirrors consent flow)
+## Database (additive — safe for 44 live agents)
 
-```text
-Agent in StudentDocumentsTab
-  └─► "Request Documents" button
-        └─► creates row in student_document_requests (token, expires 7d)
-              └─► copy link / send email to student
-                    └─► Student opens /upload-documents/:token (public page)
-                          └─► sees list of requested doc types
-                          └─► drag/drop files
-                                └─► submit-student-documents edge function
-                                      ├─► validates token (service role)
-                                      ├─► uploads to student-documents bucket
-                                      └─► inserts into student_documents
-                                            └─► docs appear in agent's view
-```
+**Table 1: `learn_lesson_comments`**
+- `id` uuid PK
+- `lesson_id` uuid (references learn_lessons)
+- `user_id` uuid (auth.uid())
+- `parent_comment_id` uuid nullable (for replies — 1-level nesting)
+- `content` text
+- `image_url` text nullable
+- `created_at`, `updated_at` timestamps
 
-## Database changes (1 new table)
+**RLS:**
+- SELECT: any authenticated user (`true`)
+- INSERT: `user_id = auth.uid()`
+- UPDATE: own comments only
+- DELETE: own comments OR owner OR admin (using `has_role`)
 
-`student_document_requests`:
-- `id`, `token` (random hex), `student_id`, `agent_id`
-- `requested_doc_types` (text[]) — e.g. `['Passport', 'Transcript', 'CV']`
-- `message` (text, optional note from agent)
-- `status` ('pending' | 'submitted' | 'expired')
-- `expires_at` (default now + 14 days), `submitted_at`, `created_at`
+**Table 2: `learn_comment_reactions`**
+- `id` uuid PK
+- `comment_id` uuid (references learn_lesson_comments)
+- `user_id` uuid
+- `emoji` text (e.g. '👍', '❤️', '🎉', '🙌', '🔥')
+- UNIQUE constraint on `(comment_id, user_id, emoji)` — one reaction per emoji per user per comment
+- `created_at`
 
-RLS: agents/admins read/insert their own (mirrors `consent_signing_tokens`). Service role full access for validation.
+**RLS:**
+- SELECT: any authenticated
+- INSERT/DELETE: own reactions only
 
-## Edge functions (2 new)
-
-1. **`validate-document-token`** (public, no JWT)
-   - Input: `{ token }`
-   - Returns: `{ status, studentName, requestedDocTypes, message, agentName }`
-
-2. **`submit-student-documents`** (public, no JWT, service role)
-   - Input: `{ token, files: [{ name, type, base64 }] }`
-   - Validates token → uploads to `student-documents/${studentId}/...` → inserts `student_documents` rows → marks token `submitted` → triggers Drive sync
+## Storage
+Reuse existing **`brand-assets`** bucket (public) for comment images, under path `lesson-comments/${userId}/${timestamp}-${filename}`. No new bucket needed.
 
 ## Frontend changes
 
-1. **New public page**: `src/pages/public/UploadDocumentsPage.tsx` (route `/upload-documents/:token`)
-   - Brand header (EduForYou navy/gold)
-   - Shows student name + agent name + requested doc types as a checklist
-   - Drag/drop file uploader per doc type
-   - Submit button → calls `submit-student-documents`
-   - Success state with green check
+**1. New component: `src/components/learn/LessonComments.tsx`**
+- Fetches comments + reactions for a lesson via React Query
+- Comment input box at top with:
+  - Textarea
+  - Image upload button (paperclip icon → uploads to storage)
+  - Quick-reply chips: "Great!" "So powerful!" "Amazing!" "Thank you!" (click → fills textarea)
+  - Emoji picker button (uses simple grid of common emojis, no extra library — adds to text)
+  - Submit button
+- Comment list (newest first):
+  - Avatar + name + role badge + timestamp
+  - Content + image (if any)
+  - Reaction bar: 5 emoji buttons with counts (toggle on click)
+  - Reply button → opens inline reply box
+  - Delete button (visible if own OR owner/admin)
+  - Nested replies indented below
+- Realtime subscription for live updates (optional but consistent with other features)
 
-2. **Add to `App.tsx`**: route `/upload-documents/:token` (public, like `/sign-consent/:token`)
-
-3. **`StudentDocumentsTab.tsx`**: Add new "Request Documents" card/button
-   - Dialog with checkboxes for doc types (Passport, Transcript, CV, Personal Statement, etc.)
-   - Optional message textarea
-   - Generates token → shows: copy link button + "Send via email" button
-   - "Send via email" calls `send-transactional-email` with new template
-
-4. **New email template**: `document-upload-request.tsx` (mirrors `consent-signing-link.tsx`)
-   - Subject: "Please upload your documents — EduForYou UK"
-   - Body: agent intro + list of requested docs + CTA button to upload page
+**2. Modify: `src/components/learn/LessonPlayer.tsx`**
+- Add `<LessonComments lessonId={lesson.id} />` below attachments section inside the dialog
+- Make dialog content scrollable to accommodate
 
 ## Files to create/modify
 
 **New:**
-- Migration: `student_document_requests` table + RLS
-- `supabase/functions/validate-document-token/index.ts`
-- `supabase/functions/submit-student-documents/index.ts`
-- `supabase/functions/_shared/transactional-email-templates/document-upload-request.tsx`
-- `src/pages/public/UploadDocumentsPage.tsx`
+- Migration: `learn_lesson_comments` + `learn_comment_reactions` tables with RLS
+- `src/components/learn/LessonComments.tsx`
 
 **Modified:**
-- `src/App.tsx` — add public route
-- `src/components/student-detail/StudentDocumentsTab.tsx` — add "Request Documents" button + dialog
-- `supabase/functions/_shared/transactional-email-templates/registry.ts` — register new template
+- `src/components/learn/LessonPlayer.tsx` — embed `<LessonComments />`
+- `src/integrations/supabase/types.ts` — auto-regenerated by migration
 
-## Safety (live env, 44 agents)
-- 100% additive — new table, new functions, new page, new button. Zero changes to existing flows.
-- Reuses existing storage bucket + path convention `${studentId}/${filename}` (RLS-compatible).
-- Auto-triggers Google Drive sync after upload (consistent with current behavior).
-- Token expires after 14 days; one-time use (status flips to `submitted`).
+## Safety
+- 100% additive — 2 new tables, 1 new component, 1 file modified
+- Reuses existing `brand-assets` bucket (no storage policy changes)
+- No emoji library dependency — uses native Unicode emojis in a simple grid
+- No impact on existing learn flow (modules, lessons, progress)
 
