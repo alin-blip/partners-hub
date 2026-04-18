@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { LessonComments } from "./LessonComments";
 
 type Attachment = { name: string; url: string };
 
@@ -140,6 +141,8 @@ export function LessonPlayer({ lesson, open, onOpenChange, isCompleted }: Props)
             Mark as completed
           </Button>
         )}
+
+        <LessonComments lessonId={lesson.id} />
       </DialogContent>
     </Dialog>
   );
