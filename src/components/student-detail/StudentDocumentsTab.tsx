@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Download, Trash2, FileText, RefreshCw, ShieldCheck, Eye, Archive, Send, Copy, Check, Loader2, ExternalLink, Mail } from "lucide-react";
+import { Upload, Download, Trash2, FileText, RefreshCw, ShieldCheck, Eye, Archive, Send, Copy, Check, Loader2, ExternalLink, Mail, FolderUp } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { SignatureCanvas } from "@/components/SignatureCanvas";
 import { syncToDrive } from "@/lib/drive-sync";
@@ -56,6 +57,15 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
   const [linkCopied, setLinkCopied] = useState(false);
   const [emailingLink, setEmailingLink] = useState(false);
   const [emailingRegent, setEmailingRegent] = useState(false);
+
+  // Document upload request state
+  const [docRequestOpen, setDocRequestOpen] = useState(false);
+  const [requestedDocTypes, setRequestedDocTypes] = useState<Record<string, boolean>>({});
+  const [requestMessage, setRequestMessage] = useState("");
+  const [creatingRequest, setCreatingRequest] = useState(false);
+  const [emailingRequest, setEmailingRequest] = useState(false);
+  const [docRequestLink, setDocRequestLink] = useState<string | null>(null);
+  const [requestLinkCopied, setRequestLinkCopied] = useState(false);
 
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
@@ -491,6 +501,83 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
     }
   };
 
+  const buildDocTypesList = () => Object.entries(requestedDocTypes).filter(([, v]) => v).map(([k]) => k);
+
+  const handleCreateDocRequest = async () => {
+    const list = buildDocTypesList();
+    if (list.length === 0) {
+      toast({ title: "Select at least one document type", variant: "destructive" });
+      return;
+    }
+    setCreatingRequest(true);
+    setDocRequestLink(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-document-request", {
+        body: { student_id: student.id, doc_types: list, message: requestMessage || null },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setDocRequestLink(data.upload_url);
+      toast({ title: "Upload link created", description: "Copy and share with the student." });
+    } catch (err: any) {
+      toast({ title: "Failed to create link", description: err.message, variant: "destructive" });
+    } finally {
+      setCreatingRequest(false);
+    }
+  };
+
+  const handleEmailDocRequest = async () => {
+    if (!student.email) {
+      toast({ title: "No email address", description: "This student doesn't have an email on file.", variant: "destructive" });
+      return;
+    }
+    const list = buildDocTypesList();
+    if (list.length === 0) {
+      toast({ title: "Select at least one document type", variant: "destructive" });
+      return;
+    }
+    setEmailingRequest(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-document-request", {
+        body: { student_id: student.id, doc_types: list, message: requestMessage || null },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      const uploadUrl = data.upload_url;
+      const studentName = `${student.title ? student.title + " " : ""}${student.first_name} ${student.last_name}`;
+
+      const { error: emailError } = await supabase.functions.invoke("send-transactional-email", {
+        body: {
+          templateName: "document-upload-request",
+          recipientEmail: student.email,
+          idempotencyKey: `doc-request-${data.token}`,
+          templateData: {
+            studentName,
+            agentName: agentProfile?.full_name || "EduForYou UK",
+            uploadUrl,
+            docTypes: list,
+            message: requestMessage || null,
+          },
+        },
+      });
+      if (emailError) throw emailError;
+      setDocRequestLink(uploadUrl);
+      toast({ title: "Email sent", description: `Upload link sent to ${student.email}.` });
+    } catch (err: any) {
+      toast({ title: "Failed to send email", description: err.message, variant: "destructive" });
+    } finally {
+      setEmailingRequest(false);
+    }
+  };
+
+  const handleCopyRequestLink = () => {
+    if (!docRequestLink) return;
+    navigator.clipboard.writeText(docRequestLink);
+    setRequestLinkCopied(true);
+    toast({ title: "Link copied to clipboard" });
+    setTimeout(() => setRequestLinkCopied(false), 2000);
+  };
+
   return (
     <>
       <Card>
@@ -511,6 +598,9 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
                 <Button size="sm" variant="outline" onClick={handleEmailConsentLink} disabled={emailingLink || sendingLink || !student.email}>
                   {emailingLink ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Mail className="w-3 h-3 mr-1" />}
                   Email Link
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => { setDocRequestOpen(true); setDocRequestLink(null); setRequestedDocTypes({}); setRequestMessage(""); }}>
+                  <FolderUp className="w-3 h-3 mr-1" /> Request Documents
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => setConsentDialogOpen(true)}>
                   <RefreshCw className="w-3 h-3 mr-1" /> Re-generate Consent
@@ -823,6 +913,86 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
                   {verifyingCode ? "Verifying…" : "Confirm delete"}
                 </Button>
               </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Request Documents from Student Dialog */}
+      <Dialog open={docRequestOpen} onOpenChange={setDocRequestOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FolderUp className="w-5 h-5 text-primary" />
+              Request Documents from Student
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Send a secure upload link to <strong>{student.first_name} {student.last_name}</strong>.
+              The student opens the link, uploads documents, and they appear here automatically — no email attachments needed.
+            </p>
+
+            <div className="space-y-2">
+              <Label>Which documents do you need?</Label>
+              <div className="grid grid-cols-2 gap-2 p-3 rounded-lg border bg-muted/20">
+                {DOC_TYPES.map((dt) => (
+                  <label key={dt} className="flex items-center gap-2 cursor-pointer text-sm">
+                    <Checkbox
+                      checked={!!requestedDocTypes[dt]}
+                      onCheckedChange={(v) => setRequestedDocTypes((p) => ({ ...p, [dt]: !!v }))}
+                    />
+                    <span>{dt}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Optional message to student</Label>
+              <Textarea
+                placeholder="e.g. Please make sure your passport scan is in colour and clearly readable."
+                value={requestMessage}
+                onChange={(e) => setRequestMessage(e.target.value)}
+                rows={3}
+              />
+            </div>
+
+            {docRequestLink && (
+              <div className="p-3 rounded-lg border border-accent/40 bg-accent/5 space-y-2">
+                <p className="text-xs font-semibold text-accent">Upload link ready</p>
+                <p className="text-xs text-muted-foreground break-all">{docRequestLink}</p>
+                <Button size="sm" variant="outline" onClick={handleCopyRequestLink} className="w-full">
+                  {requestLinkCopied ? <Check className="w-3 h-3 mr-1" /> : <Copy className="w-3 h-3 mr-1" />}
+                  {requestLinkCopied ? "Copied" : "Copy link"}
+                </Button>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={handleCreateDocRequest}
+                disabled={creatingRequest || emailingRequest}
+                className="flex-1"
+              >
+                {creatingRequest ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+                {creatingRequest ? "Creating…" : "Get link"}
+              </Button>
+              <Button
+                onClick={handleEmailDocRequest}
+                disabled={emailingRequest || creatingRequest || !student.email}
+                className="flex-1"
+              >
+                {emailingRequest ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Mail className="w-4 h-4 mr-2" />}
+                {emailingRequest ? "Sending…" : "Send via email"}
+              </Button>
+            </div>
+            {!student.email && (
+              <p className="text-xs text-muted-foreground text-center">
+                No email on file — use "Get link" and share the URL manually (WhatsApp, SMS, etc.).
+              </p>
             )}
           </div>
         </DialogContent>
