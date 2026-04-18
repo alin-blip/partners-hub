@@ -58,6 +58,14 @@ function formatDuration(s: number | null) {
   return `${m}:${sec.toString().padStart(2, "0")}`;
 }
 
+function getVideoThumbnail(videoUrl: string | null, thumbnailUrl: string | null): string | null {
+  if (thumbnailUrl) return thumbnailUrl;
+  if (!videoUrl) return null;
+  const yt = videoUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/);
+  if (yt) return `https://img.youtube.com/vi/${yt[1]}/mqdefault.jpg`;
+  return null;
+}
+
 function getIconComponent(name: string | null) {
   if (!name) return Icons.BookOpen;
   const Comp = (Icons as any)[name];
