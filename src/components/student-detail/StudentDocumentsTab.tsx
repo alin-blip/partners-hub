@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Download, Trash2, FileText, RefreshCw, ShieldCheck, Eye, Archive, Send, Copy, Check, Loader2, ExternalLink, Mail } from "lucide-react";
+import { Upload, Download, Trash2, FileText, RefreshCw, ShieldCheck, Eye, Archive, Send, Copy, Check, Loader2, ExternalLink, Mail, FolderUp } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { SignatureCanvas } from "@/components/SignatureCanvas";
 import { syncToDrive } from "@/lib/drive-sync";
@@ -56,6 +57,15 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
   const [linkCopied, setLinkCopied] = useState(false);
   const [emailingLink, setEmailingLink] = useState(false);
   const [emailingRegent, setEmailingRegent] = useState(false);
+
+  // Document upload request state
+  const [docRequestOpen, setDocRequestOpen] = useState(false);
+  const [requestedDocTypes, setRequestedDocTypes] = useState<Record<string, boolean>>({});
+  const [requestMessage, setRequestMessage] = useState("");
+  const [creatingRequest, setCreatingRequest] = useState(false);
+  const [emailingRequest, setEmailingRequest] = useState(false);
+  const [docRequestLink, setDocRequestLink] = useState<string | null>(null);
+  const [requestLinkCopied, setRequestLinkCopied] = useState(false);
 
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
