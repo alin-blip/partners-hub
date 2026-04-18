@@ -501,6 +501,83 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
     }
   };
 
+  const buildDocTypesList = () => Object.entries(requestedDocTypes).filter(([, v]) => v).map(([k]) => k);
+
+  const handleCreateDocRequest = async () => {
+    const list = buildDocTypesList();
+    if (list.length === 0) {
+      toast({ title: "Select at least one document type", variant: "destructive" });
+      return;
+    }
+    setCreatingRequest(true);
+    setDocRequestLink(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-document-request", {
+        body: { student_id: student.id, doc_types: list, message: requestMessage || null },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setDocRequestLink(data.upload_url);
+      toast({ title: "Upload link created", description: "Copy and share with the student." });
+    } catch (err: any) {
+      toast({ title: "Failed to create link", description: err.message, variant: "destructive" });
+    } finally {
+      setCreatingRequest(false);
+    }
+  };
+
+  const handleEmailDocRequest = async () => {
+    if (!student.email) {
+      toast({ title: "No email address", description: "This student doesn't have an email on file.", variant: "destructive" });
+      return;
+    }
+    const list = buildDocTypesList();
+    if (list.length === 0) {
+      toast({ title: "Select at least one document type", variant: "destructive" });
+      return;
+    }
+    setEmailingRequest(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-document-request", {
+        body: { student_id: student.id, doc_types: list, message: requestMessage || null },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      const uploadUrl = data.upload_url;
+      const studentName = `${student.title ? student.title + " " : ""}${student.first_name} ${student.last_name}`;
+
+      const { error: emailError } = await supabase.functions.invoke("send-transactional-email", {
+        body: {
+          templateName: "document-upload-request",
+          recipientEmail: student.email,
+          idempotencyKey: `doc-request-${data.token}`,
+          templateData: {
+            studentName,
+            agentName: agentProfile?.full_name || "EduForYou UK",
+            uploadUrl,
+            docTypes: list,
+            message: requestMessage || null,
+          },
+        },
+      });
+      if (emailError) throw emailError;
+      setDocRequestLink(uploadUrl);
+      toast({ title: "Email sent", description: `Upload link sent to ${student.email}.` });
+    } catch (err: any) {
+      toast({ title: "Failed to send email", description: err.message, variant: "destructive" });
+    } finally {
+      setEmailingRequest(false);
+    }
+  };
+
+  const handleCopyRequestLink = () => {
+    if (!docRequestLink) return;
+    navigator.clipboard.writeText(docRequestLink);
+    setRequestLinkCopied(true);
+    toast({ title: "Link copied to clipboard" });
+    setTimeout(() => setRequestLinkCopied(false), 2000);
+  };
+
   return (
     <>
       <Card>
@@ -521,6 +598,9 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
                 <Button size="sm" variant="outline" onClick={handleEmailConsentLink} disabled={emailingLink || sendingLink || !student.email}>
                   {emailingLink ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Mail className="w-3 h-3 mr-1" />}
                   Email Link
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => { setDocRequestOpen(true); setDocRequestLink(null); setRequestedDocTypes({}); setRequestMessage(""); }}>
+                  <FolderUp className="w-3 h-3 mr-1" /> Request Documents
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => setConsentDialogOpen(true)}>
                   <RefreshCw className="w-3 h-3 mr-1" /> Re-generate Consent
