@@ -98,7 +98,7 @@ export function LessonComments({ lessonId }: Props) {
         .select("user_id, role")
         .in("user_id", userIds);
       if (error) return [] as RoleRow[];
-      return (data ?? []) as RoleRow[];
+      return ((data ?? []) as unknown) as RoleRow[];
     },
   });
 
