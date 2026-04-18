@@ -88,61 +88,63 @@ export function LessonPlayer({ lesson, open, onOpenChange, isCompleted }: Props)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      <DialogContent className="max-w-4xl max-h-[90vh] p-0 flex flex-col gap-0">
+        <DialogHeader className="px-6 pt-6 pb-3 shrink-0 border-b">
+          <DialogTitle className="flex items-center gap-2 pr-8">
             {lesson.title}
             {isCompleted && <Badge variant="secondary" className="gap-1"><CheckCircle2 className="h-3 w-3" /> Completed</Badge>}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="aspect-video w-full bg-black rounded-lg overflow-hidden">
-          {embedUrl ? (
-            <iframe
-              src={embedUrl}
-              className="w-full h-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              title={lesson.title}
-            />
-          ) : isDirectVideo ? (
-            <video ref={videoRef} src={url} controls className="w-full h-full" />
-          ) : (
-            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-              No video uploaded yet
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 min-h-0">
+          <div className="relative w-full bg-black rounded-lg overflow-hidden" style={{ aspectRatio: "16 / 9", maxHeight: "55vh" }}>
+            {embedUrl ? (
+              <iframe
+                src={embedUrl}
+                className="absolute inset-0 w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                title={lesson.title}
+              />
+            ) : isDirectVideo ? (
+              <video ref={videoRef} src={url} controls className="absolute inset-0 w-full h-full" />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
+                No video uploaded yet
+              </div>
+            )}
+          </div>
+
+          {lesson.description && (
+            <div className="text-sm text-muted-foreground whitespace-pre-wrap">{lesson.description}</div>
+          )}
+
+          {lesson.attachments && lesson.attachments.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold">Resources</h4>
+              <div className="flex flex-wrap gap-2">
+                {lesson.attachments.map((a, i) => (
+                  <a key={i} href={a.url} target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline" size="sm" className="gap-2">
+                      <FileText className="h-4 w-4" />
+                      {a.name}
+                      <ExternalLink className="h-3 w-3" />
+                    </Button>
+                  </a>
+                ))}
+              </div>
             </div>
           )}
+
+          {!isCompleted && (
+            <Button onClick={markComplete} disabled={marking} className="w-full">
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Mark as completed
+            </Button>
+          )}
+
+          <LessonComments lessonId={lesson.id} />
         </div>
-
-        {lesson.description && (
-          <div className="text-sm text-muted-foreground whitespace-pre-wrap">{lesson.description}</div>
-        )}
-
-        {lesson.attachments && lesson.attachments.length > 0 && (
-          <div className="space-y-2">
-            <h4 className="text-sm font-semibold">Resources</h4>
-            <div className="flex flex-wrap gap-2">
-              {lesson.attachments.map((a, i) => (
-                <a key={i} href={a.url} target="_blank" rel="noopener noreferrer">
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <FileText className="h-4 w-4" />
-                    {a.name}
-                    <ExternalLink className="h-3 w-3" />
-                  </Button>
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {!isCompleted && (
-          <Button onClick={markComplete} disabled={marking} className="w-full">
-            <CheckCircle2 className="h-4 w-4 mr-2" />
-            Mark as completed
-          </Button>
-        )}
-
-        <LessonComments lessonId={lesson.id} />
       </DialogContent>
     </Dialog>
   );
