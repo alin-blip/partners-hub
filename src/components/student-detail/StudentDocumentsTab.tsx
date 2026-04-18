@@ -917,6 +917,86 @@ export function StudentDocumentsTab({ student, canEdit }: Props) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Request Documents from Student Dialog */}
+      <Dialog open={docRequestOpen} onOpenChange={setDocRequestOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FolderUp className="w-5 h-5 text-primary" />
+              Request Documents from Student
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Send a secure upload link to <strong>{student.first_name} {student.last_name}</strong>.
+              The student opens the link, uploads documents, and they appear here automatically — no email attachments needed.
+            </p>
+
+            <div className="space-y-2">
+              <Label>Which documents do you need?</Label>
+              <div className="grid grid-cols-2 gap-2 p-3 rounded-lg border bg-muted/20">
+                {DOC_TYPES.map((dt) => (
+                  <label key={dt} className="flex items-center gap-2 cursor-pointer text-sm">
+                    <Checkbox
+                      checked={!!requestedDocTypes[dt]}
+                      onCheckedChange={(v) => setRequestedDocTypes((p) => ({ ...p, [dt]: !!v }))}
+                    />
+                    <span>{dt}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Optional message to student</Label>
+              <Textarea
+                placeholder="e.g. Please make sure your passport scan is in colour and clearly readable."
+                value={requestMessage}
+                onChange={(e) => setRequestMessage(e.target.value)}
+                rows={3}
+              />
+            </div>
+
+            {docRequestLink && (
+              <div className="p-3 rounded-lg border border-accent/40 bg-accent/5 space-y-2">
+                <p className="text-xs font-semibold text-accent">Upload link ready</p>
+                <p className="text-xs text-muted-foreground break-all">{docRequestLink}</p>
+                <Button size="sm" variant="outline" onClick={handleCopyRequestLink} className="w-full">
+                  {requestLinkCopied ? <Check className="w-3 h-3 mr-1" /> : <Copy className="w-3 h-3 mr-1" />}
+                  {requestLinkCopied ? "Copied" : "Copy link"}
+                </Button>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={handleCreateDocRequest}
+                disabled={creatingRequest || emailingRequest}
+                className="flex-1"
+              >
+                {creatingRequest ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+                {creatingRequest ? "Creating…" : "Get link"}
+              </Button>
+              <Button
+                onClick={handleEmailDocRequest}
+                disabled={emailingRequest || creatingRequest || !student.email}
+                className="flex-1"
+              >
+                {emailingRequest ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Mail className="w-4 h-4 mr-2" />}
+                {emailingRequest ? "Sending…" : "Send via email"}
+              </Button>
+            </div>
+            {!student.email && (
+              <p className="text-xs text-muted-foreground text-center">
+                No email on file — use "Get link" and share the URL manually (WhatsApp, SMS, etc.).
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
