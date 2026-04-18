@@ -63,6 +63,8 @@ function getVideoThumbnail(videoUrl: string | null, thumbnailUrl: string | null)
   if (!videoUrl) return null;
   const yt = videoUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/);
   if (yt) return `https://img.youtube.com/vi/${yt[1]}/mqdefault.jpg`;
+  const loom = videoUrl.match(/loom\.com\/(?:share|embed)\/([\w-]+)/);
+  if (loom) return `https://cdn.loom.com/sessions/thumbnails/${loom[1]}-with-play.gif`;
   return null;
 }
 
