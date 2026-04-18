@@ -319,6 +319,7 @@ export default function LearnPage() {
                       )}
                       {visibleLessons.map((lesson) => {
                         const done = completedSet.has(lesson.id);
+                        const thumb = getVideoThumbnail(lesson.video_url, lesson.thumbnail_url);
                         return (
                           <div
                             key={lesson.id}
@@ -326,20 +327,36 @@ export default function LearnPage() {
                           >
                             <button
                               onClick={() => openLesson(lesson)}
-                              className="flex items-center gap-3 flex-1 text-left"
+                              className="flex items-center gap-3 flex-1 text-left min-w-0"
                             >
-                              {done ? (
+                              {thumb ? (
+                                <div className="relative w-24 h-14 rounded-md overflow-hidden bg-muted shrink-0 border">
+                                  <img
+                                    src={thumb}
+                                    alt={lesson.title}
+                                    loading="lazy"
+                                    className="w-full h-full object-cover"
+                                  />
+                                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Play className="h-6 w-6 text-white fill-white" />
+                                  </div>
+                                  {done && (
+                                    <div className="absolute top-1 right-1 bg-background rounded-full">
+                                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                                    </div>
+                                  )}
+                                </div>
+                              ) : done ? (
                                 <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
                               ) : (
                                 <Circle className="h-5 w-5 text-muted-foreground shrink-0" />
                               )}
-                              <Play className="h-4 w-4 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                              <span className="flex-1 text-sm">{lesson.title}</span>
+                              <span className="flex-1 text-sm truncate">{lesson.title}</span>
                               {!lesson.is_published && (
                                 <Badge variant="outline" className="text-xs">Draft</Badge>
                               )}
                               {lesson.video_duration && (
-                                <span className="text-xs text-muted-foreground tabular-nums">
+                                <span className="text-xs text-muted-foreground tabular-nums shrink-0">
                                   {formatDuration(lesson.video_duration)}
                                 </span>
                               )}
