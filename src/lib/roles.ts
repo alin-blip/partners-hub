@@ -1,27 +1,30 @@
+// Centralized role constants. Values match the database `app_role` enum.
 export const APP_ROLES = {
   SUPER_ADMIN: "owner",
   COMPANY_ADMIN: "company_admin",
-  BRANCH_MANAGER: "admin", // Refactored from 'admin'
-  CONSULTANT: "agent",     // Refactored from 'agent'
+  BRANCH_MANAGER: "admin",
+  CONSULTANT: "agent",
+} as const;
+
+export type AppRoleValue = (typeof APP_ROLES)[keyof typeof APP_ROLES];
+
+export const ROLE_PREFIXES: Record<string, string> = {
+  [APP_ROLES.SUPER_ADMIN]: "/owner",
+  [APP_ROLES.COMPANY_ADMIN]: "/company",
+  [APP_ROLES.BRANCH_MANAGER]: "/admin",
+  [APP_ROLES.CONSULTANT]: "/agent",
 };
 
-export const ROLE_PREFIXES = {
-  [APP_ROLES.SUPER_ADMIN]: "owner",
-  [APP_ROLES.COMPANY_ADMIN]: "company",
-  [APP_ROLES.BRANCH_MANAGER]: "admin",
-  [APP_ROLES.CONSULTANT]: "agent",
+export const getRolePrefix = (role: string | null | undefined) => {
+  if (!role) return "/agent";
+  return ROLE_PREFIXES[role] ?? "/agent";
 };
 
-export const getRolePrefix = (role: string) => {
-  return ROLE_PREFIXES[role as keyof typeof ROLE_PREFIXES] || "";
+export const getHomeRoute = (role: string | null | undefined) => {
+  return `${getRolePrefix(role)}/dashboard`;
 };
 
-export const getHomeRoute = (role: string) => {
-  const prefix = getRolePrefix(role);
-  return `/${prefix}/dashboard`;
-};
-
-export const getRoleLabel = (role: string) => {
+export const getRoleLabel = (role: string | null | undefined) => {
   switch (role) {
     case APP_ROLES.SUPER_ADMIN:
       return "Super Admin";
@@ -32,6 +35,6 @@ export const getRoleLabel = (role: string) => {
     case APP_ROLES.CONSULTANT:
       return "Consultant";
     default:
-      return role;
+      return role ?? "User";
   }
 };
