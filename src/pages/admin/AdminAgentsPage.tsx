@@ -31,17 +31,17 @@ export default function AdminAgentsPage() {
   const [newAddress, setNewAddress] = useState("");
 
   const { data: consultants = [] } = useQuery({
-    queryKey: ["branch-consultants", user?.id],
+    queryKey: ["admin-team", user?.id],
     queryFn: async () => {
+      if (!user?.id) return [];
       const { data } = await supabase
         .from("profiles")
         .select("*")
-        .eq("branch_id", user!.branch_id)
-        .eq("role", APP_ROLES.CONSULTANT)
+        .eq("admin_id", user.id)
         .order("created_at", { ascending: false });
       return data || [];
     },
-    enabled: !!user?.branch_id,
+    enabled: !!user?.id,
   });
 
   const createConsultant = useMutation({
@@ -50,8 +50,8 @@ export default function AdminAgentsPage() {
         body: {
           email: newEmail,
           full_name: newName,
-          role: APP_ROLES.CONSULTANT,
-          branch_id: user!.branch_id,
+          role: "agent",
+          admin_id: user!.id,
           postcode: newPostcode || undefined,
           address: newAddress || undefined,
         },
@@ -81,7 +81,7 @@ export default function AdminAgentsPage() {
           console.error("Failed to create welcome conversation:", e);
         }
       }
-      queryClient.invalidateQueries({ queryKey: ["branch-consultants"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-team"] });
       toast({ title: "Consultant created successfully" });
       setOpen(false);
       setNewEmail("");
@@ -99,11 +99,11 @@ export default function AdminAgentsPage() {
       const { error } = await supabase.from("profiles").update({ is_active }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["branch-consultants"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-team"] }),
   });
 
   return (
-    <DashboardLayout allowedRoles={[APP_ROLES.BRANCH_MANAGER]}>
+    <DashboardLayout allowedRoles={["admin"]}>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold tracking-tight">My Consultants</h1>

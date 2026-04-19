@@ -231,15 +231,15 @@ export default function AgentsPage() {
                     )}
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
-                    {presenceMap.has(p.id) ? (
-                      <Badge variant="success" className="text-xs">Online</Badge>
+                    {presenceMap[p.id] ? (
+                      <Badge variant="default" className="text-xs bg-emerald-500 hover:bg-emerald-600">Online</Badge>
                     ) : (
                       <Badge variant="outline" className="text-xs">Offline</Badge>
                     )}
                   </TableCell>
                   <TableCell>
                     {p.is_active ? (
-                      <Badge variant="success" className="text-xs">Active</Badge>
+                      <Badge variant="default" className="text-xs bg-emerald-500 hover:bg-emerald-600">Active</Badge>
                     ) : (
                       <Badge variant="destructive" className="text-xs">Inactive</Badge>
                     )}
