@@ -15,9 +15,9 @@ interface AuthContextType {
     email: string; 
     phone: string | null; 
     avatar_url: string | null; 
-    company_id: string | null; 
-    branch_id: string | null; 
   } | null;
+  companyId: string | null;
+  branchId: string | null;
   loading: boolean;
   signOut: () => Promise<void>;
 }
@@ -27,6 +27,8 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   role: null,
   profile: null,
+  companyId: null,
+  branchId: null,
   loading: true,
   signOut: async () => {},
 });
@@ -43,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchRoleAndProfile = async (userId: string) => {
     const [roleRes, profileRes] = await Promise.all([
       supabase.rpc("get_user_role", { _user_id: userId }),
-      supabase.from("profiles").select("full_name, email, phone, avatar_url, company_id, branch_id").eq("id", userId).single(),
+      supabase.from("profiles").select("full_name, email, phone, avatar_url").eq("id", userId).single(),
     ]);
     if (roleRes.data) setRole(roleRes.data as AppRole);
     if (profileRes.data) setProfile(profileRes.data);
@@ -85,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, role, profile, loading, signOut }}>
+    <AuthContext.Provider value={{ session, user, role, profile, companyId: null, branchId: null, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   );
