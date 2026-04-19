@@ -18,6 +18,9 @@ import BranchDashboard from "./pages/admin/BranchDashboard";
 import CompanyDashboard from "./pages/company/CompanyDashboard";
 import CompanyBranchDetailPage from "./pages/company/CompanyBranchDetailPage";
 import CompanyBranchCreatePage from "./pages/company/CompanyBranchCreatePage";
+import CompanyBranchesListPage from "./pages/company/CompanyBranchesListPage";
+import CompanyUsersPage from "./pages/company/CompanyUsersPage";
+import CompanyPaymentsPage from "./pages/company/CompanyPaymentsPage";
 import AgentDashboard from "./pages/agent/AgentDashboard";
 import AdminAgentsPage from "./pages/admin/AdminAgentsPage";
 import AgentsPage from "./pages/owner/AgentsPage";
@@ -123,8 +126,11 @@ const App = () => (
             
                         {/* Company Admin routes */}
             <Route path="/company/dashboard" element={<CompanyDashboard />} />
-            <Route path="/company/branches/:branchId" element={<CompanyBranchDetailPage />} />
+            <Route path="/company/branches" element={<CompanyBranchesListPage />} />
             <Route path="/company/branches/new" element={<CompanyBranchCreatePage />} />
+            <Route path="/company/branches/:branchId" element={<CompanyBranchDetailPage />} />
+            <Route path="/company/users" element={<CompanyUsersPage />} />
+            <Route path="/company/payments" element={<CompanyPaymentsPage />} />
             <Route path="/company/embed-manager" element={<EmbedManagerPage />} />
             <Route path="/company/email-generator" element={<AIEmailGeneratorPage />} />
 
