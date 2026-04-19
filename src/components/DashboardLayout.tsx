@@ -11,7 +11,7 @@ import { getHomeRoute, getRoleLabel, APP_ROLES } from "@/lib/roles";
 
 interface DashboardLayoutProps {
   children: ReactNode;
-  allowedRoles?: Array<keyof typeof APP_ROLES>;
+  allowedRoles?: string[];
 }
 
 export function DashboardLayout({ children, allowedRoles }: DashboardLayoutProps) {
@@ -75,7 +75,7 @@ export function DashboardLayout({ children, allowedRoles }: DashboardLayoutProps
   }
 
   if (!user) return <Navigate to="/login" replace />;
-  if (allowedRoles && role && !allowedRoles.includes(role as keyof typeof APP_ROLES)) {
+  if (allowedRoles && role && !allowedRoles.includes(role as string)) {
     return <Navigate to={getHomeRoute(role)} replace />;
   }
 

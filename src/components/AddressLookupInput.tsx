@@ -9,6 +9,7 @@ interface AddressLookupInputProps {
   address: string;
   onPostcodeChange: (postcode: string) => void;
   onAddressChange: (address: string) => void;
+  onCityChange?: (city: string) => void;
 }
 
 interface PostcodeSuggestion {
