@@ -449,6 +449,141 @@ export type Database = {
           },
         ]
       }
+      branch_users: {
+        Row: {
+          branch_id: string
+          created_at: string
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string
+          id?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "branch_users_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      branch_widget_settings: {
+        Row: {
+          accent_color: string | null
+          branch_id: string
+          button_text: string | null
+          created_at: string
+          greeting_text: string | null
+          id: string
+          is_enabled: boolean
+          notification_emails: string[] | null
+          primary_color: string | null
+          required_fields: Json
+          updated_at: string
+        }
+        Insert: {
+          accent_color?: string | null
+          branch_id: string
+          button_text?: string | null
+          created_at?: string
+          greeting_text?: string | null
+          id?: string
+          is_enabled?: boolean
+          notification_emails?: string[] | null
+          primary_color?: string | null
+          required_fields?: Json
+          updated_at?: string
+        }
+        Update: {
+          accent_color?: string | null
+          branch_id?: string
+          button_text?: string | null
+          created_at?: string
+          greeting_text?: string | null
+          id?: string
+          is_enabled?: boolean
+          notification_emails?: string[] | null
+          primary_color?: string | null
+          required_fields?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "branch_widget_settings_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: true
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      branches: {
+        Row: {
+          address: string | null
+          city: string | null
+          company_id: string
+          created_at: string
+          email: string | null
+          id: string
+          is_active: boolean
+          name: string
+          phone: string | null
+          postcode: string | null
+          slug: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          company_id: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          phone?: string | null
+          postcode?: string | null
+          slug?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          company_id?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          phone?: string | null
+          postcode?: string | null
+          slug?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "branches_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brand_settings: {
         Row: {
           brand_prompt: string
@@ -686,6 +821,148 @@ export type Database = {
             columns: ["university_id"]
             isOneToOne: false
             referencedRelation: "universities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      companies: {
+        Row: {
+          business_type: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          contract_terms: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          logo_url: string | null
+          name: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          business_type?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          contract_terms?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          logo_url?: string | null
+          name: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          business_type?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          contract_terms?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          logo_url?: string | null
+          name?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      company_applications: {
+        Row: {
+          approved_company_id: string | null
+          branches_count: number | null
+          business_type: string | null
+          company_name: string
+          contact_email: string
+          contact_name: string
+          contact_phone: string | null
+          created_at: string
+          estimated_referrals_per_month: number | null
+          id: string
+          message: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          reviewer_notes: string | null
+          status: string
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          approved_company_id?: string | null
+          branches_count?: number | null
+          business_type?: string | null
+          company_name: string
+          contact_email: string
+          contact_name: string
+          contact_phone?: string | null
+          created_at?: string
+          estimated_referrals_per_month?: number | null
+          id?: string
+          message?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewer_notes?: string | null
+          status?: string
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          approved_company_id?: string | null
+          branches_count?: number | null
+          business_type?: string | null
+          company_name?: string
+          contact_email?: string
+          contact_name?: string
+          contact_phone?: string | null
+          created_at?: string
+          estimated_referrals_per_month?: number | null
+          id?: string
+          message?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          reviewer_notes?: string | null
+          status?: string
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_applications_approved_company_id_fkey"
+            columns: ["approved_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_users: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_users_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -1125,7 +1402,9 @@ export type Database = {
         Row: {
           assessment_date: string | null
           assessment_time: string | null
+          branch_id: string | null
           campus_id: string | null
+          company_id: string | null
           course_id: string
           created_at: string
           funding_notes: string | null
@@ -1143,7 +1422,9 @@ export type Database = {
         Insert: {
           assessment_date?: string | null
           assessment_time?: string | null
+          branch_id?: string | null
           campus_id?: string | null
+          company_id?: string | null
           course_id: string
           created_at?: string
           funding_notes?: string | null
@@ -1161,7 +1442,9 @@ export type Database = {
         Update: {
           assessment_date?: string | null
           assessment_time?: string | null
+          branch_id?: string | null
           campus_id?: string | null
+          company_id?: string | null
           course_id?: string
           created_at?: string
           funding_notes?: string | null
@@ -1178,10 +1461,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "enrollments_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "enrollments_campus_id_fkey"
             columns: ["campus_id"]
             isOneToOne: false
             referencedRelation: "campuses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
           {
@@ -1240,6 +1537,60 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      generated_email_sequences: {
+        Row: {
+          audience: string | null
+          branch_id: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string
+          emails: Json
+          goal: string | null
+          id: string
+          sequence_name: string
+          updated_at: string
+        }
+        Insert: {
+          audience?: string | null
+          branch_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by: string
+          emails?: Json
+          goal?: string | null
+          id?: string
+          sequence_name: string
+          updated_at?: string
+        }
+        Update: {
+          audience?: string | null
+          branch_id?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string
+          emails?: Json
+          goal?: string | null
+          id?: string
+          sequence_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_email_sequences_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_email_sequences_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       generated_images: {
         Row: {
@@ -1416,7 +1767,9 @@ export type Database = {
       leads: {
         Row: {
           agent_id: string
+          branch_id: string | null
           campus_id: string | null
+          company_id: string | null
           course_id: string | null
           course_interest: string | null
           created_at: string
@@ -1434,7 +1787,9 @@ export type Database = {
         }
         Insert: {
           agent_id: string
+          branch_id?: string | null
           campus_id?: string | null
+          company_id?: string | null
           course_id?: string | null
           course_interest?: string | null
           created_at?: string
@@ -1452,7 +1807,9 @@ export type Database = {
         }
         Update: {
           agent_id?: string
+          branch_id?: string | null
           campus_id?: string | null
+          company_id?: string | null
           course_id?: string | null
           course_interest?: string | null
           created_at?: string
@@ -1468,7 +1825,22 @@ export type Database = {
           timetable_option?: string | null
           university_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "leads_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       learn_comment_reactions: {
         Row: {
@@ -1676,6 +2048,8 @@ export type Database = {
           address: string | null
           admin_id: string | null
           avatar_url: string | null
+          branch_id: string | null
+          company_id: string | null
           created_at: string
           email: string
           full_name: string
@@ -1690,6 +2064,8 @@ export type Database = {
           address?: string | null
           admin_id?: string | null
           avatar_url?: string | null
+          branch_id?: string | null
+          company_id?: string | null
           created_at?: string
           email: string
           full_name: string
@@ -1704,6 +2080,8 @@ export type Database = {
           address?: string | null
           admin_id?: string | null
           avatar_url?: string | null
+          branch_id?: string | null
+          company_id?: string | null
           created_at?: string
           email?: string
           full_name?: string
@@ -1734,6 +2112,20 @@ export type Database = {
             columns: ["admin_id"]
             isOneToOne: false
             referencedRelation: "public_agent_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -2255,6 +2647,8 @@ export type Database = {
       students: {
         Row: {
           agent_id: string
+          branch_id: string | null
+          company_id: string | null
           created_at: string
           crn: string | null
           date_of_birth: string | null
@@ -2282,6 +2676,8 @@ export type Database = {
         }
         Insert: {
           agent_id: string
+          branch_id?: string | null
+          company_id?: string | null
           created_at?: string
           crn?: string | null
           date_of_birth?: string | null
@@ -2309,6 +2705,8 @@ export type Database = {
         }
         Update: {
           agent_id?: string
+          branch_id?: string | null
+          company_id?: string | null
           created_at?: string
           crn?: string | null
           date_of_birth?: string | null
@@ -2354,6 +2752,20 @@ export type Database = {
             columns: ["agent_id"]
             isOneToOne: false
             referencedRelation: "public_agent_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "students_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "students_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -2769,6 +3181,59 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      widget_leads: {
+        Row: {
+          branch_id: string
+          converted_lead_id: string | null
+          course_interest: string | null
+          created_at: string
+          email: string
+          first_name: string
+          id: string
+          last_name: string
+          message: string | null
+          phone: string | null
+          source_url: string | null
+          status: string
+        }
+        Insert: {
+          branch_id: string
+          converted_lead_id?: string | null
+          course_interest?: string | null
+          created_at?: string
+          email: string
+          first_name: string
+          id?: string
+          last_name: string
+          message?: string | null
+          phone?: string | null
+          source_url?: string | null
+          status?: string
+        }
+        Update: {
+          branch_id?: string
+          converted_lead_id?: string | null
+          course_interest?: string | null
+          created_at?: string
+          email?: string
+          first_name?: string
+          id?: string
+          last_name?: string
+          message?: string | null
+          phone?: string | null
+          source_url?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "widget_leads_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
